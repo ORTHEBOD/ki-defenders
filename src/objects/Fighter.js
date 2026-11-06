@@ -1,4 +1,4 @@
-import { FIGHTERS } from '../data/fighters.js';
+import { FIGHTERS, FORMS } from '../data/fighters.js';
 import { distToSegment } from '../systems/Path.js';
 import { textStyle } from '../ui/theme.js';
 
@@ -10,77 +10,172 @@ export default class Fighter {
     this.def = FIGHTERS[type];
     this.x = spot.x;
     this.y = spot.y;
-    this.level = 0;
+    this.tier = 0;
     this.spent = this.def.cost;
     this.cooldown = 0;
+    this.hits = 0;
+    this.kiTimer = 0;
 
-    this.aura = scene.add.ellipse(this.x, this.y - 14, 56, 76, this.def.color, 0).setDepth(19);
-    this.sprite = scene.add.image(this.x, this.y - 14, this.def.texture).setDepth(20 + this.y / 1000);
+    this.aura = scene.add.ellipse(this.x, this.y - 14, 60, 82, 0xffffff, 0).setDepth(19);
+    this.sprite = scene.add.image(this.x, this.y - 14, this.textureKey()).setDepth(20 + this.y / 1000);
     this.sprite.setInteractive({ useHandCursor: true });
     this.sprite.on('pointerdown', () => scene.state === 'playing' && scene.selectFighter(this));
-    this.stars = scene.add.text(this.x, this.y + 30, '', textStyle(16, '#ffd93b')).setOrigin(0.5).setDepth(21);
+    this.stars = scene.add.text(this.x, this.y + 30, '', textStyle(16)).setOrigin(0.5).setDepth(21);
     this.refreshStars();
 
     this.sprite.setScale(0);
     scene.tweens.add({ targets: this.sprite, scale: 1, duration: 250, ease: 'Back.Out' });
-    this.idle = scene.tweens.add({ targets: this.sprite, scaleY: 1.04, duration: 700, yoyo: true, repeat: -1, delay: 260 });
+    scene.tweens.add({ targets: this.sprite, scaleY: 1.04, duration: 700, yoyo: true, repeat: -1, delay: 260 });
   }
 
   get stats() {
-    return this.def.levels[this.level];
+    return this.def.tiers[this.tier];
   }
 
-  get nextLevel() {
-    return this.def.levels[this.level + 1];
+  get next() {
+    return this.def.tiers[this.tier + 1];
+  }
+
+  get form() {
+    return this.stats.form;
+  }
+
+  get formInfo() {
+    return FORMS[this.form];
+  }
+
+  get nextIsTransform() {
+    return !!this.next && this.next.form !== this.form;
+  }
+
+  // Stars inside the current form (1 or 2)
+  get formStars() {
+    return this.def.tiers.slice(0, this.tier + 1).filter((t) => t.form === this.form).length;
+  }
+
+  textureKey() {
+    return `${this.def.texture}_${this.form}`;
   }
 
   refreshStars() {
-    this.stars.setText('★'.repeat(this.level + 1));
+    this.stars.setText('★'.repeat(this.formStars)).setColor(this.formInfo.color);
   }
 
   upgrade() {
-    const next = this.nextLevel;
+    const next = this.next;
     if (!next) return;
-    this.level++;
+    const transform = this.nextIsTransform;
+    this.tier++;
     this.spent += next.cost;
     this.refreshStars();
-    this.aura.setFillStyle(this.def.color, 0.18 + this.level * 0.08);
-    this.scene.tweens.add({ targets: this.aura, scaleX: 1.12, scaleY: 1.08, duration: 500, yoyo: true, repeat: -1 });
-    this.scene.hitSpark(this.x, this.y - 14, this.def.color, 2);
+    if (transform) {
+      this.scene.tweens.killTweensOf(this.sprite);
+      this.sprite.setTexture(this.textureKey()).setScale(1).setPosition(this.x, this.y - 14);
+      this.scene.tweens.add({ targets: this.sprite, scaleY: 1.04, duration: 700, yoyo: true, repeat: -1, delay: 330 });
+      this.aura.setFillStyle(this.formInfo.aura, 0.22 + this.form * 0.08);
+      if (!this.auraTween) {
+        this.auraTween = this.scene.tweens.add({ targets: this.aura, scaleX: 1.15, scaleY: 1.1, duration: 450, yoyo: true, repeat: -1 });
+      }
+      this.scene.transformFx(this);
+    } else {
+      this.scene.hitSpark(this.x, this.y - 14, this.def.color, 2);
+    }
+  }
+
+  // A short line describing the current stats, for the upgrade panel
+  describe() {
+    const s = this.stats;
+    const spd = (1 / (s.cooldown ?? 1)).toFixed(1);
+    switch (this.def.attack) {
+      case 'blast': return `Damage ${s.damage}   Splash ${s.splash}   Range ${s.range}`;
+      case 'flash': return `Slow ${Math.round((1 - s.slow) * 100)}%   Damage ${s.damage}   Range ${s.range}`;
+      case 'support': return `Boost +${Math.round(s.boost * 100)}%   Ki +${s.ki} / ${s.kiEvery}s   Range ${s.range}`;
+      default: return `Damage ${s.damage}   Range ${s.range}   Speed ${spd}/s`;
+    }
   }
 
   update(dt) {
-    this.cooldown -= dt;
+    if (this.def.attack === 'support') {
+      this.supportTick(dt);
+      return;
+    }
+    this.cooldown -= dt * this.scene.hasteAt(this);
     if (this.cooldown > 0) return;
-    const target = this.scene.findTarget(this.x, this.y, this.stats.range);
+
+    const s = this.stats;
+    const damage = Math.round(s.damage * this.scene.boostAt(this));
+    if (this.def.attack === 'flash') {
+      if (!this.scene.findTarget(this.x, this.y, s.range)) return;
+      this.cooldown = s.cooldown;
+      this.flash(damage);
+      return;
+    }
+
+    const target = this.scene.findTarget(this.x, this.y, s.range);
     if (!target) return;
     this.sprite.setFlipX(target.x < this.x);
-    this.cooldown = this.stats.cooldown;
-    if (this.def.attack === 'punch') this.punch(target);
-    else this.beam(target);
+    this.cooldown = s.cooldown;
+    if (this.def.attack === 'punch') this.punch(target, damage);
+    else if (this.def.attack === 'beam') this.beam(target, damage);
+    else if (this.def.attack === 'blast') this.blast(target, damage);
   }
 
-  punch(target) {
+  punch(target, damage) {
     const dir = Math.sign(target.x - this.x) || 1;
     this.scene.tweens.add({ targets: this.sprite, x: this.x + dir * 8, duration: 60, yoyo: true });
     this.scene.hitSpark(target.x, target.y - 6, this.def.color);
-    this.scene.damageNumber(target.x, target.y - 20, this.stats.damage);
-    target.takeDamage(this.stats.damage);
+    this.scene.damageNumber(target.x, target.y - 20, damage);
+    this.hits++;
+    if (this.stats.stunEvery && this.hits % this.stats.stunEvery === 0) {
+      target.stun(this.stats.stun);
+      this.scene.floatText(target.x, target.y - 40, 'STUN!', '#ffd93b', 20);
+    }
+    target.takeDamage(damage);
   }
 
-  beam(target) {
+  beam(target, damage) {
+    const s = this.stats;
     const sx = this.x;
     const sy = this.y - 18;
     const angle = Math.atan2(target.y - sy, target.x - sx);
-    const ex = sx + Math.cos(angle) * this.stats.range;
-    const ey = sy + Math.sin(angle) * this.stats.range;
-    this.scene.beamFx(sx, sy, ex, ey, this.def.color);
+    const ex = sx + Math.cos(angle) * s.range;
+    const ey = sy + Math.sin(angle) * s.range;
+    this.scene.beamFx(sx, sy, ex, ey, this.form > 0 ? this.formInfo.aura : this.def.color, s.width);
     // The beam pierces: every enemy close to the line gets hit
     for (const e of [...this.scene.enemies]) {
-      if (e.alive && distToSegment(e.x, e.y, sx, sy, ex, ey) < 22) {
-        this.scene.damageNumber(e.x, e.y - 20, this.stats.damage);
-        e.takeDamage(this.stats.damage);
+      if (e.alive && distToSegment(e.x, e.y, sx, sy, ex, ey) < s.width) {
+        const dmg = e.def.flying && s.flyingBonus ? damage * s.flyingBonus : damage;
+        this.scene.damageNumber(e.x, e.y - 20, dmg);
+        e.takeDamage(dmg);
       }
+    }
+  }
+
+  blast(target, damage) {
+    const s = this.stats;
+    this.scene.tweens.add({ targets: this.sprite, y: this.y - 20, duration: 70, yoyo: true });
+    this.scene.fireBlast(this.x, this.y - 22, target, {
+      damage, splash: s.splash, burn: s.burn, color: this.form > 0 ? this.formInfo.aura : this.def.color,
+    });
+  }
+
+  flash(damage) {
+    const s = this.stats;
+    this.scene.flashFx(this.x, this.y - 14, s.range, this.form > 0 ? this.formInfo.aura : this.def.color);
+    for (const e of [...this.scene.enemies]) {
+      if (!e.alive || Math.hypot(e.x - this.x, e.y - this.y) > s.range) continue;
+      e.slow(s.slow, s.slowTime);
+      if (s.freeze) e.stun(s.freeze);
+      e.takeDamage(damage);
+    }
+  }
+
+  supportTick(dt) {
+    if (!this.scene.waveActive) return;
+    this.kiTimer += dt;
+    if (this.kiTimer >= this.stats.kiEvery) {
+      this.kiTimer -= this.stats.kiEvery;
+      this.scene.addKi(this.stats.ki, this.x, this.y - 50);
     }
   }
 

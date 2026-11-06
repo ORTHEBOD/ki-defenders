@@ -1,4 +1,4 @@
-import { FIGHTERS } from '../data/fighters.js';
+import { FIGHTERS, FORMS } from '../data/fighters.js';
 import { HERO } from '../data/hero.js';
 import { drawFighterArt, pts } from '../art/fighterArt.js';
 
@@ -13,7 +13,10 @@ export default class BootScene extends Phaser.Scene {
   }
 
   create() {
-    for (const def of Object.values(FIGHTERS)) this.makeFighter(def.texture, def.look);
+    // One texture per form: kaito_0 (base), kaito_1 (gold hair), kaito_2 (blue hair)
+    for (const def of Object.values(FIGHTERS)) {
+      FORMS.forEach((form, i) => this.makeFighter(`${def.texture}_${i}`, { ...def.look, hair: form.hair ?? def.look.hair }));
+    }
     this.makeFighter('hero', HERO.look);
     this.makeGrunt();
     this.makeRunner();

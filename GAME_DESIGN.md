@@ -82,6 +82,8 @@ Each fighter has **3 forms**. Base → Form 2 (gold aura) → Form 3 (blue/divin
 | 5 | **Master Oru** | Support | Boosts damage of nearby fighters + makes extra Ki | Aura also boosts the hero |
 
 Upgrades inside each form: small stat upgrades (damage, range, speed). The transformation is the big upgrade.
+In the game each fighter has 6 tiers: 2 stars in Base, 2 in Super Form, 2 in Ascended Form. Master Oru's Ascended
+bonus currently makes nearby fighters attack faster (the hero boost comes with the hero in Phase 3).
 
 ---
 

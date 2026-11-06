@@ -32,6 +32,8 @@ export default class GameScene extends Phaser.Scene {
     this.spawnQueue = [];
     this.enemies = [];
     this.fighters = [];
+    this.projectiles = [];
+    this.hazards = [];
     this.speed = 1;
     this.state = 'playing';
     this.menu = null;
@@ -222,7 +224,7 @@ export default class GameScene extends Phaser.Scene {
       const card = this.add.rectangle(cx, 0, cardW, cardH, COLORS.card)
         .setStrokeStyle(2, afford ? 0xffffff : 0x555a6a)
         .setInteractive({ useHandCursor: true });
-      card.on('pointerover', () => this.showRange(spot.x, spot.y, def.levels[0].range, def.color));
+      card.on('pointerover', () => this.showRange(spot.x, spot.y, def.tiers[0].range, def.color));
       card.on('pointerdown', () => {
         if (this.ki < def.cost) {
           this.floatText(pos.x + cx, pos.y, 'Not enough Ki', '#ff6b6b', 22);
@@ -232,12 +234,12 @@ export default class GameScene extends Phaser.Scene {
       });
       m.add([
         card,
-        this.add.image(cx, -34, def.texture),
-        this.add.text(cx, 10, def.name, textStyle(24)).setOrigin(0.5),
+        this.add.image(cx, -34, `${def.texture}_0`),
+        this.add.text(cx, 10, def.name, textStyle(22)).setOrigin(0.5),
         this.add.text(cx, 34, def.role, textStyle(16, '#c9d3ff')).setOrigin(0.5),
         this.add.text(cx, 56, `${def.cost} Ki`, textStyle(22, afford ? '#ffd93b' : '#ff6b6b')).setOrigin(0.5),
       ]);
-      if (i === 0) this.showRange(spot.x, spot.y, def.levels[0].range, def.color);
+      if (i === 0) this.showRange(spot.x, spot.y, def.tiers[0].range, def.color);
     });
     this.menu = m;
   }
@@ -246,19 +248,23 @@ export default class GameScene extends Phaser.Scene {
     this.closeMenu();
     this.showRange(f.x, f.y, f.stats.range, f.def.color);
 
-    const w = 290;
-    const h = 170;
+    const w = 340;
+    const h = 236;
     const pos = this.menuPosition(f.spot, w, h);
     const m = this.add.container(pos.x, pos.y).setDepth(120);
-    m.add(this.add.rectangle(0, 0, w, h, COLORS.panel, 0.94).setStrokeStyle(2, f.def.color));
-    m.add(this.add.text(0, -62, `${f.def.name}  ${'★'.repeat(f.level + 1)}`, textStyle(28)).setOrigin(0.5));
-    const s = f.stats;
-    m.add(this.add.text(0, -28, `Damage ${s.damage}   Range ${s.range}   Speed ${(1 / s.cooldown).toFixed(1)}/s`,
-      textStyle(17, '#c9d3ff')).setOrigin(0.5));
+    m.add(this.add.rectangle(0, 0, w, h, COLORS.panel, 0.94).setStrokeStyle(2, f.form > 0 ? f.formInfo.aura : f.def.color));
+    m.add(this.add.text(0, -92, `${f.def.name}  ${'★'.repeat(f.formStars)}`, textStyle(28)).setOrigin(0.5));
+    m.add(this.add.text(0, -62, f.formInfo.name, textStyle(20, f.formInfo.color)).setOrigin(0.5));
+    m.add(this.add.text(0, -36, f.describe(), textStyle(17, '#c9d3ff')).setOrigin(0.5));
+    const bonusOn = f.form === 2;
+    m.add(this.add.text(0, -12, `${bonusOn ? 'Ascended bonus' : 'Ascended unlocks'}: ${f.def.bonusText}`,
+      { ...textStyle(15, bonusOn ? '#5be35b' : '#8a91ad'), wordWrap: { width: w - 24 }, align: 'center' }).setOrigin(0.5));
 
-    const next = f.nextLevel;
-    const upLabel = next ? `Upgrade  ${next.cost} Ki` : 'Max level';
-    const up = makeButton(this, 0, 18, 250, 44, upLabel, () => {
+    const next = f.next;
+    const transform = f.nextIsTransform;
+    let upLabel = 'Max power';
+    if (next) upLabel = transform ? `TRANSFORM!  ${next.cost} Ki` : `Upgrade  ${next.cost} Ki`;
+    const up = makeButton(this, 0, 38, 300, 48, upLabel, () => {
       if (!next) return;
       if (this.ki < next.cost) {
         this.floatText(pos.x, pos.y, 'Not enough Ki', '#ff6b6b', 22);
@@ -268,11 +274,11 @@ export default class GameScene extends Phaser.Scene {
       f.upgrade();
       this.refreshHud();
       this.selectFighter(f);
-    }, { color: 0x2f8a4a, fontSize: 22 });
+    }, { color: transform ? 0xc99a00 : 0x2f8a4a, fontSize: 24 });
     up.setEnabled(!!next && this.ki >= next.cost);
 
     const refund = Math.floor(f.spent * 0.7);
-    const sell = makeButton(this, 0, 64, 250, 36, `Sell  +${refund} Ki`, () => {
+    const sell = makeButton(this, 0, 90, 300, 36, `Sell  +${refund} Ki`, () => {
       this.ki += refund;
       f.destroy();
       f.spot.fighter = null;
@@ -340,6 +346,8 @@ export default class GameScene extends Phaser.Scene {
 
     for (const e of this.enemies) if (e.alive) e.update(dt);
     for (const f of this.fighters) f.update(dt);
+    this.updateProjectiles(dt);
+    this.updateHazards(dt);
 
     for (const e of this.enemies) if (e.reachedEnd) this.loseLives(e.def.lives);
     this.enemies = this.enemies.filter((e) => e.alive);
@@ -357,6 +365,93 @@ export default class GameScene extends Phaser.Scene {
       if (!best || e.dist > best.dist) best = e;
     }
     return best;
+  }
+
+  // Master Oru's aura: the strongest nearby Oru boosts damage (they don't stack)
+  supportFor(f) {
+    let best = null;
+    for (const o of this.fighters) {
+      if (o === f || o.def.attack !== 'support') continue;
+      if (Math.hypot(o.x - f.x, o.y - f.y) > o.stats.range) continue;
+      if (!best || o.stats.boost > best.stats.boost) best = o;
+    }
+    return best;
+  }
+
+  boostAt(f) {
+    const o = this.supportFor(f);
+    return o ? 1 + o.stats.boost : 1;
+  }
+
+  hasteAt(f) {
+    const o = this.supportFor(f);
+    return o && o.stats.haste ? 1 + o.stats.haste : 1;
+  }
+
+  addKi(amount, x, y) {
+    this.ki += amount;
+    this.floatText(x, y, `+${amount} Ki`, '#9bff7a', 20);
+    this.refreshHud();
+  }
+
+  // ---------- Blaze's ki blasts and burning ground ----------
+
+  fireBlast(x, y, target, opts) {
+    const ball = this.add.circle(x, y, 9, opts.color).setStrokeStyle(3, 0xffffff).setDepth(31);
+    this.projectiles.push({ ball, target, tx: target.x, ty: target.y, speed: 520, ...opts });
+  }
+
+  updateProjectiles(dt) {
+    for (const p of this.projectiles) {
+      if (p.target.alive) {
+        p.tx = p.target.x;
+        p.ty = p.target.y;
+      }
+      const dx = p.tx - p.ball.x;
+      const dy = p.ty - p.ball.y;
+      const d = Math.hypot(dx, dy);
+      const step = p.speed * dt;
+      if (d <= step) {
+        p.done = true;
+        this.explode(p);
+      } else {
+        p.ball.x += (dx / d) * step;
+        p.ball.y += (dy / d) * step;
+      }
+    }
+    this.projectiles = this.projectiles.filter((p) => !p.done);
+  }
+
+  explode(p) {
+    p.ball.destroy();
+    this.explosionFx(p.tx, p.ty, p.splash, p.color);
+    this.damageNumber(p.tx, p.ty - 24, p.damage);
+    for (const e of [...this.enemies]) {
+      if (e.alive && Math.hypot(e.x - p.tx, e.y - p.ty) <= p.splash) e.takeDamage(p.damage);
+    }
+    if (p.burn) {
+      const r = p.splash * 0.8;
+      const g = this.add.graphics().setDepth(3);
+      g.fillStyle(0xff5a2a, 0.35).fillCircle(p.tx, p.ty, r);
+      g.fillStyle(0xffb347, 0.35).fillCircle(p.tx, p.ty, r * 0.6);
+      this.hazards.push({ x: p.tx, y: p.ty, r, dps: p.burn.dps, time: p.burn.time, total: p.burn.time, tick: 0, g });
+    }
+  }
+
+  updateHazards(dt) {
+    for (const h of this.hazards) {
+      h.time -= dt;
+      h.tick += dt;
+      if (h.tick >= 0.25) {
+        h.tick -= 0.25;
+        for (const e of [...this.enemies]) {
+          if (e.alive && Math.hypot(e.x - h.x, e.y - h.y) <= h.r) e.takeDamage(h.dps * 0.25, false);
+        }
+      }
+      h.g.setAlpha(Math.max(0, h.time / h.total));
+      if (h.time <= 0) h.g.destroy();
+    }
+    this.hazards = this.hazards.filter((h) => h.time > 0);
   }
 
   onEnemyKilled(e) {
@@ -458,13 +553,41 @@ export default class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: g, scale: scale * 1.6, alpha: 0, duration: 180, onComplete: () => g.destroy() });
   }
 
-  beamFx(x1, y1, x2, y2, color) {
+  beamFx(x1, y1, x2, y2, color, width = 22) {
     const g = this.add.graphics().setDepth(30);
-    g.lineStyle(16, color, 0.55).lineBetween(x1, y1, x2, y2);
-    g.lineStyle(6, 0xffffff, 1).lineBetween(x1, y1, x2, y2);
-    g.fillStyle(0xffffff).fillCircle(x1, y1, 9);
-    g.fillStyle(color, 0.6).fillCircle(x1, y1, 14);
+    g.lineStyle(width * 0.75, color, 0.55).lineBetween(x1, y1, x2, y2);
+    g.lineStyle(width * 0.28, 0xffffff, 1).lineBetween(x1, y1, x2, y2);
+    g.fillStyle(0xffffff).fillCircle(x1, y1, width * 0.4);
+    g.fillStyle(color, 0.6).fillCircle(x1, y1, width * 0.65);
     this.tweens.add({ targets: g, alpha: 0, duration: 260, onComplete: () => g.destroy() });
+  }
+
+  flashFx(x, y, range, color) {
+    const ring = this.add.circle(x, y, range, color, 0.28).setStrokeStyle(4, 0xffffff, 0.9).setDepth(29).setScale(0.2);
+    this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 380, ease: 'Cubic.Out', onComplete: () => ring.destroy() });
+    const core = this.add.circle(x, y, 22, 0xffffff, 0.95).setDepth(31);
+    this.tweens.add({ targets: core, scale: 1.8, alpha: 0, duration: 220, onComplete: () => core.destroy() });
+  }
+
+  explosionFx(x, y, radius, color) {
+    const c = this.add.circle(x, y, radius, color, 0.55).setDepth(29).setScale(0.3);
+    this.tweens.add({ targets: c, scale: 1, alpha: 0, duration: 300, ease: 'Cubic.Out', onComplete: () => c.destroy() });
+    this.hitSpark(x, y, 0xffffff, 1.6);
+  }
+
+  transformFx(f) {
+    const color = f.formInfo.aura;
+    this.cameras.main.shake(180, 0.006);
+    this.cameras.main.flash(120, 255, 255, 255);
+    for (let i = 0; i < 3; i++) {
+      const ring = this.add.circle(f.x, f.y - 14, 30, color, 0.4).setStrokeStyle(4, color).setDepth(32);
+      this.tweens.add({
+        targets: ring, scale: 4, alpha: 0, delay: i * 120, duration: 600, ease: 'Cubic.Out',
+        onComplete: () => ring.destroy(),
+      });
+    }
+    this.tweens.add({ targets: f.sprite, scale: { from: 1.4, to: 1 }, duration: 320, ease: 'Back.Out' });
+    this.floatText(f.x, f.y - 70, `${f.formInfo.name.toUpperCase()}!`, f.formInfo.color, 34);
   }
 
   poof(x, y) {
