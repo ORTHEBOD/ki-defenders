@@ -1,7 +1,8 @@
 import { LEVELS } from '../data/levels.js';
 import { FIGHTERS } from '../data/fighters.js';
 import { DIFFICULTY } from '../data/difficulty.js';
-import { addXp } from '../data/hero.js';
+import { HERO, addXp } from '../data/hero.js';
+import Hero from '../objects/Hero.js';
 import { Save } from '../systems/Save.js';
 import Path from '../systems/Path.js';
 import Enemy from '../objects/Enemy.js';
@@ -43,12 +44,100 @@ export default class GameScene extends Phaser.Scene {
     this.drawMap();
     this.createSpots();
     this.rangeCircle = this.add.graphics().setDepth(6);
-    this.createHud();
+    this.aiming = null;
+    this.uiClickFrame = -1;
 
-    // Tapping empty ground closes any open menu
+    // Zenko starts next to the base, with his saved level and skills
+    const saved = Save.current()?.hero ?? { level: 1, skills: [] };
+    const end = this.path.points[this.path.points.length - 1];
+    this.hero = new Hero(this, end.x - 90, end.y - 80, saved);
+    if (this.hero.has('overflow')) this.ki += 50;
+
+    this.createHud();
+    this.createAbilityBar();
+    this.floatText(W / 2, 600, 'Tap the ground to move Zenko', '#ffe9c4', 28);
+
     this.input.on('pointerdown', (pointer, over) => {
-      if (over.length === 0) this.closeMenu();
+      if (this.state !== 'playing') return;
+      if (this.uiClickFrame === this.game.loop.frame) return;
+      if (this.aiming) {
+        // Use the chosen ability at the tapped spot
+        const key = this.aiming;
+        this.cancelAim();
+        this.hero.cast(key, pointer.worldX, pointer.worldY);
+        return;
+      }
+      if (over.length > 0) return;
+      // Tapping empty ground: close a menu, or move Zenko there
+      if (this.menu) this.closeMenu();
+      else if (pointer.worldY > 60) this.hero.moveTo(pointer.worldX, pointer.worldY);
     });
+  }
+
+  // ---------- Hero ability bar ----------
+
+  createAbilityBar() {
+    this.abilityButtons = Object.entries(HERO.abilities).map(([key, a], i) => {
+      const r = key === 'spiritOrb' ? 42 : 38;
+      const c = this.add.container(640 + i * 92, 670).setDepth(110);
+      const bg = this.add.circle(0, 0, r, COLORS.panel, 0.92).setStrokeStyle(4, a.color);
+      const label = this.add.text(0, 0, a.label, { ...textStyle(16), align: 'center' }).setOrigin(0.5);
+      const shade = this.add.graphics();
+      const timer = this.add.text(0, 0, '', textStyle(26)).setOrigin(0.5);
+      c.add([bg, label, shade, timer]);
+      bg.setInteractive({ useHandCursor: true });
+      bg.on('pointerdown', () => {
+        this.uiClickFrame = this.game.loop.frame;
+        this.useAbility(key);
+      });
+      return { key, a, c, bg, shade, timer, r };
+    });
+    this.refreshAbilities();
+  }
+
+  useAbility(key) {
+    if (this.state !== 'playing') return;
+    if (this.aiming === key) {
+      this.cancelAim();
+      return;
+    }
+    this.cancelAim();
+    const hero = this.hero;
+    if (!hero.alive) {
+      this.floatText(W / 2, 600, 'Zenko is down', '#ff6b6b', 26);
+      return;
+    }
+    if (!hero.canUse(key)) return;
+    this.closeMenu();
+    const a = HERO.abilities[key];
+    if (!a.aim) {
+      hero.cast(key);
+      return;
+    }
+    this.aiming = key;
+    this.aimText = this.add.text(W / 2, 96, `Tap where to use ${a.name}`, textStyle(30, '#ffd93b')).setOrigin(0.5).setDepth(150);
+  }
+
+  cancelAim() {
+    this.aiming = null;
+    this.aimText?.destroy();
+    this.aimText = null;
+  }
+
+  refreshAbilities() {
+    for (const b of this.abilityButtons) {
+      const left = this.hero.cd[b.key];
+      const total = this.hero.abilityCooldown(b.key);
+      b.shade.clear();
+      if (left > 0) {
+        b.shade.fillStyle(0x000000, 0.7);
+        b.shade.slice(0, 0, b.r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (left / total), false);
+        b.shade.fillPath();
+      }
+      b.timer.setText(left > 0 ? `${Math.ceil(left)}` : '');
+      b.bg.setStrokeStyle(this.aiming === b.key ? 6 : 4, this.aiming === b.key ? 0xffffff : b.a.color);
+      b.c.setAlpha(this.hero.alive ? 1 : 0.45);
+    }
   }
 
   // ---------- Map ----------
@@ -78,7 +167,7 @@ export default class GameScene extends Phaser.Scene {
       const y = rnd.between(80, H - 20);
       if (this.path.distanceTo(x, y) < 70) continue;
       if (this.level.spots.some(([sx, sy]) => Math.hypot(sx - x, sy - y) < 60)) continue;
-      if (x < 340 && y > 620) continue;
+      if ((x < 340 || (x > 580 && x < 960)) && y > 620) continue;
       placed++;
       if (rnd.frac() < 0.6) this.drawTree(g, x, y, rnd);
       else this.drawRock(g, x, y, rnd);
@@ -133,7 +222,7 @@ export default class GameScene extends Phaser.Scene {
       const img = this.add.image(x, y, 'spot').setDepth(4).setInteractive({ useHandCursor: true });
       const spot = { x, y, img, fighter: null };
       img.on('pointerdown', () => {
-        if (this.state !== 'playing') return;
+        if (this.state !== 'playing' || this.aiming) return;
         if (spot.fighter) this.selectFighter(spot.fighter);
         else this.openBuildMenu(spot);
       });
@@ -344,8 +433,11 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
+    this.hero.updateBlocking(this.enemies);
     for (const e of this.enemies) if (e.alive) e.update(dt);
     for (const f of this.fighters) f.update(dt);
+    this.hero.update(dt);
+    this.refreshAbilities();
     this.updateProjectiles(dt);
     this.updateHazards(dt);
 
@@ -380,7 +472,25 @@ export default class GameScene extends Phaser.Scene {
 
   boostAt(f) {
     const o = this.supportFor(f);
-    return o ? 1 + o.stats.boost : 1;
+    let boost = o ? 1 + o.stats.boost : 1;
+    // Zenko's Battle Aura skill
+    const h = this.hero;
+    if (h && f !== h && h.alive && h.has('battleAura') && Math.hypot(h.x - f.x, h.y - f.y) <= 150) boost *= 1.15;
+    return boost;
+  }
+
+  findNearest(x, y, range) {
+    let best = null;
+    let bestD = range;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      const d = Math.hypot(e.x - x, e.y - y);
+      if (d <= bestD) {
+        best = e;
+        bestD = d;
+      }
+    }
+    return best;
   }
 
   hasteAt(f) {
@@ -397,7 +507,7 @@ export default class GameScene extends Phaser.Scene {
   // ---------- Blaze's ki blasts and burning ground ----------
 
   fireBlast(x, y, target, opts) {
-    const ball = this.add.circle(x, y, 9, opts.color).setStrokeStyle(3, 0xffffff).setDepth(31);
+    const ball = this.add.circle(x, y, opts.size ?? 9, opts.color).setStrokeStyle(3, 0xffffff).setDepth(31);
     this.projectiles.push({ ball, target, tx: target.x, ty: target.y, speed: 520, ...opts });
   }
 
@@ -425,6 +535,7 @@ export default class GameScene extends Phaser.Scene {
   explode(p) {
     p.ball.destroy();
     this.explosionFx(p.tx, p.ty, p.splash, p.color);
+    if (p.big) this.cameras.main.shake(300, 0.012);
     this.damageNumber(p.tx, p.ty - 24, p.damage);
     for (const e of [...this.enemies]) {
       if (e.alive && Math.hypot(e.x - p.tx, e.y - p.ty) <= p.splash) e.takeDamage(p.damage);
@@ -474,6 +585,7 @@ export default class GameScene extends Phaser.Scene {
     if (this.state !== 'playing') return;
     this.state = 'paused';
     this.closeMenu();
+    this.cancelAim();
     this.tweens.pauseAll();
     const m = this.add.container(0, 0).setDepth(200);
     m.add(this.add.rectangle(0, 0, W, H, 0x000000, 0.65).setOrigin(0).setInteractive());
@@ -509,6 +621,7 @@ export default class GameScene extends Phaser.Scene {
   endGame(win) {
     this.state = 'over';
     this.closeMenu();
+    this.cancelAim();
     this.refreshHud();
     this.startBtn.setVisible(false);
     this.speedBtn.setVisible(false);

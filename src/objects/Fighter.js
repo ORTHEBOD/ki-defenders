@@ -19,7 +19,7 @@ export default class Fighter {
     this.aura = scene.add.ellipse(this.x, this.y - 14, 60, 82, 0xffffff, 0).setDepth(19);
     this.sprite = scene.add.image(this.x, this.y - 14, this.textureKey()).setDepth(20 + this.y / 1000);
     this.sprite.setInteractive({ useHandCursor: true });
-    this.sprite.on('pointerdown', () => scene.state === 'playing' && scene.selectFighter(this));
+    this.sprite.on('pointerdown', () => scene.state === 'playing' && !scene.aiming && scene.selectFighter(this));
     this.stars = scene.add.text(this.x, this.y + 30, '', textStyle(16)).setOrigin(0.5).setDepth(21);
     this.refreshStars();
 

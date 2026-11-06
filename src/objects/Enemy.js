@@ -30,6 +30,16 @@ export default class Enemy {
       this.applyTint();
       return;
     }
+    if (this.blocked && this.scene.hero) {
+      // Stopped by Zenko: fight him instead of walking
+      this.scene.hero.takeDamage(this.def.dps * dt);
+      this.bob += dt * 12;
+      this.sprite.setPosition(this.x + Math.sin(this.bob) * 2, this.y);
+      this.sprite.setFlipX(this.scene.hero.x < this.x);
+      this.applyTint();
+      this.drawHpBar();
+      return;
+    }
     let speed = this.def.speed;
     if (this.slowTime > 0) {
       this.slowTime -= dt;

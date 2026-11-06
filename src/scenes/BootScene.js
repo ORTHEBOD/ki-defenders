@@ -17,7 +17,9 @@ export default class BootScene extends Phaser.Scene {
     for (const def of Object.values(FIGHTERS)) {
       FORMS.forEach((form, i) => this.makeFighter(`${def.texture}_${i}`, { ...def.look, hair: form.hair ?? def.look.hair }));
     }
-    this.makeFighter('hero', HERO.look);
+    // Zenko: normal, and gold-haired while Power Up is active
+    this.makeFighter('hero_0', HERO.look);
+    this.makeFighter('hero_1', { ...HERO.look, hair: FORMS[1].hair });
     this.makeGrunt();
     this.makeRunner();
     this.makeSpot();

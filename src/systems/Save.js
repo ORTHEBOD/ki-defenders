@@ -51,7 +51,7 @@ async function hashPin(key, pin) {
 }
 
 function newPlayer(name) {
-  return { name, hero: { level: 1, xp: 0 }, stars: {}, kills: 0, createdAt: Date.now() };
+  return { name, hero: { level: 1, xp: 0, skills: [] }, stars: {}, kills: 0, createdAt: Date.now() };
 }
 
 export const Save = {

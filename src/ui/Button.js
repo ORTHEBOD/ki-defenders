@@ -14,6 +14,8 @@ export function makeButton(scene, x, y, w, h, label, onClick, opts = {}) {
   bg.on('pointerover', () => c.enabled && bg.setFillStyle(hover));
   bg.on('pointerout', () => bg.setFillStyle(color));
   bg.on('pointerdown', () => {
+    // Lets the scene know this tap was on a button, not on the map
+    scene.uiClickFrame = scene.game.loop.frame;
     if (!c.enabled) return;
     scene.tweens.add({ targets: c, scale: 0.94, duration: 60, yoyo: true });
     onClick();
