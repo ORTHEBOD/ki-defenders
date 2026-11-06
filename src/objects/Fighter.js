@@ -15,6 +15,7 @@ export default class Fighter {
     this.cooldown = 0;
     this.hits = 0;
     this.kiTimer = 0;
+    this.stunTime = 0;
 
     this.aura = scene.add.ellipse(this.x, this.y - 14, 60, 82, 0xffffff, 0).setDepth(19);
     this.sprite = scene.add.image(this.x, this.y - 14, this.textureKey()).setDepth(20 + this.y / 1000);
@@ -94,7 +95,19 @@ export default class Fighter {
     }
   }
 
+  // Stunned by a boss: does nothing until it wears off
+  stun(time) {
+    this.stunTime = Math.max(this.stunTime, time);
+    this.sprite.setTint(0x7fd8ff);
+    this.scene.floatText(this.x, this.y - 56, 'STUNNED', '#7fd8ff', 20);
+  }
+
   update(dt) {
+    if (this.stunTime > 0) {
+      this.stunTime -= dt;
+      if (this.stunTime <= 0) this.sprite.clearTint();
+      return;
+    }
     if (this.def.attack === 'support') {
       this.supportTick(dt);
       return;
@@ -105,13 +118,13 @@ export default class Fighter {
     const s = this.stats;
     const damage = Math.round(s.damage * this.scene.boostAt(this));
     if (this.def.attack === 'flash') {
-      if (!this.scene.findTarget(this.x, this.y, s.range)) return;
+      if (!this.scene.findTarget(this.x, this.y, s.range, this.def.hitsAir)) return;
       this.cooldown = s.cooldown;
       this.flash(damage);
       return;
     }
 
-    const target = this.scene.findTarget(this.x, this.y, s.range);
+    const target = this.scene.findTarget(this.x, this.y, s.range, this.def.hitsAir);
     if (!target) return;
     this.sprite.setFlipX(target.x < this.x);
     this.cooldown = s.cooldown;
@@ -163,7 +176,7 @@ export default class Fighter {
     const s = this.stats;
     this.scene.flashFx(this.x, this.y - 14, s.range, this.form > 0 ? this.formInfo.aura : this.def.color);
     for (const e of [...this.scene.enemies]) {
-      if (!e.alive || Math.hypot(e.x - this.x, e.y - this.y) > s.range) continue;
+      if (!e.alive || (e.flying && !this.def.hitsAir) || Math.hypot(e.x - this.x, e.y - this.y) > s.range) continue;
       e.slow(s.slow, s.slowTime);
       if (s.freeze) e.stun(s.freeze);
       e.takeDamage(damage);

@@ -1,6 +1,7 @@
 import { LEVELS } from '../data/levels.js';
 import { FIGHTERS, WALL } from '../data/fighters.js';
 import { DIFFICULTY } from '../data/difficulty.js';
+import { ENEMIES } from '../data/enemies.js';
 import { HERO, addXp } from '../data/hero.js';
 import Hero from '../objects/Hero.js';
 import { Save } from '../systems/Save.js';
@@ -29,6 +30,17 @@ export default class GameScene extends Phaser.Scene {
     this.maze = !!this.level.maze;
     this.route = this.maze ? new Grid(this.level.maze) : new Path(this.level.path);
     this.path = this.maze ? null : this.route;
+    // Flyers: straight over the maze field, or along the road on fixed levels
+    const r = this.route;
+    this.airRoute = this.maze
+      ? new Path([[r.spawnPoint.x, r.spawnPoint.y], [r.end.x, r.end.y]], { remaining: true })
+      : this.route;
+    this.seenTypes = new Set();
+    // Scene objects survive a restart, so clear anything left from the last run
+    this.boss = null;
+    this.bossBar = null;
+    this.heroHint = null;
+    this.aimText = null;
     this.walls = [];
     this.heroSelected = false;
     this.ki = this.level.startKi;
@@ -520,6 +532,8 @@ export default class GameScene extends Phaser.Scene {
         this.add.text(cx, 34, def.role, textStyle(16, '#c9d3ff')).setOrigin(0.5),
         this.add.text(cx, 56, `${def.cost} Ki`, textStyle(22, afford ? '#ffd93b' : '#ff6b6b')).setOrigin(0.5),
       ]);
+      // Which fighters can hit flying enemies
+      if (def.hitsAir) m.add(this.add.text(cx + 54, -60, 'AIR', textStyle(14, '#7fd8ff')).setOrigin(1, 0));
       if (i === 0) this.showRange(spot.x, spot.y, range, def.color);
     });
     this.markCell(spot);
@@ -601,6 +615,7 @@ export default class GameScene extends Phaser.Scene {
       }
     }
     this.spawnQueue.sort((a, b) => a.time - b.time);
+    this.showNewEnemyTips(this.level.waves[this.waveIndex].groups.map((gr) => gr.type));
     const last = this.waveIndex === this.level.waves.length - 1;
     this.banner(last ? 'Final wave!' : `Wave ${this.waveIndex + 1}`);
     this.refreshHud();
@@ -626,7 +641,9 @@ export default class GameScene extends Phaser.Scene {
       this.waveTime += dt;
       while (this.spawnQueue.length && this.spawnQueue[0].time <= this.waveTime) {
         const s = this.spawnQueue.shift();
-        this.enemies.push(new Enemy(this, s.type, s.hpScale * this.diff.hp));
+        const e = new Enemy(this, s.type, s.hpScale * this.diff.hp);
+        this.enemies.push(e);
+        if (e.def.boss) this.showBoss(e);
       }
     }
 
@@ -641,6 +658,7 @@ export default class GameScene extends Phaser.Scene {
     this.refreshAbilities();
     this.updateProjectiles(dt);
     this.updateHazards(dt);
+    this.updateBossBar();
 
     for (const e of this.enemies) if (e.reachedEnd) this.loseLives(e.def.lives);
     this.enemies = this.enemies.filter((e) => e.alive);
@@ -650,11 +668,12 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  findTarget(x, y, range) {
+  // `air` = false skips flying enemies (for fighters that can't reach them)
+  findTarget(x, y, range, air = true) {
     // Target the enemy closest to the base (furthest along the path)
     let best = null;
     for (const e of this.enemies) {
-      if (!e.alive || Math.hypot(e.x - x, e.y - y) > range) continue;
+      if (!e.alive || (e.flying && !air) || Math.hypot(e.x - x, e.y - y) > range) continue;
       if (!best || e.dist > best.dist) best = e;
     }
     return best;
@@ -766,7 +785,84 @@ export default class GameScene extends Phaser.Scene {
     this.hazards = this.hazards.filter((h) => h.time > 0);
   }
 
+  // A split or a boss summon: a new enemy appears where `from` is
+  spawnFrom(from, type, hpScale, back) {
+    const e = new Enemy(this, type, hpScale, from, back);
+    this.enemies.push(e);
+    return e;
+  }
+
+  // ---------- Bosses and new enemies ----------
+
+  showNewEnemyTips(types) {
+    const tips = [];
+    for (const t of types) {
+      if (this.seenTypes.has(t)) continue;
+      this.seenTypes.add(t);
+      if (ENEMIES[t].tip) tips.push(ENEMIES[t].tip);
+    }
+    tips.forEach((tip, i) => this.time.delayedCall(i * 4200, () => this.showTip(tip)));
+  }
+
+  showTip(text) {
+    if (this.state === 'over') return;
+    const c = this.add.container(W / 2, 112).setDepth(140);
+    const t = this.add.text(0, 0, `NEW ENEMY!  ${text}`, { ...textStyle(22, '#ffffff'), wordWrap: { width: 860 }, align: 'center' })
+      .setOrigin(0.5);
+    c.add([this.add.rectangle(0, 0, t.width + 40, t.height + 20, 0x3a1a4a, 0.92).setStrokeStyle(3, 0xc38be0), t]);
+    c.setAlpha(0);
+    this.tweens.add({ targets: c, alpha: 1, duration: 250, hold: 3500, yoyo: true, onComplete: () => c.destroy() });
+  }
+
+  showBoss(e) {
+    this.boss = e;
+    this.cameras.main.shake(400, 0.008);
+    this.banner(`BOSS: ${e.def.name}!`);
+    this.bossBar?.destroy();
+    const c = this.add.container(W / 2, 84).setDepth(105);
+    c.add(this.add.rectangle(0, 0, 520, 40, COLORS.panel, 0.9).setStrokeStyle(2, 0xff5a5a));
+    c.add(this.add.text(-250, 0, e.def.name, textStyle(22, '#ff9a9a')).setOrigin(0, 0.5));
+    this.bossBarFill = this.add.graphics();
+    c.add(this.bossBarFill);
+    this.bossBar = c;
+  }
+
+  updateBossBar() {
+    if (!this.bossBar) return;
+    const e = this.boss;
+    if (!e.alive) {
+      this.bossBar.destroy();
+      this.bossBar = null;
+      this.boss = null;
+      return;
+    }
+    const g = this.bossBarFill;
+    const r = Math.max(0, e.hp / e.maxHp);
+    g.clear();
+    g.fillStyle(0x000000, 0.8).fillRect(-40, -9, 280, 18);
+    g.fillStyle(0xff4b4b).fillRect(-40, -9, 280 * r, 18);
+    if (e.shield > 0) g.fillStyle(0x7fd8ff, 0.9).fillRect(-40, -9, Math.min(280, (280 * e.shield) / e.maxHp), 6);
+  }
+
+  healFx(x, y, radius, healed) {
+    const ring = this.add.circle(x, y, radius, 0x5be35b, 0.18).setStrokeStyle(3, 0x9bff7a, 0.8).setDepth(8).setScale(0.3);
+    this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 500, onComplete: () => ring.destroy() });
+    if (healed) this.floatText(x, y - 44, '+', '#9bff7a', 30);
+  }
+
+  stompFx(x, y, radius) {
+    this.cameras.main.shake(250, 0.01);
+    const ring = this.add.circle(x, y, radius, 0xa8864f, 0.35).setStrokeStyle(6, 0xffe9c4).setDepth(8).setScale(0.2);
+    this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 450, ease: 'Cubic.Out', onComplete: () => ring.destroy() });
+    this.floatText(x, y - 80, 'STOMP!', '#ffe9c4', 30);
+  }
+
   onEnemyKilled(e) {
+    if (e.def.boss) {
+      this.explosionFx(e.x, e.y, 120, 0xff8a3d);
+      this.cameras.main.shake(500, 0.012);
+      this.banner(`${e.def.name} defeated!`);
+    }
     this.kills++;
     this.ki += e.def.reward;
     this.floatText(e.x, e.y - 34, `+${e.def.reward}`, '#ffd93b', 20);

@@ -38,6 +38,7 @@ export const LEVELS = [
       { groups: [
         { type: 'grunt', count: 22, interval: 0.45, hpScale: 2.8 },
         { type: 'runner', count: 18, interval: 0.3, delay: 4, hpScale: 2.4 },
+        { type: 'ogre', count: 1, interval: 1, delay: 10 },
       ] },
     ],
   },
@@ -62,24 +63,28 @@ export const LEVELS = [
     waves: [
       { groups: [{ type: 'grunt', count: 10, interval: 1.0 }] },
       { groups: [
-        { type: 'grunt', count: 10, interval: 0.9 },
-        { type: 'runner', count: 6, interval: 0.6, delay: 5 },
+        { type: 'grunt', count: 8, interval: 0.9 },
+        { type: 'flyer', count: 5, interval: 1.0, delay: 4 },
       ] },
       { groups: [
-        { type: 'runner', count: 12, interval: 0.5 },
-        { type: 'grunt', count: 8, interval: 0.9, delay: 3, hpScale: 1.2 },
+        { type: 'splitter', count: 8, interval: 1.0 },
+        { type: 'runner', count: 10, interval: 0.5, delay: 3, hpScale: 1.2 },
       ] },
       { groups: [
-        { type: 'grunt', count: 14, interval: 0.6, hpScale: 1.8 },
-        { type: 'runner', count: 10, interval: 0.4, delay: 5, hpScale: 1.6 },
+        { type: 'brute', count: 4, interval: 2.5, hpScale: 1.2 },
+        { type: 'medic', count: 3, interval: 2.5, delay: 2 },
+        { type: 'grunt', count: 12, interval: 0.6, delay: 1, hpScale: 1.6 },
       ] },
       { groups: [
-        { type: 'grunt', count: 18, interval: 0.5, hpScale: 2.1 },
-        { type: 'runner', count: 14, interval: 0.35, delay: 4, hpScale: 1.8 },
+        { type: 'flyer', count: 10, interval: 0.7, hpScale: 1.6 },
+        { type: 'splitter', count: 10, interval: 0.7, delay: 3, hpScale: 1.6 },
+        { type: 'brute', count: 4, interval: 2.0, delay: 6, hpScale: 1.3 },
       ] },
       { groups: [
-        { type: 'grunt', count: 22, interval: 0.45, hpScale: 2.6 },
-        { type: 'runner', count: 18, interval: 0.3, delay: 3, hpScale: 2.2 },
+        { type: 'grunt', count: 18, interval: 0.5, hpScale: 1.9 },
+        { type: 'medic', count: 4, interval: 3.0, delay: 2, hpScale: 1.8 },
+        { type: 'krag', count: 1, interval: 1, delay: 6 },
+        { type: 'runner', count: 14, interval: 0.3, delay: 9, hpScale: 2.0 },
       ] },
     ],
   },

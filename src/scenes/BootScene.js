@@ -1,6 +1,7 @@
 import { FIGHTERS, FORMS } from '../data/fighters.js';
 import { HERO } from '../data/hero.js';
 import { drawFighterArt, pts } from '../art/fighterArt.js';
+import { drawBrute, drawFlyer, drawSplitter, drawSplitling, drawMedic, drawOgre, drawKrag } from '../art/enemyArt.js';
 
 // Placeholder art drawn in code. When the AI art is ready, this scene will load PNG files instead,
 // using the same texture keys, so nothing else in the game needs to change.
@@ -22,6 +23,13 @@ export default class BootScene extends Phaser.Scene {
     this.makeFighter('hero_1', { ...HERO.look, hair: FORMS[1].hair });
     this.makeGrunt();
     this.makeRunner();
+    this.makeArt('brute', 56, drawBrute);
+    this.makeArt('flyer', 48, drawFlyer);
+    this.makeArt('splitter', 48, drawSplitter);
+    this.makeArt('splitling', 32, drawSplitling);
+    this.makeArt('medic', 48, drawMedic);
+    this.makeArt('ogre', 80, drawOgre);
+    this.makeArt('krag', 100, drawKrag);
     this.makeSpot();
     this.makeWall();
     this.makeKi();
@@ -32,6 +40,13 @@ export default class BootScene extends Phaser.Scene {
     const g = this.make.graphics({ add: false });
     drawFighterArt(g, look);
     g.generateTexture(key, 64, 64);
+    g.destroy();
+  }
+
+  makeArt(key, size, draw) {
+    const g = this.make.graphics({ add: false });
+    draw(g);
+    g.generateTexture(key, size, size);
     g.destroy();
   }
 

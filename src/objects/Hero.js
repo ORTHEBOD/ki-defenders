@@ -93,7 +93,7 @@ export default class Hero {
     for (const e of enemies) e.blocked = false;
     if (!this.canBlock) return;
     enemies
-      .filter((e) => e.alive && Math.hypot(e.x - this.x, e.y - this.y) <= B.blockRadius)
+      .filter((e) => e.alive && !e.flying && Math.hypot(e.x - this.x, e.y - this.y) <= B.blockRadius)
       .sort((a, b) => b.dist - a.dist)
       .slice(0, B.maxBlock)
       .forEach((e) => { e.blocked = true; });

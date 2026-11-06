@@ -115,6 +115,17 @@ export default class Grid {
     this.updateProgress(e);
   }
 
+  // Put a new enemy where `from` is (a split or a summon), nudged a little so they don't overlap
+  place(e, from, back) {
+    const j = back ? 8 : 0;
+    e.x = from.x + Phaser.Math.Between(-j, j);
+    e.y = from.y + Phaser.Math.Between(-j, j);
+    e.cell = from.cell && { ...from.cell };
+    e.next = { ...from.next };
+    e.dir = from.dir;
+    this.updateProgress(e);
+  }
+
   // Moves an enemy `step` pixels. Returns the x direction it moved, or 'done' at the base.
   move(e, step) {
     let dx = 0;
