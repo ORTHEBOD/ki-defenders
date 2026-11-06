@@ -1,10 +1,11 @@
 import { LEVELS } from '../data/levels.js';
-import { FIGHTERS } from '../data/fighters.js';
+import { FIGHTERS, WALL } from '../data/fighters.js';
 import { DIFFICULTY } from '../data/difficulty.js';
 import { HERO, addXp } from '../data/hero.js';
 import Hero from '../objects/Hero.js';
 import { Save } from '../systems/Save.js';
 import Path from '../systems/Path.js';
+import Grid from '../systems/Grid.js';
 import Enemy from '../objects/Enemy.js';
 import Fighter from '../objects/Fighter.js';
 import { makeButton } from '../ui/Button.js';
@@ -24,7 +25,12 @@ export default class GameScene extends Phaser.Scene {
     this.diffKey = data.difficulty ?? 'normal';
     this.diff = DIFFICULTY[this.diffKey];
     this.kills = 0;
-    this.path = new Path(this.level.path);
+    // Fixed levels follow a drawn road; maze levels use an open grid the player builds on
+    this.maze = !!this.level.maze;
+    this.route = this.maze ? new Grid(this.level.maze) : new Path(this.level.path);
+    this.path = this.maze ? null : this.route;
+    this.walls = [];
+    this.heroSelected = false;
     this.ki = this.level.startKi;
     this.lives = this.level.lives;
     this.waveIndex = -1;
@@ -41,21 +47,32 @@ export default class GameScene extends Phaser.Scene {
     this.tweens.timeScale = 1;
     this.time.timeScale = 1;
 
-    this.drawMap();
-    this.createSpots();
+    if (this.maze) this.drawMazeMap();
+    else {
+      this.drawMap();
+      this.createSpots();
+    }
     this.rangeCircle = this.add.graphics().setDepth(6);
+    this.cellMark = this.add.graphics().setDepth(5);
     this.aiming = null;
     this.uiClickFrame = -1;
 
     // Zenko starts next to the base, with his saved level and skills
     const saved = Save.current()?.hero ?? { level: 1, skills: [] };
-    const end = this.path.points[this.path.points.length - 1];
+    const end = this.route.end;
     this.hero = new Hero(this, end.x - 90, end.y - 80, saved);
     if (this.hero.has('overflow')) this.ki += 50;
 
     this.createHud();
     this.createAbilityBar();
-    this.floatText(W / 2, 600, 'Tap the ground to move Zenko', '#ffe9c4', 28);
+    if (this.maze) {
+      this.heroSel = this.add.ellipse(0, 0, 66, 24).setStrokeStyle(4, 0xffffff).setDepth(17).setVisible(false);
+      this.drawRoute();
+      this.floatText(W / 2, 560, 'Tap empty ground to build. Fighters and walls block the way!', '#ffe9c4', 28);
+      this.time.delayedCall(1400, () => this.floatText(W / 2, 560, 'Tap Zenko, then tap where he should go', '#ffe9c4', 28));
+    } else {
+      this.floatText(W / 2, 600, 'Tap the ground to move Zenko', '#ffe9c4', 28);
+    }
 
     this.input.on('pointerdown', (pointer, over) => {
       if (this.state !== 'playing') return;
@@ -68,8 +85,9 @@ export default class GameScene extends Phaser.Scene {
         return;
       }
       if (over.length > 0) return;
-      // Tapping empty ground: close a menu, or move Zenko there
+      // Tapping empty ground: close a menu, or move Zenko there (maze: build there)
       if (this.menu) this.closeMenu();
+      else if (this.maze) this.mazeTap(pointer.worldX, pointer.worldY);
       else if (pointer.worldY > 60) this.hero.moveTo(pointer.worldX, pointer.worldY);
     });
   }
@@ -102,6 +120,7 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
     this.cancelAim();
+    this.selectHero(false);
     const hero = this.hero;
     if (!hero.alive) {
       this.floatText(W / 2, 600, 'Zenko is down', '#ff6b6b', 26);
@@ -230,6 +249,167 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  // ---------- Maze levels ----------
+
+  drawMazeMap() {
+    const grid = this.route;
+    const g = this.add.graphics().setDepth(0);
+    const rnd = new Phaser.Math.RandomDataGenerator([`map-${this.level.id}`]);
+    g.fillStyle(0x6fb552).fillRect(0, 0, W, H);
+    for (let i = 0; i < 140; i++) {
+      g.fillStyle(rnd.pick([0x64a84a, 0x7cc25e, 0x5d9e44]), 1);
+      g.fillEllipse(rnd.between(0, W), rnd.between(0, H), rnd.between(30, 90), rnd.between(14, 40));
+    }
+    // Checkered field so the cells are easy to see
+    for (let r = 0; r < grid.rows; r++) {
+      for (let c = 0; c < grid.cols; c++) {
+        const p = grid.center(c, r);
+        g.fillStyle((c + r) % 2 ? 0xffffff : 0x000000, 0.05);
+        g.fillRect(p.x - grid.size / 2, p.y - grid.size / 2, grid.size, grid.size);
+      }
+    }
+    g.lineStyle(3, 0xffffff, 0.25).strokeRect(grid.ox, grid.oy, grid.cols * grid.size, grid.rows * grid.size);
+    // Short dirt roads from the portal into the field and from the field to the base
+    const inY = grid.start.y;
+    const outY = grid.end.y;
+    const right = grid.ox + grid.cols * grid.size;
+    g.fillStyle(0xa8864f).fillRect(-10, inY - 33, grid.ox + 10, 66).fillRect(right, outY - 33, W - right + 10, 66);
+    g.fillStyle(0xe0c08c).fillRect(-10, inY - 27, grid.ox + 10, 54).fillRect(right, outY - 27, W - right + 10, 54);
+    for (const [c, r] of grid.rocks) {
+      const p = grid.center(c, r);
+      this.drawBoulder(g, p.x, p.y, rnd);
+    }
+    for (const [x, y] of [[1220, 110], [1250, 200], [1215, 520], [1252, 600], [30, 130], [28, 590]]) {
+      this.drawTree(g, x, y, rnd);
+    }
+    this.routeLine = this.add.graphics().setDepth(2);
+    this.drawPortal(grid.start.x, grid.start.y);
+    this.drawBase(grid.end.x, grid.end.y);
+  }
+
+  drawBoulder(g, x, y, rnd) {
+    g.fillStyle(0x000000, 0.2).fillEllipse(x + 2, y + 18, 58, 18);
+    g.lineStyle(3, COLORS.outline);
+    g.fillStyle(0x8c8f99).fillEllipse(x, y + 2, 58, 46).strokeEllipse(x, y + 2, 58, 46);
+    g.fillStyle(0xa3a6b0).fillEllipse(x - 6 + rnd.between(-3, 3), y - 8, 30, 16);
+    g.fillStyle(0xc4c7d0).fillEllipse(x - 10, y - 11, 10, 5);
+  }
+
+  // Dotted line showing the way enemies will walk right now
+  drawRoute() {
+    const g = this.routeLine;
+    g.clear();
+    const pts = this.route.routePoints();
+    g.fillStyle(0xfff3c4, 0.6);
+    let carry = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i];
+      const b = pts[i + 1];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      let d = carry;
+      for (; d < len; d += 20) {
+        g.fillCircle(a.x + ((b.x - a.x) * d) / len, a.y + ((b.y - a.y) * d) / len, 3.5);
+      }
+      carry = d - len;
+    }
+  }
+
+  mazeTap(x, y) {
+    const h = this.hero;
+    if (this.heroSelected) {
+      this.selectHero(false);
+      if (y > 60) h.moveTo(x, y);
+      return;
+    }
+    if (h.alive && Math.hypot(x - h.x, y - (h.y - 10)) < 42) {
+      this.selectHero(true);
+      return;
+    }
+    const cell = this.route.cellAt(x, y);
+    if (!cell) return;
+    const problem = this.route.buildProblem(cell.c, cell.r, this.enemies);
+    if (problem === 'taken') return;
+    if (problem) {
+      this.cellWarning(cell, problem);
+      return;
+    }
+    const p = this.route.center(cell.c, cell.r);
+    this.openBuildMenu({ x: p.x, y: p.y, c: cell.c, r: cell.r, fighter: null, maze: true });
+  }
+
+  selectHero(on) {
+    if (!this.maze) return;
+    this.heroSelected = on && this.hero.alive;
+    this.heroSel.setVisible(this.heroSelected);
+    this.heroHint?.destroy();
+    this.heroHint = null;
+    if (this.heroSelected) {
+      this.heroSel.setPosition(this.hero.x, this.hero.y + 16);
+      this.heroHint = this.add.text(W / 2, 96, 'Tap where Zenko should go', textStyle(30, '#ffffff')).setOrigin(0.5).setDepth(150);
+    }
+  }
+
+  cellWarning(cell, problem) {
+    const p = this.route.center(cell.c, cell.r);
+    const s = this.route.size;
+    const box = this.add.rectangle(p.x, p.y, s - 4, s - 4, 0xff3b3b, 0.45).setStrokeStyle(3, 0xff3b3b).setDepth(5);
+    this.tweens.add({ targets: box, alpha: 0, duration: 600, onComplete: () => box.destroy() });
+    const msg = problem === 'block' ? "Can't block the way to the base!" : 'An enemy is standing there';
+    this.floatText(p.x, p.y - 40, msg, '#ff8080', 24);
+  }
+
+  // A maze cell got a fighter or wall (blocked = true), or was cleared
+  setCell(spot, blocked) {
+    if (!spot.maze) return;
+    this.route.setBlocked(spot.c, spot.r, blocked);
+    this.drawRoute();
+  }
+
+  buildWall(spot) {
+    this.ki -= WALL.cost;
+    const img = this.add.image(spot.x, spot.y - 4, 'wall').setDepth(8 + spot.y / 1000).setInteractive({ useHandCursor: true });
+    const wall = { spot, img, x: spot.x, y: spot.y };
+    img.on('pointerdown', () => this.state === 'playing' && !this.aiming && this.selectWall(wall));
+    img.setScale(0);
+    this.tweens.add({ targets: img, scale: 1, duration: 200, ease: 'Back.Out' });
+    spot.wall = wall;
+    this.walls.push(wall);
+    this.setCell(spot, true);
+    this.closeMenu();
+    this.refreshHud();
+  }
+
+  // Walls give all their Ki back, so it is free to reshape the maze
+  selectWall(wall) {
+    this.closeMenu();
+    this.selectHero(false);
+    this.markCell(wall.spot);
+    const w = 260;
+    const h = 120;
+    const pos = this.menuPosition(wall.spot, w, h);
+    const m = this.add.container(pos.x, pos.y).setDepth(120);
+    m.add(this.add.rectangle(0, 0, w, h, COLORS.panel, 0.94).setStrokeStyle(2, WALL.color));
+    m.add(this.add.text(0, -32, WALL.name, textStyle(26)).setOrigin(0.5));
+    m.add(makeButton(this, 0, 18, 220, 44, `Remove  +${WALL.cost} Ki`, () => {
+      this.ki += WALL.cost;
+      this.tweens.killTweensOf(wall.img);
+      wall.img.destroy();
+      wall.spot.wall = null;
+      this.walls = this.walls.filter((x) => x !== wall);
+      this.setCell(wall.spot, false);
+      this.closeMenu();
+      this.refreshHud();
+    }, { color: 0x8a2f3a, fontSize: 22 }));
+    this.menu = m;
+  }
+
+  markCell(spot) {
+    this.cellMark.clear();
+    if (!spot.maze) return;
+    const s = this.route.size;
+    this.cellMark.lineStyle(3, 0xffffff, 0.9).strokeRect(spot.x - s / 2 + 2, spot.y - s / 2 + 2, s - 4, s - 4);
+  }
+
   // ---------- HUD ----------
 
   createHud() {
@@ -273,6 +453,7 @@ export default class GameScene extends Phaser.Scene {
 
   closeMenu() {
     this.rangeCircle.clear();
+    this.cellMark.clear();
     if (!this.menu) return;
     const m = this.menu;
     this.menu = null;
@@ -297,6 +478,7 @@ export default class GameScene extends Phaser.Scene {
   openBuildMenu(spot) {
     this.closeMenu();
     const types = Object.keys(FIGHTERS);
+    if (spot.maze) types.push('wall');
     const cardW = 124;
     const cardH = 140;
     const gap = 10;
@@ -307,34 +489,47 @@ export default class GameScene extends Phaser.Scene {
     m.add(this.add.rectangle(0, 0, w, h, COLORS.panel, 0.94).setStrokeStyle(2, COLORS.ki));
 
     types.forEach((type, i) => {
-      const def = FIGHTERS[type];
+      const def = type === 'wall' ? WALL : FIGHTERS[type];
+      const range = def.tiers?.[0].range;
       const cx = -w / 2 + 10 + cardW / 2 + i * (cardW + gap);
       const afford = this.ki >= def.cost;
       const card = this.add.rectangle(cx, 0, cardW, cardH, COLORS.card)
         .setStrokeStyle(2, afford ? 0xffffff : 0x555a6a)
         .setInteractive({ useHandCursor: true });
-      card.on('pointerover', () => this.showRange(spot.x, spot.y, def.tiers[0].range, def.color));
+      card.on('pointerover', () => (range ? this.showRange(spot.x, spot.y, range, def.color) : this.rangeCircle.clear()));
       card.on('pointerdown', () => {
         if (this.ki < def.cost) {
           this.floatText(pos.x + cx, pos.y, 'Not enough Ki', '#ff6b6b', 22);
           return;
         }
-        this.buildFighter(spot, type);
+        if (spot.maze) {
+          const problem = this.route.buildProblem(spot.c, spot.r, this.enemies);
+          if (problem) {
+            this.closeMenu();
+            this.cellWarning(spot, problem);
+            return;
+          }
+        }
+        if (type === 'wall') this.buildWall(spot);
+        else this.buildFighter(spot, type);
       });
       m.add([
         card,
-        this.add.image(cx, -34, `${def.texture}_0`),
+        this.add.image(cx, -34, type === 'wall' ? 'wall' : `${def.texture}_0`),
         this.add.text(cx, 10, def.name, textStyle(22)).setOrigin(0.5),
         this.add.text(cx, 34, def.role, textStyle(16, '#c9d3ff')).setOrigin(0.5),
         this.add.text(cx, 56, `${def.cost} Ki`, textStyle(22, afford ? '#ffd93b' : '#ff6b6b')).setOrigin(0.5),
       ]);
-      if (i === 0) this.showRange(spot.x, spot.y, def.tiers[0].range, def.color);
+      if (i === 0) this.showRange(spot.x, spot.y, range, def.color);
     });
+    this.markCell(spot);
     this.menu = m;
   }
 
   selectFighter(f) {
     this.closeMenu();
+    this.selectHero(false);
+    this.markCell(f.spot);
     this.showRange(f.x, f.y, f.stats.range, f.def.color);
 
     const w = 340;
@@ -372,6 +567,7 @@ export default class GameScene extends Phaser.Scene {
       f.destroy();
       f.spot.fighter = null;
       this.fighters = this.fighters.filter((x) => x !== f);
+      this.setCell(f.spot, false);
       this.closeMenu();
       this.refreshHud();
     }, { color: 0x8a2f3a, fontSize: 20 });
@@ -385,6 +581,7 @@ export default class GameScene extends Phaser.Scene {
     const f = new Fighter(this, spot, type);
     spot.fighter = f;
     this.fighters.push(f);
+    this.setCell(spot, true);
     this.closeMenu();
     this.refreshHud();
   }
@@ -437,6 +634,10 @@ export default class GameScene extends Phaser.Scene {
     for (const e of this.enemies) if (e.alive) e.update(dt);
     for (const f of this.fighters) f.update(dt);
     this.hero.update(dt);
+    if (this.heroSelected) {
+      if (this.hero.alive) this.heroSel.setPosition(this.hero.x, this.hero.y + 16);
+      else this.selectHero(false);
+    }
     this.refreshAbilities();
     this.updateProjectiles(dt);
     this.updateHazards(dt);
@@ -586,6 +787,7 @@ export default class GameScene extends Phaser.Scene {
     this.state = 'paused';
     this.closeMenu();
     this.cancelAim();
+    this.selectHero(false);
     this.tweens.pauseAll();
     const m = this.add.container(0, 0).setDepth(200);
     m.add(this.add.rectangle(0, 0, W, H, 0x000000, 0.65).setOrigin(0).setInteractive());
@@ -622,6 +824,7 @@ export default class GameScene extends Phaser.Scene {
     this.state = 'over';
     this.closeMenu();
     this.cancelAim();
+    this.selectHero(false);
     this.refreshHud();
     this.startBtn.setVisible(false);
     this.speedBtn.setVisible(false);

@@ -105,3 +105,6 @@ export const FIGHTERS = {
     ],
   },
 };
+
+// Maze levels only: a cheap block that does not attack. It just makes enemies walk around it.
+export const WALL = { name: 'Ki Wall', role: 'Blocks path', cost: 8, texture: 'wall', color: 0x9aa3c7 };

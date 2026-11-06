@@ -34,8 +34,10 @@ export default class LevelSelectScene extends Phaser.Scene {
     return this.player.stars[id] || 0;
   }
 
+  // A level opens once the level before it (that exists so far) has been won
   isUnlocked(id) {
-    return id === 1 || this.stars(id - 1) > 0;
+    const before = LEVELS.filter((l) => l.id < id).map((l) => l.id);
+    return before.length === 0 || this.stars(Math.max(...before)) > 0;
   }
 
   // Open the map that holds the newest unlocked level
@@ -90,7 +92,8 @@ export default class LevelSelectScene extends Phaser.Scene {
     pop.add(this.add.rectangle(0, 0, 1280, 720, 0x000000, 0.6).setOrigin(0).setInteractive());
     pop.add(panel(this, 640, 380, 640, 400));
     pop.add(this.add.text(640, 225, level.name, textStyle(40, '#ffd93b')).setOrigin(0.5));
-    pop.add(this.add.text(640, 275, `${level.waves.length} waves   -   Best: ${starText(this.stars(id))}`,
+    const kind = level.maze ? 'Maze level  -  ' : '';
+    pop.add(this.add.text(640, 275, `${kind}${level.waves.length} waves   -   Best: ${starText(this.stars(id))}`,
       textStyle(24, '#c9d3ff')).setOrigin(0.5));
     pop.add(this.add.text(640, 318, 'Choose difficulty', textStyle(28)).setOrigin(0.5));
 

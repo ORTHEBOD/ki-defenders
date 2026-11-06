@@ -16,10 +16,8 @@ export default class Enemy {
     this.stunTime = 0;
     this.flashTime = 0;
 
-    const p = scene.path.pointAt(0);
-    this.x = p.x;
-    this.y = p.y;
-    this.sprite = scene.add.image(p.x, p.y, this.def.texture).setDepth(10);
+    scene.route.spawn(this);
+    this.sprite = scene.add.image(this.x, this.y, this.def.texture).setDepth(10);
     this.hpBar = scene.add.graphics().setDepth(12);
   }
 
@@ -45,19 +43,16 @@ export default class Enemy {
       this.slowTime -= dt;
       speed *= this.slowFactor;
     }
-    this.dist += speed * dt;
-    if (this.dist >= this.scene.path.length) {
+    const dx = this.scene.route.move(this, speed * dt);
+    if (dx === 'done') {
       this.reachedEnd = true;
       this.destroy();
       return;
     }
-    const p = this.scene.path.pointAt(this.dist);
     this.bob += dt * speed * 0.15;
-    this.x = p.x;
-    this.y = p.y;
-    this.sprite.setPosition(p.x, p.y + Math.sin(this.bob) * 2);
-    this.sprite.setDepth(10 + p.y / 1000);
-    if (p.dx !== 0) this.sprite.setFlipX(p.dx < 0);
+    this.sprite.setPosition(this.x, this.y + Math.sin(this.bob) * 2);
+    this.sprite.setDepth(10 + this.y / 1000);
+    if (dx !== 0) this.sprite.setFlipX(dx < 0);
     this.applyTint();
     this.drawHpBar();
   }

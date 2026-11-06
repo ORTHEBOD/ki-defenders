@@ -21,6 +21,26 @@ export default class Path {
       total += len;
     }
     this.length = total;
+    this.start = this.points[0];
+    this.end = this.points[this.points.length - 1];
+  }
+
+  // ---- Route interface shared with Grid: spawn / move ----
+
+  spawn(e) {
+    e.dist = 0;
+    e.x = this.start.x;
+    e.y = this.start.y;
+  }
+
+  // Moves an enemy `step` pixels. Returns the x direction it moved, or 'done' at the base.
+  move(e, step) {
+    e.dist += step;
+    if (e.dist >= this.length) return 'done';
+    const p = this.pointAt(e.dist);
+    e.x = p.x;
+    e.y = p.y;
+    return p.dx;
   }
 
   pointAt(dist) {

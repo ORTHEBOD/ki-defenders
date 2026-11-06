@@ -41,4 +41,46 @@ export const LEVELS = [
       ] },
     ],
   },
+  {
+    id: 4,
+    map: 'Green Valley',
+    name: 'Level 4: Boulder Field',
+    startKi: 300,
+    lives: 20,
+    // Maze level: no road. A 17 x 9 grid of 64px cells; enemies enter on the left at entryRow
+    // and leave on the right at exitRow. Rocks are cells that are blocked from the start.
+    maze: {
+      cols: 17,
+      rows: 9,
+      entryRow: 4,
+      exitRow: 4,
+      rocks: [
+        [3, 0], [3, 1], [3, 7], [3, 8], [6, 4], [7, 4],
+        [10, 0], [10, 1], [10, 2], [10, 6], [10, 7], [10, 8], [14, 3], [14, 5],
+      ],
+    },
+    waves: [
+      { groups: [{ type: 'grunt', count: 10, interval: 1.0 }] },
+      { groups: [
+        { type: 'grunt', count: 10, interval: 0.9 },
+        { type: 'runner', count: 6, interval: 0.6, delay: 5 },
+      ] },
+      { groups: [
+        { type: 'runner', count: 12, interval: 0.5 },
+        { type: 'grunt', count: 8, interval: 0.9, delay: 3, hpScale: 1.2 },
+      ] },
+      { groups: [
+        { type: 'grunt', count: 14, interval: 0.6, hpScale: 1.8 },
+        { type: 'runner', count: 10, interval: 0.4, delay: 5, hpScale: 1.6 },
+      ] },
+      { groups: [
+        { type: 'grunt', count: 18, interval: 0.5, hpScale: 2.1 },
+        { type: 'runner', count: 14, interval: 0.35, delay: 4, hpScale: 1.8 },
+      ] },
+      { groups: [
+        { type: 'grunt', count: 22, interval: 0.45, hpScale: 2.6 },
+        { type: 'runner', count: 18, interval: 0.3, delay: 3, hpScale: 2.2 },
+      ] },
+    ],
+  },
 ];

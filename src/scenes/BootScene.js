@@ -23,6 +23,7 @@ export default class BootScene extends Phaser.Scene {
     this.makeGrunt();
     this.makeRunner();
     this.makeSpot();
+    this.makeWall();
     this.makeKi();
     this.scene.start('Title');
   }
@@ -80,6 +81,20 @@ export default class BootScene extends Phaser.Scene {
     g.lineBetween(32, 24, 32, 40);
     g.lineBetween(24, 32, 40, 32);
     g.generateTexture('spot', 64, 64);
+    g.destroy();
+  }
+
+  makeWall() {
+    const g = this.make.graphics({ add: false });
+    g.fillStyle(0x000000, 0.2).fillRoundedRect(4, 10, 56, 50, 8);
+    g.lineStyle(3, O);
+    g.fillStyle(0x7d8496).fillRoundedRect(4, 4, 56, 50, 8).strokeRoundedRect(4, 4, 56, 50, 8);
+    g.fillStyle(0x9aa3b8).fillRoundedRect(10, 8, 44, 18, 6);
+    g.lineStyle(2, 0x555b6b);
+    g.lineBetween(32, 26, 32, 52);
+    g.lineBetween(8, 30, 56, 30);
+    g.fillStyle(0x7fd8ff, 0.9).fillCircle(32, 17, 5);
+    g.generateTexture('wall', 64, 64);
     g.destroy();
   }
 
