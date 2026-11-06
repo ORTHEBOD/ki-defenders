@@ -1,3 +1,11 @@
+// The 3 maps and where each level's button sits on the level map screen.
+// Levels that aren't in LEVELS yet show as "coming soon".
+export const MAPS = [
+  { name: 'Green Valley', color: 0x4f9a3a, levels: [1, 2, 3, 4], nodes: [[220, 500], [480, 380], [760, 490], [1040, 330]] },
+  { name: 'Desert Wasteland', color: 0xc98a3a, levels: [5, 6, 7], nodes: [[260, 440], [640, 330], [1020, 470]] },
+  { name: 'Enemy Mothership', color: 0x6a5aa8, levels: [8, 9, 10], nodes: [[260, 480], [640, 340], [1020, 440]] },
+];
+
 // Each wave is a list of groups. A group spawns `count` enemies, one every `interval` seconds,
 // starting `delay` seconds after the wave starts. hpScale makes that group tougher.
 

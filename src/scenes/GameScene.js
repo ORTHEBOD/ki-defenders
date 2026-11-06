@@ -1,5 +1,8 @@
 import { LEVELS } from '../data/levels.js';
 import { FIGHTERS } from '../data/fighters.js';
+import { DIFFICULTY } from '../data/difficulty.js';
+import { addXp } from '../data/hero.js';
+import { Save } from '../systems/Save.js';
 import Path from '../systems/Path.js';
 import Enemy from '../objects/Enemy.js';
 import Fighter from '../objects/Fighter.js';
@@ -14,8 +17,12 @@ export default class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  create() {
-    this.level = LEVELS[0];
+  create(data = {}) {
+    this.startData = data;
+    this.level = LEVELS.find((l) => l.id === data.levelId) ?? LEVELS[0];
+    this.diffKey = data.difficulty ?? 'normal';
+    this.diff = DIFFICULTY[this.diffKey];
+    this.kills = 0;
     this.path = new Path(this.level.path);
     this.ki = this.level.startKi;
     this.lives = this.level.lives;
@@ -141,8 +148,9 @@ export default class GameScene extends Phaser.Scene {
     this.add.text(190, 28, '♥', textStyle(28, '#ff5a5a')).setOrigin(0, 0.5).setDepth(101);
     this.livesText = this.add.text(220, 28, '', textStyle(28)).setOrigin(0, 0.5).setDepth(101);
     this.waveText = this.add.text(340, 28, '', textStyle(28)).setOrigin(0, 0.5).setDepth(101);
-    this.add.text(W - 20, 28, `${this.level.map}  -  ${this.level.name}`, textStyle(24, '#c9d3ff'))
+    this.add.text(W - 130, 28, `${this.level.name}  (${this.diff.label})`, textStyle(24, '#c9d3ff'))
       .setOrigin(1, 0.5).setDepth(101);
+    makeButton(this, W - 60, 28, 100, 42, 'Menu', () => this.pause(), { fontSize: 24, color: 0x3a4470, depth: 102 });
 
     this.startBtn = makeButton(this, 120, 672, 200, 56, '', () => this.startWave(), { color: 0xe0661a });
     this.speedBtn = makeButton(this, 272, 672, 84, 56, '1x', () => this.toggleSpeed());
@@ -326,7 +334,7 @@ export default class GameScene extends Phaser.Scene {
       this.waveTime += dt;
       while (this.spawnQueue.length && this.spawnQueue[0].time <= this.waveTime) {
         const s = this.spawnQueue.shift();
-        this.enemies.push(new Enemy(this, s.type, s.hpScale));
+        this.enemies.push(new Enemy(this, s.type, s.hpScale * this.diff.hp));
       }
     }
 
@@ -352,6 +360,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   onEnemyKilled(e) {
+    this.kills++;
     this.ki += e.def.reward;
     this.floatText(e.x, e.y - 34, `+${e.def.reward}`, '#ffd93b', 20);
     this.poof(e.x, e.y);
@@ -366,25 +375,74 @@ export default class GameScene extends Phaser.Scene {
     if (this.lives <= 0) this.endGame(false);
   }
 
+  pause() {
+    if (this.state !== 'playing') return;
+    this.state = 'paused';
+    this.closeMenu();
+    this.tweens.pauseAll();
+    const m = this.add.container(0, 0).setDepth(200);
+    m.add(this.add.rectangle(0, 0, W, H, 0x000000, 0.65).setOrigin(0).setInteractive());
+    m.add(this.add.text(W / 2, 190, 'Paused', textStyle(90, '#ffd93b')).setOrigin(0.5));
+    m.add(makeButton(this, W / 2, 320, 300, 64, 'Resume', () => {
+      this.state = 'playing';
+      this.tweens.resumeAll();
+      m.setVisible(false);
+      this.time.delayedCall(1, () => m.destroy());
+    }, { color: 0xe0661a }));
+    m.add(makeButton(this, W / 2, 404, 300, 64, 'Restart level', () => this.scene.restart(this.startData)));
+    m.add(makeButton(this, W / 2, 488, 300, 64, 'Quit to map', () => this.quitToMap()));
+  }
+
+  quitToMap() {
+    this.scene.start('LevelSelect', { mapIndex: this.startData.mapIndex });
+  }
+
+  // Saves stars and hero XP, and returns what was earned
+  saveRewards(win) {
+    const xp = this.kills * 2 + (win ? 40 * this.diff.stars : 10);
+    const stars = win ? this.diff.stars : 0;
+    const result = Save.update((p) => {
+      const newBest = stars > (p.stars[this.level.id] || 0);
+      if (newBest) p.stars[this.level.id] = stars;
+      p.kills += this.kills;
+      const gained = addXp(p.hero, xp);
+      return { newBest, gained, heroLevel: p.hero.level };
+    });
+    return { xp, stars, ...(result || { newBest: false, gained: 0 }) };
+  }
+
   endGame(win) {
     this.state = 'over';
     this.closeMenu();
     this.refreshHud();
     this.startBtn.setVisible(false);
     this.speedBtn.setVisible(false);
+    const r = this.saveRewards(win);
+
     this.add.rectangle(0, 0, W, H, 0x000000, 0.65).setOrigin(0).setDepth(200).setInteractive();
-    this.add.text(W / 2, H / 2 - 90, win ? 'Victory!' : 'Defeat', textStyle(96, win ? '#ffd93b' : '#ff5a5a'))
+    this.add.text(W / 2, 150, win ? 'Victory!' : 'Defeat', textStyle(96, win ? '#ffd93b' : '#ff5a5a'))
       .setOrigin(0.5).setDepth(201);
-    let sub = 'The army broke through. Train harder and try again.';
     if (win) {
-      const stars = this.lives >= this.level.lives * 0.9 ? 3 : this.lives >= this.level.lives * 0.5 ? 2 : 1;
-      this.add.text(W / 2, H / 2, '★'.repeat(stars) + '☆'.repeat(3 - stars), textStyle(64, '#ffd93b'))
+      this.add.text(W / 2, 245, '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars), textStyle(64, '#ffd93b'))
         .setOrigin(0.5).setDepth(201);
-      sub = `The valley is safe. Lives left: ${this.lives}/${this.level.lives}`;
+      this.add.text(W / 2, 305, `${this.diff.label} cleared${r.newBest ? '  -  New best!' : ''}`, textStyle(28))
+        .setOrigin(0.5).setDepth(201);
+    } else {
+      this.add.text(W / 2, 260, 'The army broke through. Train harder and try again.', textStyle(28))
+        .setOrigin(0.5).setDepth(201);
     }
-    this.add.text(W / 2, H / 2 + 60, sub, textStyle(28)).setOrigin(0.5).setDepth(201);
-    makeButton(this, W / 2, H / 2 + 140, 240, 60, 'Play again', () => this.scene.restart(),
+    this.add.text(W / 2, 360, `Zenko +${r.xp} XP   (${this.kills} enemies defeated)`, textStyle(30, '#3fd0f5'))
+      .setOrigin(0.5).setDepth(201);
+    if (r.gained > 0) {
+      const lv = this.add.text(W / 2, 410, `LEVEL UP!  Zenko is now level ${r.heroLevel}`, textStyle(36, '#5be35b'))
+        .setOrigin(0.5).setDepth(201);
+      this.tweens.add({ targets: lv, scale: 1.1, duration: 400, yoyo: true, repeat: -1 });
+    }
+
+    makeButton(this, W / 2 - 150, 520, 260, 64, win ? 'Continue' : 'Back to map', () => this.quitToMap(),
       { color: 0xe0661a, depth: 202 });
+    makeButton(this, W / 2 + 150, 520, 260, 64, win ? 'Play again' : 'Try again', () => this.scene.restart(this.startData),
+      { depth: 202 });
   }
 
   // ---------- Effects ----------

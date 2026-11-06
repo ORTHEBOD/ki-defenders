@@ -3,7 +3,7 @@
 // when online, so the next launch gets the newest version.
 // Bump CACHE when the file list changes.
 
-const CACHE = 'ki-defenders-v1';
+const CACHE = 'ki-defenders-v2';
 
 const FILES = [
   './',
@@ -16,15 +16,25 @@ const FILES = [
   'icons/apple-touch-icon.png',
   'src/main.js',
   'src/scenes/BootScene.js',
+  'src/scenes/TitleScene.js',
+  'src/scenes/LoginScene.js',
+  'src/scenes/HubScene.js',
+  'src/scenes/HeroScene.js',
+  'src/scenes/LevelSelectScene.js',
   'src/scenes/GameScene.js',
   'src/objects/Enemy.js',
   'src/objects/Fighter.js',
   'src/systems/Path.js',
+  'src/systems/Save.js',
+  'src/art/fighterArt.js',
   'src/data/fighters.js',
   'src/data/enemies.js',
   'src/data/levels.js',
+  'src/data/hero.js',
+  'src/data/difficulty.js',
   'src/ui/Button.js',
   'src/ui/theme.js',
+  'src/ui/menuBackground.js',
 ];
 
 self.addEventListener('install', (event) => {

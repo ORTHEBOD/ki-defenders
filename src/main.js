@@ -1,17 +1,23 @@
 import BootScene from './scenes/BootScene.js';
+import TitleScene from './scenes/TitleScene.js';
+import LoginScene from './scenes/LoginScene.js';
+import HubScene from './scenes/HubScene.js';
+import HeroScene from './scenes/HeroScene.js';
+import LevelSelectScene from './scenes/LevelSelectScene.js';
 import GameScene from './scenes/GameScene.js';
 
 const config = {
   type: Phaser.AUTO,
   parent: 'game',
   backgroundColor: '#07090f',
+  dom: { createContainer: true },
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: 1280,
     height: 720,
   },
-  scene: [BootScene, GameScene],
+  scene: [BootScene, TitleScene, LoginScene, HubScene, HeroScene, LevelSelectScene, GameScene],
 };
 
 async function start() {
@@ -19,7 +25,7 @@ async function start() {
   try {
     await document.fonts.load('32px Bangers');
   } catch (e) {
-    // Offline or font blocked: the fallback font is fine
+    // Font blocked: the fallback font is fine
   }
   window.game = new Phaser.Game(config);
 }
