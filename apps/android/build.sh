@@ -45,6 +45,6 @@ BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail 
   --out ../out/ki-defenders.apk ../out/aligned.apk
 jarsigner -keystore ../keystore.p12 -storetype PKCS12 -storepass "$ANDROID_KEYSTORE_PASS" \
   -signedjar ../out/ki-defenders.aab app/build/outputs/bundle/release/app-release.aab kidefenders
-rm -f ../keystore.p12 ../out/aligned.apk
+rm -f ../keystore.p12 ../out/aligned.apk ../out/*.idsig
 "$BT/apksigner" verify ../out/ki-defenders.apk
 echo "Built Ki Defenders ${VERSION_NAME}"

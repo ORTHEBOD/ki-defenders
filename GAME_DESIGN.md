@@ -209,7 +209,7 @@ An evil space emperor, **Lord Vorak**, sends his army to conquer the planet. Zen
 | 7 | Login, online save, leaderboard | Online features (done - needs the Netlify site connected) |
 | 8 | AI art + sound + music | Art loader + ART_PROMPTS.md ready (waiting for the pictures); area music done |
 | 9 | Endless mode, polish, balance | Tutorial, daily reward, next-level button, auto-pause, balance (done) |
-| 10 | Android app (Capacitor) + PC app (Electron) | Store-ready |
+| 10 | Android app (Capacitor) + PC app (Electron) | Built on GitHub Actions, posted on Releases (done) |
 
 ---
 
