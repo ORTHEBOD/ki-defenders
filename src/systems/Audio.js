@@ -22,6 +22,23 @@ const SONGS = {
     kick: 'x-------x-x-----', snare: '----x-------x---', hat: 'x-x-x-x-x-x-x-x-',
     leadVol: 0.045,
   },
+  // Desert Wasteland: an eastern-sounding scale and a rolling beat
+  desert: {
+    bpm: 128, perBeat: 4, leadWave: 'triangle',
+    lead: 'D5 _ _ _ C#5 _ D5 _ F5 _ E5 _ D5 _ A4 _ A#4 _ _ _ A4 _ G4 _ A4 _ _ _ - - - - '
+      + 'F5 _ _ _ E5 _ F5 _ A5 _ G5 _ F5 _ E5 _ D5 _ _ _ C#5 _ E5 _ D5 _ _ _ - - - -',
+    bass: 'D2 - D2 A2 D2 - D2 A2 A#1 - A#1 F2 A#1 - A#1 F2 G1 - G1 D2 G1 - G1 D2 A1 - A1 E2 A1 - C#2 E2',
+    kick: 'x--x--x-x--x--x-', snare: '----x-------x--x', hat: '--x---x---x---x-',
+    leadVol: 0.07,
+  },
+  // Enemy Mothership: fast synth arpeggios
+  ship: {
+    bpm: 145, perBeat: 4, leadWave: 'sawtooth',
+    lead: 'E5 B4 G4 B4 E5 B4 G4 B4 D5 A4 F#4 A4 D5 A4 F#4 A4 C5 G4 E4 G4 C5 G4 E4 G4 B4 F#4 D#4 F#4 B4 F#4 D#4 F#4',
+    bass: 'E2 _ E2 _ E3 _ E2 _ D2 _ D2 _ D3 _ D2 _ C2 _ C2 _ C3 _ C2 _ B1 _ B1 _ B2 _ B1 _',
+    kick: 'x---x---x---x---', snare: '----x-------x---', hat: 'x-xxx-xxx-xxx-xx',
+    leadVol: 0.03,
+  },
   boss: {
     bpm: 155, perBeat: 4,
     lead: 'D5 _ - D5 F5 _ D5 _ C5 _ A4 _ C5 _ D5 _ A#4 _ - A#4 D5 _ A#4 _ A4 _ G4 _ A4 _ C#5 _',
@@ -58,6 +75,7 @@ function parse(str) {
 let ctx = null;
 let master;
 let musicGain;
+let leadBus;
 let sfxGain;
 let noise;
 let song = null;
@@ -77,6 +95,18 @@ function setup() {
   sfxGain = ctx.createGain();
   musicGain.connect(master);
   sfxGain.connect(master);
+  // The melody gets a soft echo, which makes the little synth sound much fuller
+  leadBus = ctx.createGain();
+  const delay = ctx.createDelay(1);
+  const feedback = ctx.createGain();
+  const wet = ctx.createGain();
+  delay.delayTime.value = 0.27;
+  feedback.gain.value = 0.32;
+  wet.gain.value = 0.35;
+  leadBus.connect(musicGain);
+  leadBus.connect(delay);
+  delay.connect(feedback).connect(delay);
+  delay.connect(wet).connect(musicGain);
   noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const d = noise.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -115,7 +145,7 @@ function burst(t, dur, vol, dest, filter = 'highpass', cutoff = 1500) {
 function playStep(s, t) {
   const stepDur = 60 / s.bpm / s.perBeat;
   const li = step % s.lead.length;
-  for (const n of s.lead.notes) if (n.step === li) tone('square', n.f, t, n.len * stepDur * 0.95, s.leadVol, musicGain);
+  for (const n of s.lead.notes) if (n.step === li) tone(s.leadWave ?? 'square', n.f, t, n.len * stepDur * 0.95, s.leadVol, leadBus);
   const bi = step % s.bass.length;
   for (const n of s.bass.notes) if (n.step === bi) tone('triangle', n.f, t, n.len * stepDur * 0.9, 0.12, musicGain);
   const at = (pat) => pat[step % pat.length] === 'x';
@@ -177,7 +207,7 @@ export const Audio = {
     sfxGain.gain.value = Settings.get('sfx');
   },
 
-  // Starts a song by name ('menu', 'battle', 'boss'). Keeps playing if it is already on.
+  // Starts a song by name ('menu', 'battle', 'desert', 'ship', 'boss'). Keeps playing if it is already on.
   music(name) {
     wanted = name;
     if (!ctx) return;

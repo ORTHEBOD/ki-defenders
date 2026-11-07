@@ -52,26 +52,31 @@ export default class ShopScene extends Phaser.Scene {
 
   showGear() {
     const L = this.layer;
-    const heroId = this.player.activeHero;
-    const worn = activeHero(this.player).gear;
-    L.add(this.add.text(640, 160, `Bought gear can be worn by any hero. Buying puts it on ${HEROES[heroId].name}.`,
-      textStyle(20, '#c9d3ff')).setOrigin(0.5));
+    const hero = activeHero(this.player);
+    const worn = hero?.gear ?? {};
+    const note = hero
+      ? `Bought gear can be worn by any hero. Buying puts it on ${HEROES[this.player.activeHero].name}.`
+      : 'Bought gear can be worn by any hero - win your first hero in the Lucky Spin!';
+    L.add(this.add.text(640, 160, note, textStyle(20, '#c9d3ff')).setOrigin(0.5));
     GEAR_SLOTS.forEach((slot, col) => {
-      const x = 175 + col * 310;
-      L.add(this.add.text(x, 200, slot.name, textStyle(28, '#ffd93b')).setOrigin(0.5));
+      const x = 134 + col * 253;
+      L.add(this.add.text(x, 200, slot.name, textStyle(26, '#ffd93b')).setOrigin(0.5));
       Object.entries(GEAR).filter(([, g]) => g.slot === slot.key).forEach(([id, item], row) => {
         const y = 300 + row * 140;
         const owned = this.player.items.includes(id);
         const wearing = worn[slot.key] === id;
-        L.add(panel(this, x, y, 290, 124, item.color));
-        L.add(this.gearIcon(x - 104, y - 10, slot.key, item.color));
-        L.add(this.add.text(x - 70, y - 38, item.name, textStyle(22)).setOrigin(0, 0.5));
-        L.add(this.add.text(x - 70, y - 4, gearText(item), { ...textStyle(16, '#9bff7a'), wordWrap: { width: 200 } }).setOrigin(0, 0.5));
+        L.add(panel(this, x, y, 240, 124, item.color));
+        L.add(this.gearIcon(x - 92, y - 10, slot.key, item.color));
+        L.add(this.add.text(x - 64, y - 38, item.name, textStyle(19)).setOrigin(0, 0.5));
+        L.add(this.add.text(x - 64, y - 4, gearText(item), { ...textStyle(14, '#9bff7a'), wordWrap: { width: 170 } }).setOrigin(0, 0.5));
         let label;
         let action;
         let color = 0x2f8a4a;
         if (wearing) {
           label = 'Wearing';
+          color = 0x3a4470;
+        } else if (owned && !hero) {
+          label = 'Owned';
           color = 0x3a4470;
         } else if (owned) {
           label = 'Wear';
@@ -81,7 +86,7 @@ export default class ShopScene extends Phaser.Scene {
           color = 0xc99a00;
           action = () => this.buy(id);
         }
-        const b = makeButton(this, x + 40, y + 36, 190, 40, label, () => action?.(), { fontSize: 20, color });
+        const b = makeButton(this, x + 22, y + 36, 180, 40, label, () => action?.(), { fontSize: 19, color });
         if (!action || (!owned && this.player.coins < item.cost)) b.setEnabled(false);
         L.add(b);
       });
@@ -97,6 +102,9 @@ export default class ShopScene extends Phaser.Scene {
     } else if (slot === 'armor') {
       g.fillRoundedRect(x - 14, y - 14, 28, 28, 6).strokeRoundedRect(x - 14, y - 14, 28, 28, 6);
       g.lineStyle(2, 0x0d0d12).lineBetween(x, y - 14, x, y + 14);
+    } else if (slot === 'accessory') {
+      g.fillCircle(x, y, 13).strokeCircle(x, y, 13);
+      g.fillStyle(0xffffff, 0.6).fillCircle(x - 4, y - 4, 4);
     } else if (slot === 'boots') {
       g.fillRect(x - 10, y - 14, 10, 22).strokeRect(x - 10, y - 14, 10, 22);
       g.fillRoundedRect(x - 10, y + 4, 22, 10, 4).strokeRoundedRect(x - 10, y + 4, 22, 10, 4);
@@ -113,7 +121,8 @@ export default class ShopScene extends Phaser.Scene {
       if (p.coins < item.cost || p.items.includes(id)) return false;
       p.coins -= item.cost;
       p.items.push(id);
-      activeHero(p).gear[item.slot] = id;
+      const h = activeHero(p);
+      if (h) h.gear[item.slot] = id;
       return true;
     });
     if (ok) {
@@ -124,7 +133,10 @@ export default class ShopScene extends Phaser.Scene {
   }
 
   wear(id) {
-    Save.update((p) => { activeHero(p).gear[GEAR[id].slot] = id; });
+    Save.update((p) => {
+      const h = activeHero(p);
+      if (h) h.gear[GEAR[id].slot] = id;
+    });
     this.refreshCoins();
     this.show('gear');
   }
@@ -161,10 +173,10 @@ export default class ShopScene extends Phaser.Scene {
     // Prize list and chances
     L.add(panel(this, 960, 300, 500, 260));
     L.add(this.add.text(960, 195, 'Win a new hero!', textStyle(32, '#ffd93b')).setOrigin(0.5));
-    Object.entries(HEROES).filter(([id]) => id !== 'zenko').forEach(([id, h], i) => {
-      const x = 820 + i * 140;
+    Object.entries(HEROES).forEach(([id, h], i) => {
+      const x = 765 + i * 130;
       const owned = !!this.player.heroes[id];
-      L.add(fighterPortrait(this, x, 285, h.look, 1.3));
+      L.add(fighterPortrait(this, x, 285, h.look, 1.3, `hero_${id}_0`));
       L.add(this.add.text(x, 340, h.name, textStyle(22, owned ? '#5be35b' : '#ffffff')).setOrigin(0.5));
       L.add(this.add.text(x, 366, owned ? 'Owned' : h.title.split(' ').slice(-1)[0], textStyle(15, '#9aa3c7')).setOrigin(0.5));
     });
@@ -242,7 +254,11 @@ export default class ShopScene extends Phaser.Scene {
         text = `${HEROES[slice.hero].name} again!\nTurned into ${SPIN.dupeCoins} coins.`;
       } else {
         p.heroes[slice.hero] = newHeroSave();
-        text = `NEW HERO: ${HEROES[slice.hero].name}!\nChoose them on the Heroes screen.`;
+        // The first hero is put to work right away
+        const first = !p.activeHero;
+        if (first) p.activeHero = slice.hero;
+        text = first ? `YOUR FIRST HERO: ${HEROES[slice.hero].name}!\nThey join your next battle.`
+          : `NEW HERO: ${HEROES[slice.hero].name}!\nChoose them on the Heroes screen.`;
       }
     });
     Audio.sfx(slice.kind === 'hero' ? 'win' : 'coin');

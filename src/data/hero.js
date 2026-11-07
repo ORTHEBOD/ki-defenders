@@ -44,8 +44,21 @@ export const ABILITIES = {
   spiritOrb: { name: 'Spirit Orb', label: 'Spirit\nOrb', color: 0x9fe8ff, aim: true, cooldown: 55, damage: 150, radius: 120, charge: 1 },
 };
 
+// Kai Wave can be used from the start; the other abilities are learned in the Techniques branch.
+export const FREE_ABILITY = 'kaiWave';
+
 // Each skill costs 1 skill point. Skills in a branch are learned from top to bottom.
+// `needs` = another skill that must be learned first (from any branch).
 export const SKILL_TREE = [
+  {
+    branch: 'Techniques',
+    color: 0xc38be0,
+    skills: [
+      { id: 'flashStep', name: 'Flash Step', desc: 'New ability: teleport and blast the enemies around you', ability: true },
+      { id: 'powerUp', name: 'Power Up', desc: 'New ability: gold hair for a few seconds - stronger and faster', ability: true },
+      { id: 'spiritOrb', name: 'Spirit Orb', desc: 'New ability: charge a giant orb and throw it for a huge explosion', ability: true },
+    ],
+  },
   {
     branch: 'Strength',
     color: 0xff6b4a,
@@ -64,7 +77,7 @@ export const SKILL_TREE = [
     skills: [
       { id: 'quickFeet', name: 'Quick Feet', desc: '+25% move speed' },
       { id: 'fastStrikes', name: 'Fast Strikes', desc: '+25% attack speed' },
-      { id: 'flashStepPlus', name: 'Flash Step+', desc: 'Flash Step recharges 40% faster and hits twice as hard' },
+      { id: 'flashStepPlus', name: 'Flash Step+', desc: 'Flash Step recharges 40% faster and hits twice as hard', needs: 'flashStep' },
       { id: 'afterimage', name: 'Afterimage', desc: 'Take 20% less damage' },
       { id: 'quickReturn', name: 'Quick Return', desc: 'Come back twice as fast after being defeated' },
       { id: 'cooldownMaster', name: 'Focus', desc: 'All abilities recharge 20% faster' },
@@ -76,7 +89,7 @@ export const SKILL_TREE = [
     skills: [
       { id: 'kiHarvest', name: 'Ki Harvest', desc: '+2 Ki for every enemy the hero defeats' },
       { id: 'battleAura', name: 'Battle Aura', desc: 'Fighters near the hero deal 15% more damage' },
-      { id: 'spiritOrbPlus', name: 'Spirit Orb+', desc: 'Spirit Orb is 50% stronger, bigger and recharges faster' },
+      { id: 'spiritOrbPlus', name: 'Spirit Orb+', desc: 'Spirit Orb is 50% stronger, bigger and recharges faster', needs: 'spiritOrb' },
       { id: 'overflow', name: 'Overflow', desc: 'Start every level with +50 Ki' },
       { id: 'bounty', name: 'Bounty', desc: '+25% coins from every battle' },
       { id: 'greatAura', name: 'Great Aura', desc: 'Battle Aura reaches farther and gives +25% damage' },
@@ -87,12 +100,17 @@ export const SKILL_TREE = [
 // Kept for older code: the starting hero
 export const HERO = { ...HEROES.zenko, abilities: ABILITIES, skillTree: SKILL_TREE };
 
+// Can this saved hero use this ability yet?
+export function hasAbility(hero, key) {
+  return key === FREE_ABILITY || learnedSkills(hero).includes(key);
+}
+
 export function newHeroSave() {
   return { level: 1, xp: 0, skills: [], gear: {} };
 }
 
 export function xpToNext(level) {
-  return 100 + (level - 1) * 50;
+  return 120 + (level - 1) * 80;
 }
 
 // Adds XP to a saved hero ({ level, xp }) and returns how many levels were gained

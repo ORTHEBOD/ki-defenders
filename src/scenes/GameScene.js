@@ -65,7 +65,8 @@ export default class GameScene extends Phaser.Scene {
     this.state = 'playing';
     // The "screen shake" setting: when off, camera shakes do nothing
     if (!Settings.get('screenShake')) this.cameras.main.shake = () => this.cameras.main;
-    Audio.music('battle');
+    this.areaMusic = this.endless ? 'battle' : MAPS[this.level.map ?? 0].music;
+    Audio.music(this.areaMusic);
     this.menu = null;
     this.tweens.timeScale = this.speed;
     this.time.timeScale = this.speed;
@@ -81,22 +82,29 @@ export default class GameScene extends Phaser.Scene {
     this.uiClickFrame = -1;
 
     // The hero starts next to the base, with their saved level, skills and gear
+    // No hero yet (they are won in the Lucky Spin): the fighters defend alone
     const player = Save.current();
-    const saved = player ? activeHero(player) : { level: 1, skills: [], gear: {} };
+    this.player = player;
+    const saved = player ? activeHero(player) : null;
     const end = this.route.end;
-    this.hero = new Hero(this, end.x - 90, end.y - 80, saved, player?.activeHero);
-    const heroName = this.hero.def.name;
-    if (this.hero.has('overflow')) this.ki += 50;
+    this.hero = saved ? new Hero(this, end.x - 90, end.y - 80, saved, player.activeHero) : null;
+    const heroName = this.hero?.def.name;
+    if (this.hero?.has('overflow')) this.ki += 50;
+    // Tester account: lots of Ki to try everything
+    if (player?.super) this.ki += 20000;
 
     this.createHud();
-    this.createAbilityBar();
+    this.abilityButtons = [];
+    if (this.hero) this.createAbilityBar();
     if (this.maze) {
       this.heroSel = this.add.ellipse(0, 0, 66, 24).setStrokeStyle(4, 0xffffff).setDepth(17).setVisible(false);
       this.drawRoute();
       this.floatText(W / 2, 560, 'Tap empty ground to build. Fighters and walls block the way!', '#ffe9c4', 28);
-      this.time.delayedCall(1400, () => this.floatText(W / 2, 560, `Tap ${heroName}, then tap where to send them`, '#ffe9c4', 28));
-    } else {
+      if (this.hero) this.time.delayedCall(1400, () => this.floatText(W / 2, 560, `Tap ${heroName}, then tap where to send them`, '#ffe9c4', 28));
+    } else if (this.hero) {
       this.floatText(W / 2, 600, `Tap the ground to move ${heroName}`, '#ffe9c4', 28);
+    } else {
+      this.floatText(W / 2, 600, 'Tap a glowing spot to place a fighter', '#ffe9c4', 28);
     }
 
     this.input.on('pointerdown', (pointer, over) => {
@@ -106,14 +114,14 @@ export default class GameScene extends Phaser.Scene {
         // Use the chosen ability at the tapped spot
         const key = this.aiming;
         this.cancelAim();
-        this.hero.cast(key, pointer.worldX, pointer.worldY);
+        this.hero?.cast(key, pointer.worldX, pointer.worldY);
         return;
       }
       if (over.length > 0) return;
       // Tapping empty ground: close a menu, or move Zenko there (maze: build there)
       if (this.menu) this.closeMenu();
       else if (this.maze) this.mazeTap(pointer.worldX, pointer.worldY);
-      else if (pointer.worldY > 60) this.hero.moveTo(pointer.worldX, pointer.worldY);
+      else if (pointer.worldY > 60) this.hero?.moveTo(pointer.worldX, pointer.worldY);
     });
   }
 
@@ -128,6 +136,10 @@ export default class GameScene extends Phaser.Scene {
       const shade = this.add.graphics();
       const timer = this.add.text(0, 0, '', textStyle(26)).setOrigin(0.5);
       c.add([bg, label, shade, timer]);
+      if (!this.hero.knows(key)) {
+        label.setAlpha(0.35);
+        c.add(this.add.text(0, 0, '🔒', { fontSize: '26px' }).setOrigin(0.5));
+      }
       bg.setInteractive({ useHandCursor: true });
       bg.on('pointerdown', () => {
         this.uiClickFrame = this.game.loop.frame;
@@ -147,6 +159,10 @@ export default class GameScene extends Phaser.Scene {
     this.cancelAim();
     this.selectHero(false);
     const hero = this.hero;
+    if (!hero.knows(key)) {
+      this.floatText(W / 2, 600, `Learn ${hero.A[key].name} in the Heroes skill tree`, '#ffd93b', 26);
+      return;
+    }
     if (!hero.alive) {
       this.floatText(W / 2, 600, `${hero.def.name} is down`, '#ff6b6b', 26);
       return;
@@ -170,6 +186,7 @@ export default class GameScene extends Phaser.Scene {
 
   refreshAbilities() {
     for (const b of this.abilityButtons) {
+      if (!this.hero.knows(b.key)) continue;
       const left = this.hero.cd[b.key];
       const total = this.hero.abilityCooldown(b.key);
       b.shade.clear();
@@ -428,7 +445,7 @@ export default class GameScene extends Phaser.Scene {
       if (y > 60) h.moveTo(x, y);
       return;
     }
-    if (h.alive && Math.hypot(x - h.x, y - (h.y - 10)) < 42) {
+    if (h?.alive && Math.hypot(x - h.x, y - (h.y - 10)) < 42) {
       this.selectHero(true);
       return;
     }
@@ -446,7 +463,7 @@ export default class GameScene extends Phaser.Scene {
 
   selectHero(on) {
     if (!this.maze) return;
-    this.heroSelected = on && this.hero.alive;
+    this.heroSelected = !!(on && this.hero?.alive);
     this.heroSel.setVisible(this.heroSelected);
     this.heroHint?.destroy();
     this.heroHint = null;
@@ -746,15 +763,15 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    this.hero.updateBlocking(this.enemies);
+    this.hero?.updateBlocking(this.enemies);
     for (const e of this.enemies) if (e.alive) e.update(dt);
     for (const f of this.fighters) f.update(dt);
-    this.hero.update(dt);
+    this.hero?.update(dt);
     if (this.heroSelected) {
-      if (this.hero.alive) this.heroSel.setPosition(this.hero.x, this.hero.y + 16);
+      if (this.hero?.alive) this.heroSel.setPosition(this.hero.x, this.hero.y + 16);
       else this.selectHero(false);
     }
-    this.refreshAbilities();
+    if (this.hero) this.refreshAbilities();
     this.updateProjectiles(dt);
     this.updateHazards(dt);
     this.updateBossBar();
@@ -968,7 +985,7 @@ export default class GameScene extends Phaser.Scene {
   onEnemyKilled(e) {
     if (e.def.boss) {
       Audio.sfx('explode');
-      Audio.music('battle');
+      Audio.music(this.areaMusic);
       this.explosionFx(e.x, e.y, 120, 0xff8a3d);
       this.cameras.main.shake(500, 0.012);
       this.banner(`${e.def.name} defeated!`);
@@ -1013,6 +1030,17 @@ export default class GameScene extends Phaser.Scene {
     }, { color: 0xe0661a }));
     m.add(makeButton(this, W / 2, 404, 300, 64, 'Restart level', () => this.scene.restart(this.startData)));
     m.add(makeButton(this, W / 2, 488, 300, 64, this.endless ? 'Quit' : 'Quit to map', () => this.quitToMap()));
+    if (this.player?.super) {
+      m.add(makeButton(this, W / 2 - 330, 404, 260, 54, 'Tester: +5000 Ki', () => {
+        this.ki += 5000;
+        this.refreshHud();
+      }, { fontSize: 22, color: 0x6a3ab8 }));
+      m.add(makeButton(this, W / 2 - 330, 488, 260, 54, 'Tester: win now', () => {
+        this.enemies.forEach((e) => e.destroy());
+        this.enemies = [];
+        this.endGame(true);
+      }, { fontSize: 22, color: 0x6a3ab8 }));
+    }
     const musicLabel = () => `Music: ${Settings.get('music') > 0 ? 'On' : 'Off'}`;
     const mb = makeButton(this, W / 2, 572, 300, 54, musicLabel(), () => {
       Settings.set('music', Settings.get('music') > 0 ? 0 : 0.5);
@@ -1034,7 +1062,7 @@ export default class GameScene extends Phaser.Scene {
     const xp = this.xpEarned + this.heroKillXp + bonus;
     const stars = win ? this.diff.stars : 0;
     const coins = battleCoins({
-      win, stars, levelNumber: this.level.id, kills: this.kills, bounty: this.hero.has('bounty'),
+      win, stars, levelNumber: this.level.id, kills: this.kills, bounty: !!this.hero?.has('bounty'), extra: this.hero?.gear.coins ?? 0,
       endlessWaves: this.endless ? wavesDone : undefined,
     });
     const result = Save.update((p) => {
@@ -1049,8 +1077,8 @@ export default class GameScene extends Phaser.Scene {
       p.kills += this.kills;
       p.coins += coins;
       const hero = activeHero(p);
-      const gained = addXp(hero, xp);
-      return { newBest, gained, heroLevel: hero.level, best: p.endlessBest };
+      const gained = hero ? addXp(hero, xp) : 0;
+      return { newBest, gained, heroLevel: hero?.level, best: p.endlessBest };
     });
     return { xp, stars, coins, wavesDone, ...(result || { newBest: false, gained: 0 }) };
   }
@@ -1066,7 +1094,7 @@ export default class GameScene extends Phaser.Scene {
     const r = this.saveRewards(win);
     Audio.stopMusic();
     Audio.sfx(win ? 'victory' : 'defeat');
-    const heroName = this.hero.def.name;
+    const heroName = this.hero?.def.name;
 
     this.add.rectangle(0, 0, W, H, 0x000000, 0.65).setOrigin(0).setDepth(200).setInteractive();
     this.add.text(W / 2, 150, this.endless ? 'Game Over' : win ? 'Victory!' : 'Defeat', textStyle(96, win ? '#ffd93b' : '#ff5a5a'))
@@ -1084,7 +1112,8 @@ export default class GameScene extends Phaser.Scene {
       this.add.text(W / 2, 260, 'The army broke through. Train harder and try again.', textStyle(28))
         .setOrigin(0.5).setDepth(201);
     }
-    this.add.text(W / 2, 360, `${heroName} +${r.xp} XP   (${this.kills} enemies defeated)`, textStyle(30, '#3fd0f5'))
+    this.add.text(W / 2, 360, heroName ? `${heroName} +${r.xp} XP   (${this.kills} enemies defeated)`
+      : `${this.kills} enemies defeated - win a hero in the Shop's Lucky Spin!`, textStyle(30, '#3fd0f5'))
       .setOrigin(0.5).setDepth(201);
     this.add.image(W / 2 - 70, 400, 'coin').setDepth(201);
     this.add.text(W / 2 - 50, 400, `+${r.coins} coins`, textStyle(30, '#ffd93b')).setOrigin(0, 0.5).setDepth(201);

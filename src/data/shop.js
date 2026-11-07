@@ -1,12 +1,14 @@
 // Everything the shop sells. Coins are won in every battle.
 
 // Equipment: each hero can wear one item per slot. Bought items can be worn by any hero.
-// stats: damage / hp / speed / attackSpeed = +%, cooldown = -% ability recharge time.
+// stats: damage / hp / speed / attackSpeed / range / coins = +%, cooldown = -% ability recharge time,
+// regen = extra healing speed (2 = heals 3x faster).
 export const GEAR_SLOTS = [
   { key: 'weapon', name: 'Weapon' },
   { key: 'armor', name: 'Armor' },
   { key: 'boots', name: 'Boots' },
   { key: 'amulet', name: 'Amulet' },
+  { key: 'accessory', name: 'Accessory' },
 ];
 
 export const GEAR = {
@@ -25,6 +27,10 @@ export const GEAR = {
   kiCharm: { slot: 'amulet', name: 'Ki Charm', cost: 300, color: 0xc98a3a, stats: { cooldown: 0.1 } },
   spiritPendant: { slot: 'amulet', name: 'Spirit Pendant', cost: 1000, color: 0x9fe8ff, stats: { cooldown: 0.2 } },
   dragonPearl: { slot: 'amulet', name: 'Dragon Pearl', cost: 2600, color: 0xff8a3d, stats: { cooldown: 0.3, damage: 0.1 } },
+
+  scouter: { slot: 'accessory', name: 'Scouter Lens', cost: 600, color: 0x5be35b, stats: { range: 0.3 } },
+  healingBand: { slot: 'accessory', name: 'Healing Band', cost: 900, color: 0xff6b8a, stats: { regen: 2, hp: 0.1 } },
+  luckyCoin: { slot: 'accessory', name: 'Lucky Coin', cost: 1500, color: 0xffd93b, stats: { coins: 0.3 } },
 };
 
 const STAT_TEXT = {
@@ -33,6 +39,9 @@ const STAT_TEXT = {
   speed: (v) => `+${Math.round(v * 100)}% move speed`,
   attackSpeed: (v) => `+${Math.round(v * 100)}% attack speed`,
   cooldown: (v) => `abilities ${Math.round(v * 100)}% faster`,
+  range: (v) => `+${Math.round(v * 100)}% attack range`,
+  regen: (v) => `heals ${v + 1}x faster`,
+  coins: (v) => `+${Math.round(v * 100)}% coins`,
 };
 
 export function gearText(item) {
@@ -41,7 +50,7 @@ export function gearText(item) {
 
 // Adds up a hero's worn gear into one bonus object
 export function gearBonus(gear = {}) {
-  const b = { damage: 0, hp: 0, speed: 0, attackSpeed: 0, cooldown: 0 };
+  const b = { damage: 0, hp: 0, speed: 0, attackSpeed: 0, cooldown: 0, range: 0, regen: 0, coins: 0 };
   for (const id of Object.values(gear)) {
     const item = GEAR[id];
     if (!item) continue;
@@ -54,8 +63,9 @@ export function gearBonus(gear = {}) {
 // A hero you already have turns into `dupeCoins` coins.
 export const SPIN = {
   cost: 250,
-  dupeCoins: 800,
+  dupeCoins: 400,
   slices: [
+    { kind: 'hero', hero: 'zenko', label: 'Zenko', color: 0xd8442b, weight: 8 },
     { kind: 'coins', amount: 100, label: '100', color: 0x8a6a2a, weight: 26 },
     { kind: 'hero', hero: 'mira', label: 'Mira', color: 0x2fb3a0, weight: 4 },
     { kind: 'coins', amount: 200, label: '200', color: 0xa07a2a, weight: 20 },
@@ -67,10 +77,10 @@ export const SPIN = {
   ],
 };
 
-// Coins for a battle. bounty = the hero's Bounty skill.
-export function battleCoins({ win, stars, levelNumber, kills, endlessWaves, bounty }) {
+// Coins for a battle. bounty = the hero's Bounty skill, extra = gear bonus (0.3 = +30%).
+export function battleCoins({ win, stars, levelNumber, kills, endlessWaves, bounty, extra = 0 }) {
   let c;
   if (endlessWaves !== undefined) c = endlessWaves * 12 + kills;
   else c = kills + (win ? 40 + 25 * stars + 4 * levelNumber : 15);
-  return Math.round(c * (bounty ? 1.25 : 1));
+  return Math.round(c * (bounty ? 1.25 : 1) * (1 + extra));
 }

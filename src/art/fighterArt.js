@@ -56,8 +56,12 @@ export function drawFighterArt(g, look) {
   g.fillStyle(shade(look.hair, 1.6), 0.55).fillPoints(pts([[27, 12], [32, 3], [34, 11], [30, 14]]), true);
 }
 
-// A big, crisp fighter portrait centered on (x, y)
-export function fighterPortrait(scene, x, y, look, scale = 3) {
+// A big, crisp fighter portrait centered on (x, y).
+// `key` (a texture key like 'hero_zenko_0') uses the AI picture when one has been added.
+export function fighterPortrait(scene, x, y, look, scale = 3, key = null) {
+  if (key && scene.textures.exists(`art_${key}`)) {
+    return scene.add.image(x, y, `art_${key}`).setDisplaySize(64 * scale, 64 * scale);
+  }
   const g = scene.add.graphics();
   drawFighterArt(g, look);
   g.setScale(scale).setPosition(x - 32 * scale, y - 32 * scale);

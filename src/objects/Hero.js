@@ -1,4 +1,4 @@
-import { HEROES, ABILITIES, heroPower, heroMaxHp, learnedSkills } from '../data/hero.js';
+import { HEROES, ABILITIES, FREE_ABILITY, heroPower, heroMaxHp, learnedSkills } from '../data/hero.js';
 import { gearBonus } from '../data/shop.js';
 import { Audio } from '../systems/Audio.js';
 import { distToSegment } from '../systems/Path.js';
@@ -133,7 +133,9 @@ export default class Hero {
     }
 
     this.sinceHit += dt;
-    if (this.sinceHit > 3 && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.04 * dt);
+    if (this.sinceHit > 3 && this.hp < this.maxHp) {
+      this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.04 * (1 + this.gear.regen) * dt);
+    }
 
     if (this.channel) {
       this.channel.t -= dt;
@@ -163,7 +165,7 @@ export default class Hero {
   attack(dt) {
     this.attackTimer -= dt;
     if (this.attackTimer > 0) return;
-    const e = this.scene.findNearest(this.x, this.y, this.B.range);
+    const e = this.scene.findNearest(this.x, this.y, this.range);
     if (!e) return;
     this.attackTimer = this.attackCooldown;
     this.sprite.setFlipX(e.x < this.x);
@@ -254,8 +256,17 @@ export default class Hero {
 
   // ---------- Abilities ----------
 
+  get range() {
+    return this.B.range * (1 + this.gear.range);
+  }
+
+  // Kai Wave is known from the start; the others are learned in the skill tree
+  knows(key) {
+    return key === FREE_ABILITY || this.has(key);
+  }
+
   canUse(key) {
-    return this.alive && !this.channel && this.cd[key] <= 0;
+    return this.knows(key) && this.alive && !this.channel && this.cd[key] <= 0;
   }
 
   cast(key, x, y) {

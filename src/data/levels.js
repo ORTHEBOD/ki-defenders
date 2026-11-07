@@ -9,7 +9,7 @@ export const MAPS = [
       ground: 0x6fb552, blobs: [0x64a84a, 0x7cc25e, 0x5d9e44], edge: 0xa8864f, road: 0xe0c08c, pebble: 0xc9a66b,
       deco: ['tree', 'tree', 'rock', 'bush'], boulder: 0x8c8f99,
     },
-    miniBoss: 'ogre', boss: 'krag',
+    miniBoss: 'ogre', boss: 'krag', music: 'battle',
   },
   {
     name: 'Desert Wasteland', color: 0xc98a3a, needStars: 15,
@@ -17,7 +17,7 @@ export const MAPS = [
       ground: 0xe2b86a, blobs: [0xd6a858, 0xecc684, 0xc99a4a], edge: 0x9a6a3a, road: 0xc48a52, pebble: 0xa87040,
       deco: ['cactus', 'cactus', 'sandrock', 'bones'], boulder: 0xb8865a,
     },
-    miniBoss: 'scorpion', boss: 'sandKing',
+    miniBoss: 'scorpion', boss: 'sandKing', music: 'desert',
   },
   {
     name: 'Enemy Mothership', color: 0x6a5aa8, needStars: 40,
@@ -25,7 +25,7 @@ export const MAPS = [
       ground: 0x3a4152, blobs: [0x343a4a, 0x40485a, 0x2e3442], edge: 0x1a1d28, road: 0x5a6378, pebble: 0x3fd0f5,
       deco: ['crate', 'light', 'pipe', 'crate'], boulder: 0x5a6378, metal: true,
     },
-    miniBoss: 'mech', boss: 'vorn',
+    miniBoss: 'mech', boss: 'vorn', music: 'ship',
   },
 ];
 

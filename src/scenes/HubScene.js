@@ -6,8 +6,8 @@ import { Save, Sync, totalStars, activeHero } from '../systems/Save.js';
 import { Audio } from '../systems/Audio.js';
 import { textStyle } from '../ui/theme.js';
 
-// Endless mode opens after this level is won
-export const ENDLESS_AFTER = 3;
+// Endless mode opens with this many stars
+export const ENDLESS_STARS = 10;
 
 export default class HubScene extends Phaser.Scene {
   constructor() {
@@ -44,6 +44,7 @@ export default class HubScene extends Phaser.Scene {
         online: ['☁ Progress saved online', '#5be35b'],
         pending: ['☁ Saving online...', '#ffd93b'],
         login: ['Saved on this device. Log out and back in with internet to save online.', '#ffb35b'],
+        local: ['Tester account - saved on this device only', '#c9a8ff'],
         taken: ['This name belongs to another player online - progress is saved on this device only.', '#ff8a8a'],
       }[st];
       if (text) status.setText(text[0]).setColor(text[1]);
@@ -55,9 +56,27 @@ export default class HubScene extends Phaser.Scene {
 
     // Hero card: the hero in use right now
     const hero = activeHero(player);
-    const def = HEROES[player.activeHero] ?? HEROES.zenko;
+    if (hero) this.heroCard(player, hero);
+    else {
+      panel(this, 330, 400, 500, 520);
+      this.add.text(330, 250, 'No hero yet', textStyle(48, '#ffd93b')).setOrigin(0.5);
+      this.add.text(330, 340, 'Your fighters defend the base alone\nfor now. Earn coins in battle and\nwin a hero in the Lucky Spin!',
+        { ...textStyle(24), align: 'center' }).setOrigin(0.5);
+      makeButton(this, 330, 470, 300, 64, 'Lucky Spin', () => this.scene.start('Shop', { tab: 'spin' }),
+        { color: 0xc99a00, fontSize: 30 });
+    }
+    this.buttons(player, hero);
+
+    if (data && data.welcome) {
+      const t = this.add.text(830, 660, data.welcome, textStyle(30, '#5be35b')).setOrigin(0.5);
+      this.tweens.add({ targets: t, alpha: 0, delay: 2200, duration: 600 });
+    }
+  }
+
+  heroCard(player, hero) {
+    const def = HEROES[player.activeHero];
     panel(this, 330, 400, 500, 520, def.look.gi);
-    const art = fighterPortrait(this, 330, 290, def.look, 3.6);
+    const art = fighterPortrait(this, 330, 290, def.look, 3.6, `hero_${player.activeHero}_0`);
     this.tweens.add({ targets: art, y: art.y - 8, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     this.add.text(330, 440, def.name, textStyle(48)).setOrigin(0.5);
     this.add.text(330, 482, def.title, textStyle(22, '#c9d3ff')).setOrigin(0.5);
@@ -67,26 +86,24 @@ export default class HubScene extends Phaser.Scene {
     this.add.text(330, 590, `XP ${hero.xp} / ${need}`, textStyle(22, '#c9d3ff')).setOrigin(0.5);
     const sp = skillPoints(hero);
     this.add.text(330, 626, `Skill points: ${sp}`, textStyle(24, sp > 0 ? '#5be35b' : '#c9d3ff')).setOrigin(0.5);
+  }
+
+  buttons(player, hero) {
 
     // Main buttons
     makeButton(this, 830, 190, 420, 100, 'Play', () => this.scene.start('LevelSelect'), { color: 0xe0661a, fontSize: 56 });
     makeButton(this, 830, 300, 420, 76, 'Heroes', () => this.scene.start('Hero'), { color: 0xb8303a, fontSize: 36 });
     makeButton(this, 830, 392, 420, 76, 'Shop', () => this.scene.start('Shop'), { color: 0x2f8a4a, fontSize: 36 });
-    const endlessOpen = (player.stars[ENDLESS_AFTER] || 0) > 0;
+    const endlessOpen = player.super || totalStars(player) >= ENDLESS_STARS;
     const endless = makeButton(this, 830, 484, 420, 76,
-      endlessOpen ? `Endless Battle  (best: wave ${player.endlessBest})` : `Endless Battle  (win level ${ENDLESS_AFTER})`,
+      endlessOpen ? `Endless Battle  (best: wave ${player.endlessBest})` : `Endless Battle  (needs ★ ${ENDLESS_STARS})`,
       () => this.scene.start('Game', { levelId: 'endless', difficulty: 'normal' }), { color: 0x6a3ab8, fontSize: 28 });
     endless.setEnabled(endlessOpen);
     makeButton(this, 830, 576, 420, 76, 'Leaderboard', () => this.scene.start('Leaderboard'), { fontSize: 32 });
-    if (skillPoints(hero) > 0) {
+    if (hero && skillPoints(hero) > 0) {
       const dot = this.add.circle(1015, 278, 14, 0x5be35b).setStrokeStyle(3, 0x10131c).setDepth(120);
       this.add.text(1015, 278, '!', textStyle(20)).setOrigin(0.5).setDepth(121);
       this.tweens.add({ targets: dot, scale: 1.2, duration: 500, yoyo: true, repeat: -1 });
-    }
-
-    if (data && data.welcome) {
-      const t = this.add.text(830, 660, data.welcome, textStyle(30, '#5be35b')).setOrigin(0.5);
-      this.tweens.add({ targets: t, alpha: 0, delay: 2200, duration: 600 });
     }
   }
 }

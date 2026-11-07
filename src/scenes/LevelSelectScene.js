@@ -42,7 +42,7 @@ export default class LevelSelectScene extends Phaser.Scene {
 
   // An area opens when the last level of the area before it is won AND you have enough stars
   mapOpen(i) {
-    if (i === 0) return true;
+    if (i === 0 || this.player.super) return true;
     return this.stars(i * 10) > 0 && totalStars(this.player) >= MAPS[i].needStars;
   }
 
@@ -50,7 +50,7 @@ export default class LevelSelectScene extends Phaser.Scene {
   isUnlocked(id) {
     const m = Math.floor((id - 1) / 10);
     if (!this.mapOpen(m)) return false;
-    return id % 10 === 1 || this.stars(id - 1) > 0;
+    return this.player.super || id % 10 === 1 || this.stars(id - 1) > 0;
   }
 
   // Open the map that holds the newest unlocked level
@@ -63,11 +63,11 @@ export default class LevelSelectScene extends Phaser.Scene {
   }
 
   showMap(i) {
-    this.mapLayer.removeAll(true);
     if (!this.mapOpen(i)) {
       this.showLocked(i);
       return;
     }
+    this.mapLayer.removeAll(true);
     this.mapIndex = i;
     this.tabs.forEach((t, j) => t.setAlpha(j === i ? 1 : 0.6));
     const map = MAPS[i];

@@ -3,7 +3,7 @@
 // when online, so the next launch gets the newest version.
 // Bump CACHE when the file list changes.
 
-const CACHE = 'ki-defenders-v8';
+const CACHE = 'ki-defenders-v9';
 
 const FILES = [
   './',
@@ -30,6 +30,7 @@ const FILES = [
   'src/systems/Settings.js',
   'src/data/shop.js',
   'src/data/story.js',
+  'src/data/art.js',
   'src/objects/Enemy.js',
   'src/objects/Fighter.js',
   'src/objects/Hero.js',

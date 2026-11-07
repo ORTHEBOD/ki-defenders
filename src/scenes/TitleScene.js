@@ -21,14 +21,15 @@ export default class TitleScene extends Phaser.Scene {
 
     // The team lined up: hero in the middle, fighters on the sides
     const team = [FIGHTERS.ronin.look, HERO.look, FIGHTERS.kaito.look];
+    const keys = [`${FIGHTERS.ronin.texture}_0`, 'hero_zenko_0', `${FIGHTERS.kaito.texture}_0`];
     [[440, 470, 2.6], [640, 455, 3.4], [840, 470, 2.6]].forEach(([x, y, s], i) => {
-      const art = fighterPortrait(this, x, y, team[i], s);
+      const art = fighterPortrait(this, x, y, team[i], s, keys[i]);
       this.tweens.add({ targets: art, y: art.y - 8, duration: 900 + i * 200, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     });
 
     const tap = this.add.text(640, 640, 'Tap to start', textStyle(40)).setOrigin(0.5);
     this.tweens.add({ targets: tap, alpha: 0.25, duration: 700, yoyo: true, repeat: -1 });
-    this.add.text(1265, 705, 'v0.7', textStyle(18, '#9aa3c7')).setOrigin(1, 1);
+    this.add.text(1265, 705, 'v0.8', textStyle(18, '#9aa3c7')).setOrigin(1, 1);
 
     Audio.music('menu');
     this.input.once('pointerdown', () => {

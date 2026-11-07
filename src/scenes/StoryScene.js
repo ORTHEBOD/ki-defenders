@@ -63,7 +63,8 @@ export default class StoryScene extends Phaser.Scene {
     // Heroes and friends stand on the left, enemies on the right
     const friend = !!(HEROES[line.who] || FIGHTERS[line.who]);
     const x = friend ? 260 : 1020;
-    const key = this.textureFor(line.who);
+    let key = this.textureFor(line.who);
+    if (this.textures.exists(`art_${key}`)) key = `art_${key}`;
     const size = this.textures.get(key).getSourceImage().width;
     this.portrait.setTexture(key).setVisible(true).setFlipX(!friend).setScale(260 / size).setPosition(x, 330).setAlpha(0);
     this.tweens.add({ targets: this.portrait, alpha: 1, y: 320, duration: 250 });

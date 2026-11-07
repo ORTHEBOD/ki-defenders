@@ -1,5 +1,6 @@
 import { FIGHTERS, FORMS } from '../data/fighters.js';
 import { HEROES } from '../data/hero.js';
+import { ART_FILES, artSize } from '../data/art.js';
 import { drawFighterArt, pts } from '../art/fighterArt.js';
 import {
   drawBrute, drawFlyer, drawSplitter, drawSplitling, drawMedic, drawOgre, drawKrag,
@@ -14,6 +15,12 @@ const O = 0x0d0d12;
 export default class BootScene extends Phaser.Scene {
   constructor() {
     super('Boot');
+  }
+
+  // AI pictures from the art/ folder (see src/data/art.js). A missing file just keeps the drawn art.
+  preload() {
+    this.load.on('loaderror', (file) => console.warn('Art not found:', file.src));
+    for (const key of ART_FILES) this.load.image(`art_${key}`, `art/${key}.png`);
   }
 
   create() {
@@ -43,7 +50,26 @@ export default class BootScene extends Phaser.Scene {
     this.makeSpot();
     this.makeWall();
     this.makeKi();
+    this.useArt();
     this.scene.start('Title');
+  }
+
+  // Swaps drawn textures for the AI pictures that loaded, shrunk to the size the game expects
+  useArt() {
+    for (const key of ART_FILES) {
+      const raw = `art_${key}`;
+      if (!this.textures.exists(raw)) continue;
+      const img = this.textures.get(raw).getSourceImage();
+      const size = artSize(key);
+      const scale = Math.min(size / img.width, size / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      if (this.textures.exists(key)) this.textures.remove(key);
+      const canvas = this.textures.createCanvas(key, size, size);
+      canvas.context.imageSmoothingQuality = 'high';
+      canvas.context.drawImage(img, (size - w) / 2, size - h, w, h);
+      canvas.refresh();
+    }
   }
 
   makeFighter(key, look) {

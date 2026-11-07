@@ -22,10 +22,21 @@ export default class HeroScene extends Phaser.Scene {
     const heroId = player.activeHero;
     const def = HEROES[heroId];
     const hero = activeHero(player);
-    this.learned = new Set(learnedSkills(hero));
-    this.points = skillPoints(hero);
     drawMenuBackground(this);
     makeButton(this, 90, 40, 140, 50, '< Back', () => this.scene.start('Hub'), { fontSize: 26, color: 0x3a4470 });
+    this.drawPicker(player, heroId);
+    if (!hero) {
+      // No hero yet: they come from the Lucky Spin
+      panel(this, 640, 400, 760, 360);
+      this.add.text(640, 320, 'No hero yet!', textStyle(56, '#ffd93b')).setOrigin(0.5);
+      this.add.text(640, 390, 'Win your first hero in the Lucky Spin.\nPlay levels to earn coins for spins.',
+        { ...textStyle(26), align: 'center' }).setOrigin(0.5);
+      makeButton(this, 640, 490, 320, 70, 'Go to the Shop', () => this.scene.start('Shop', { tab: 'spin' }),
+        { color: 0x2f8a4a, fontSize: 32 });
+      return;
+    }
+    this.learned = new Set(learnedSkills(hero));
+    this.points = skillPoints(hero);
     if (this.learned.size > 0) {
       makeButton(this, 1170, 40, 180, 50, 'Reset skills', () => {
         Save.update((p) => { activeHero(p).skills = []; });
@@ -33,14 +44,20 @@ export default class HeroScene extends Phaser.Scene {
       }, { fontSize: 22, color: 0x8a2f3a });
     }
 
-    // Hero picker: tap an owned hero to use them
+    // Hero info and gear
+    this.drawInfo(player, hero, def);
+    this.drawTree(data);
+  }
+
+  // Hero picker: tap an owned hero to use them
+  drawPicker(player, heroId) {
     Object.entries(HEROES).forEach(([id, h], i) => {
       const x = 400 + i * 160;
       const owned = !!player.heroes[id];
       const chosen = id === heroId;
       const box = this.add.rectangle(x, 44, 150, 72, chosen ? 0x3a2a10 : 0x10131c, 0.9)
         .setStrokeStyle(3, chosen ? 0xffd93b : owned ? h.look.gi : 0x3a3f52);
-      const face = fighterPortrait(this, x - 46, 50, h.look, 0.8);
+      const face = fighterPortrait(this, x - 46, 50, h.look, 0.8, `hero_${id}_0`);
       face.setAlpha(owned ? 1 : 0.35);
       this.add.text(x - 14, 34, h.name, textStyle(22, owned ? '#ffffff' : '#8a91ad')).setOrigin(0, 0.5);
       this.add.text(x - 14, 60, owned ? (chosen ? 'In use' : `Lv ${player.heroes[id].level}`) : 'Lucky Spin', textStyle(15, chosen ? '#ffd93b' : '#9aa3c7'))
@@ -53,11 +70,12 @@ export default class HeroScene extends Phaser.Scene {
         });
       }
     });
+  }
 
-    // Hero info and gear
+  drawInfo(player, hero, def) {
     const bonus = gearBonus(hero.gear);
     panel(this, 230, 405, 400, 560, def.look.gi);
-    fighterPortrait(this, 230, 210, def.look, 2.4);
+    fighterPortrait(this, 230, 210, def.look, 2.4, `hero_${player.activeHero}_0`);
     this.add.text(230, 300, `${def.name}  Lv ${hero.level}`, textStyle(36)).setOrigin(0.5);
     this.add.text(230, 334, def.title, textStyle(19, '#c9d3ff')).setOrigin(0.5);
     const need = xpToNext(hero.level);
@@ -72,12 +90,12 @@ export default class HeroScene extends Phaser.Scene {
     }
 
     // Gear: tap a slot to switch between the items you own for it
-    this.add.text(230, 500, 'Gear (tap to change)', textStyle(18, '#9aa3c7')).setOrigin(0.5);
+    this.add.text(230, 496, 'Gear (tap to change)', textStyle(18, '#9aa3c7')).setOrigin(0.5);
     GEAR_SLOTS.forEach((slot, i) => {
-      const y = 532 + i * 34;
+      const y = 526 + i * 32;
       const id = hero.gear[slot.key];
       const item = GEAR[id];
-      const row = this.add.rectangle(230, y, 360, 30, 0x1c2133).setStrokeStyle(2, item ? item.color : 0x3a3f52)
+      const row = this.add.rectangle(230, y, 360, 28, 0x1c2133).setStrokeStyle(2, item ? item.color : 0x3a3f52)
         .setInteractive({ useHandCursor: true });
       this.add.text(60, y, slot.name, textStyle(16, '#9aa3c7')).setOrigin(0, 0.5);
       this.add.text(140, y, item ? item.name : '- empty -', textStyle(17, item ? '#ffffff' : '#6a7090')).setOrigin(0, 0.5);
@@ -97,12 +115,15 @@ export default class HeroScene extends Phaser.Scene {
       });
     });
 
-    // Skill tree: 3 branches of 6, learned top to bottom
+  }
+
+  // Skill tree: 4 branches, learned top to bottom
+  drawTree(data) {
     panel(this, 845, 405, 790, 560);
     SKILL_TREE.forEach((branch, b) => {
-      const x = 590 + b * 255;
-      this.add.text(x, 152, branch.branch, textStyle(26, hex(branch.color))).setOrigin(0.5);
-      this.add.graphics().lineStyle(4, branch.color, 0.35).lineBetween(x, 190, x, 520);
+      const x = 545 + b * 200;
+      this.add.text(x, 152, branch.branch, textStyle(24, hex(branch.color))).setOrigin(0.5);
+      this.add.graphics().lineStyle(4, branch.color, 0.35).lineBetween(x, 190, x, 192 + (branch.skills.length - 1) * 66);
       branch.skills.forEach((skill, i) => {
         const y = 192 + i * 66;
         const state = this.skillState(branch, i);
@@ -111,7 +132,7 @@ export default class HeroScene extends Phaser.Scene {
         const icon = state === 'learned' ? '✔' : state === 'ready' ? '+' : '🔒';
         this.add.text(x, y, icon, state === 'locked' ? { fontSize: '16px' } : textStyle(22, state === 'learned' ? '#10131c' : '#5be35b'))
           .setOrigin(0.5).setAlpha(state === 'locked' ? 0.6 : 1);
-        this.add.text(x, y + 31, skill.name, textStyle(16, state === 'locked' ? '#8a91ad' : '#ffffff')).setOrigin(0.5);
+        this.add.text(x, y + 31, skill.name, textStyle(15, state === 'locked' ? '#8a91ad' : '#ffffff')).setOrigin(0.5);
         if (state === 'ready') this.tweens.add({ targets: node, scale: 1.12, duration: 600, yoyo: true, repeat: -1 });
         node.setInteractive({ useHandCursor: true });
         node.on('pointerdown', () => this.showSkill(branch, i));
@@ -134,8 +155,14 @@ export default class HeroScene extends Phaser.Scene {
     const skill = branch.skills[i];
     if (this.learned.has(skill.id)) return 'learned';
     const prevDone = i === 0 || this.learned.has(branch.skills[i - 1].id);
-    if (!prevDone) return 'locked';
+    if (!prevDone || (skill.needs && !this.learned.has(skill.needs))) return 'locked';
     return this.points > 0 ? 'ready' : 'next';
+  }
+
+  lockReason(branch, i) {
+    if (i > 0 && !this.learned.has(branch.skills[i - 1].id)) return branch.skills[i - 1].name;
+    const need = branch.skills[i].needs;
+    return SKILL_TREE.flatMap((b) => b.skills).find((s) => s.id === need)?.name ?? need;
   }
 
   showSkill(branch, i) {
@@ -148,7 +175,7 @@ export default class HeroScene extends Phaser.Scene {
 
     let status = '';
     if (state === 'learned') status = 'Learned';
-    else if (state === 'locked') status = `Learn ${branch.skills[i - 1].name} first`;
+    else if (state === 'locked') status = `Learn ${this.lockReason(branch, i)} first`;
     else if (state === 'next') status = 'Needs 1 skill point';
     if (status) {
       this.info.add(this.add.text(1215, 642, status, textStyle(20, state === 'learned' ? '#5be35b' : '#9aa3c7')).setOrigin(1, 0.5));

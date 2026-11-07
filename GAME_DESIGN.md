@@ -151,13 +151,15 @@ bonus currently makes nearby fighters attack faster (the hero boost comes with t
 - **Shop:** equipment for the hero (weapon, armor, boots, amulet - 3 tiers each), and the **Lucky Spin**:
   coins, gear, or a new hero (a hero you already have turns into coins).
 - **Hero XP:** every enemy type gives its own XP; enemies the hero defeats personally give double.
-- **Heroes:** Zenko (start), Mira (speed), Goran (tank), Sora (ki master). Each has their own level, skills and gear.
+- **Heroes:** you start with none; Zenko (balanced), Mira (speed), Goran (tank) and Sora (ki master) are won in the Lucky Spin.
+  Each has their own level, skills and gear. Kai Wave is known from the start; the other abilities are learned in the skill tree.
+- **Tester account:** the name `SuperTester` opens everything (local only, never online).
 - **Fun idea:** hidden **Star Orbs** (7 total) found in levels. Collect all 7 and make a wish (a big permanent reward).
 
 ---
 
 ## 10. Endless mode
-- Unlocked after winning level 3. A boss every 10 waves.
+- Unlocked with 10 stars. A boss every 10 waves.
 - Waves never stop and get harder each wave.
 - Score = the wave you reach, which goes to the **leaderboard**.
 
@@ -205,7 +207,7 @@ An evil space emperor, **Lord Vorak**, sends his army to conquer the planet. Zen
 | 5 | All enemies + bosses | Full enemy set |
 | 6 | 30 levels, 3 maps, story, coins + shop + Lucky Spin, 4 heroes, bigger skill tree, endless, settings, music | Full game loop (done) |
 | 7 | Login, online save, leaderboard | Online features (done - needs the Netlify site connected) |
-| 8 | AI art + sound + music | Looks and sounds good |
+| 8 | AI art + sound + music | Art loader + ART_PROMPTS.md ready (waiting for the pictures); area music done |
 | 9 | Endless mode, polish, balance | Ready for friends |
 | 10 | Android app (Capacitor) + PC app (Electron) | Store-ready |
 

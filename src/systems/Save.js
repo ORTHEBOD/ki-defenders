@@ -1,4 +1,6 @@
 import { Online } from './Online.js';
+import { HEROES, SKILL_TREE, newHeroSave } from '../data/hero.js';
+import { GEAR } from '../data/shop.js';
 
 // Player profiles. Each player has a name and a 4-digit PIN.
 // Progress is always saved on this device first (localStorage), so the game works offline,
@@ -55,8 +57,24 @@ async function hashPin(key, pin) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+// New players start with no hero: heroes are won in the Lucky Spin
 function newPlayer(name) {
-  return migrate({ name, stars: {}, kills: 0, createdAt: Date.now(), updatedAt: Date.now() });
+  return migrate({ name, heroes: {}, activeHero: null, stars: {}, kills: 0, createdAt: Date.now(), updatedAt: Date.now() });
+}
+
+// The tester account: this name gets every level, hero, item and lots of coins.
+// It is only ever saved on this device - never online, never on the leaderboard.
+export const SUPER_NAME = 'supertester';
+
+function superPlayer(name) {
+  const p = newPlayer(name);
+  p.super = true;
+  p.coins = 999999;
+  const skills = SKILL_TREE.reduce((n, b) => n + b.skills.length, 0);
+  for (const id of Object.keys(HEROES)) p.heroes[id] = { ...newHeroSave(), level: skills + 1 };
+  p.activeHero = 'zenko';
+  p.items = Object.keys(GEAR);
+  return p;
 }
 
 // Brings older saves up to date (adds coins, the hero list, gear and so on)
@@ -66,7 +84,7 @@ function migrate(p) {
     delete p.hero;
   }
   for (const h of Object.values(p.heroes)) h.gear ??= {};
-  p.activeHero ??= 'zenko';
+  if (!p.heroes[p.activeHero]) p.activeHero = Object.keys(p.heroes)[0] ?? null;
   p.coins ??= 0;
   p.items ??= [];
   p.endlessBest ??= 0;
@@ -89,6 +107,13 @@ export const Save = {
     const hash = await hashPin(key, pin);
     const local = all[key];
     if (local && local.pin !== hash) return { ok: false, error: 'Wrong PIN for this player.' };
+
+    if (key === SUPER_NAME) {
+      if (!local) all[key] = { pin: hash, data: superPlayer(clean), online: 'local' };
+      writeAll(all);
+      setCurrentKey(key);
+      return { ok: true, created: !local, online: false };
+    }
 
     const res = await Online.login(clean, pin, local ? migrate(local.data) : undefined);
     if (res?.ok) {
@@ -170,6 +195,7 @@ export const Sync = {
   status() {
     const rec = readAll()[getCurrentKey()];
     if (!rec) return null;
+    if (rec.online === 'local') return 'local';
     if (rec.online === 'taken') return 'taken';
     if (!rec.token) return 'login';
     return rec.dirty ? 'pending' : 'online';
@@ -188,7 +214,7 @@ export const Sync = {
   async now() {
     const key = getCurrentKey();
     const rec = readAll()[key];
-    if (syncing || !rec || !rec.dirty || !rec.token || rec.online === 'taken') return;
+    if (syncing || !rec || !rec.dirty || !rec.token || rec.online === 'taken' || rec.online === 'local') return;
     syncing = true;
     const sent = rec.data.updatedAt;
     const res = await Online.save(rec.data.name, rec.token, rec.data);
@@ -215,7 +241,7 @@ export function totalStars(player) {
   return Object.values(player.stars).reduce((a, b) => a + b, 0);
 }
 
-// The saved data of the hero the player is using now
+// The saved data of the hero the player is using now (null before the first hero is won)
 export function activeHero(player) {
-  return player.heroes[player.activeHero] ?? player.heroes.zenko;
+  return player.heroes[player.activeHero] ?? null;
 }
