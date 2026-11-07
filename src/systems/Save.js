@@ -1,6 +1,11 @@
-// Player profiles saved on this device (localStorage).
-// Each player has a name and a 4-digit PIN. Online sync comes later (Phase 7).
+import { Online } from './Online.js';
+
+// Player profiles. Each player has a name and a 4-digit PIN.
+// Progress is always saved on this device first (localStorage), so the game works offline,
+// and then copied to the online server whenever there is internet (see Sync below).
 // If storage is blocked (private mode), it falls back to memory for this session.
+//
+// A saved record: { pin (hash), data, token (online key), dirty (not uploaded yet), online ('ok' | 'taken') }
 
 const KEY = 'kd_profiles_v1';
 const CURRENT = 'kd_current_v1';
@@ -51,7 +56,7 @@ async function hashPin(key, pin) {
 }
 
 function newPlayer(name) {
-  return migrate({ name, stars: {}, kills: 0, createdAt: Date.now() });
+  return migrate({ name, stars: {}, kills: 0, createdAt: Date.now(), updatedAt: Date.now() });
 }
 
 // Brings older saves up to date (adds coins, the hero list, gear and so on)
@@ -66,6 +71,7 @@ function migrate(p) {
   p.items ??= [];
   p.endlessBest ??= 0;
   p.seenStory ??= [];
+  p.updatedAt ??= 0;
   return p;
 }
 
@@ -74,22 +80,53 @@ export const Save = {
     return Object.values(readAll()).map((p) => p.data.name);
   },
 
-  // Logs in, or creates the player if the name is new
+  // Logs in (online when possible), or creates the player if the name is new.
+  // The newest copy of the progress wins: the one on this device or the one online.
   async login(name, pin) {
     const clean = name.trim();
     const key = clean.toLowerCase();
     const all = readAll();
     const hash = await hashPin(key, pin);
+    const local = all[key];
+    if (local && local.pin !== hash) return { ok: false, error: 'Wrong PIN for this player.' };
+
+    const res = await Online.login(clean, pin, local ? migrate(local.data) : undefined);
+    if (res?.ok) {
+      const remote = res.data ? migrate(res.data) : null;
+      let data = remote;
+      let dirty = false;
+      if (!remote) {
+        data = local ? local.data : newPlayer(res.name ?? clean);
+        dirty = true;
+      } else if (local && (local.data.updatedAt ?? 0) > (remote.updatedAt ?? 0)) {
+        data = local.data;
+        dirty = true;
+      }
+      all[key] = { pin: hash, data, token: res.token, dirty, online: 'ok' };
+      writeAll(all);
+      setCurrentKey(key);
+      if (dirty) Sync.soon(200);
+      return { ok: true, created: !local && !remote, online: true };
+    }
+    if (res?.error === 'locked') return { ok: false, error: `Too many wrong PINs. Try again in ${res.minutes} min.` };
+    if (res?.error === 'wrong_pin') {
+      if (!local) return { ok: false, error: 'Wrong PIN for this player.' };
+      // Someone else owns this name online: keep playing, saved on this device only
+      local.online = 'taken';
+      writeAll(all);
+      setCurrentKey(key);
+      return { ok: true, created: false, online: false };
+    }
+
+    // No internet (or no server): play on this device, and upload later
     let created = false;
-    if (all[key]) {
-      if (all[key].pin !== hash) return { ok: false, error: 'Wrong PIN for this player.' };
-    } else {
-      all[key] = { pin: hash, data: newPlayer(clean) };
+    if (!local) {
+      all[key] = { pin: hash, data: newPlayer(clean), dirty: true };
       writeAll(all);
       created = true;
     }
     setCurrentKey(key);
-    return { ok: true, created };
+    return { ok: true, created, online: false };
   },
 
   current() {
@@ -98,7 +135,7 @@ export const Save = {
     return key && all[key] ? migrate(all[key].data) : null;
   },
 
-  // Every player on this device (for the leaderboard)
+  // Every player on this device (for the leaderboard when offline)
   allPlayers() {
     return Object.values(readAll()).map((p) => migrate(p.data));
   },
@@ -107,8 +144,12 @@ export const Save = {
     const key = getCurrentKey();
     const all = readAll();
     if (!key || !all[key]) return null;
-    const result = fn(migrate(all[key].data));
+    const data = migrate(all[key].data);
+    const result = fn(data);
+    data.updatedAt = Date.now();
+    all[key].dirty = true;
     writeAll(all);
+    Sync.soon();
     return result;
   },
 
@@ -116,6 +157,59 @@ export const Save = {
     setCurrentKey(null);
   },
 };
+
+// ---------- Online sync ----------
+
+let syncTimer = null;
+let syncing = false;
+const listeners = new Set();
+
+export const Sync = {
+  // 'online' (saved online), 'pending' (waiting to upload), 'login' (log in again with internet),
+  // 'taken' (name used by someone else online), or null (nobody logged in)
+  status() {
+    const rec = readAll()[getCurrentKey()];
+    if (!rec) return null;
+    if (rec.online === 'taken') return 'taken';
+    if (!rec.token) return 'login';
+    return rec.dirty ? 'pending' : 'online';
+  },
+
+  onChange(fn) {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  },
+
+  soon(delay = 1500) {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => this.now(), delay);
+  },
+
+  async now() {
+    const key = getCurrentKey();
+    const rec = readAll()[key];
+    if (syncing || !rec || !rec.dirty || !rec.token || rec.online === 'taken') return;
+    syncing = true;
+    const sent = rec.data.updatedAt;
+    const res = await Online.save(rec.data.name, rec.token, rec.data);
+    syncing = false;
+    const all = readAll();
+    const now = all[key];
+    if (!now) return;
+    if (res?.ok) {
+      // Only clear the flag if nothing changed while uploading
+      if (now.data.updatedAt === sent) now.dirty = false;
+      else this.soon();
+    } else if (res?.error === 'bad_token') {
+      now.token = null;
+    }
+    writeAll(all);
+    listeners.forEach((fn) => fn(this.status()));
+  },
+};
+
+// Upload anything waiting as soon as the internet comes back
+if (typeof window !== 'undefined') window.addEventListener('online', () => Sync.now());
 
 export function totalStars(player) {
   return Object.values(player.stars).reduce((a, b) => a + b, 0);

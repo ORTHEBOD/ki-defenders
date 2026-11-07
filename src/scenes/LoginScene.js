@@ -14,6 +14,7 @@ export default class LoginScene extends Phaser.Scene {
     panel(this, 640, 380, 560, 520);
     this.add.text(640, 160, 'Who is playing?', textStyle(52, '#ffd93b')).setOrigin(0.5);
     this.add.text(640, 212, 'New name = new player. Same name + PIN = log back in.', textStyle(20, '#c9d3ff')).setOrigin(0.5);
+    this.add.text(640, 600, 'Your progress is saved online, so you can play on any device.', textStyle(18, '#9aa3c7')).setOrigin(0.5);
 
     const players = Save.players();
     const chips = players.length
@@ -55,7 +56,12 @@ export default class LoginScene extends Phaser.Scene {
         error.textContent = 'The PIN must be exactly 4 numbers.';
         return;
       }
+      const go = el.querySelector('.kd-go');
+      go.disabled = true;
+      go.textContent = 'Connecting...';
       const result = await Save.login(name, pin);
+      go.disabled = false;
+      go.textContent = "Let's fight!";
       if (!result.ok) {
         error.textContent = result.error;
         pinIn.value = '';

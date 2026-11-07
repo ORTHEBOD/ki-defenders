@@ -3,7 +3,7 @@
 // when online, so the next launch gets the newest version.
 // Bump CACHE when the file list changes.
 
-const CACHE = 'ki-defenders-v7';
+const CACHE = 'ki-defenders-v8';
 
 const FILES = [
   './',
@@ -36,6 +36,7 @@ const FILES = [
   'src/systems/Path.js',
   'src/systems/Grid.js',
   'src/systems/Save.js',
+  'src/systems/Online.js',
   'src/art/fighterArt.js',
   'src/art/enemyArt.js',
   'src/data/fighters.js',
@@ -63,7 +64,9 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  const url = new URL(req.url);
+  // Never cache the online server's answers
+  if (req.method !== 'GET' || url.origin !== self.location.origin || url.pathname.includes('/api/')) return;
 
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {

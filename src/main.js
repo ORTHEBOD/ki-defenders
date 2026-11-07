@@ -10,6 +10,7 @@ import SettingsScene from './scenes/SettingsScene.js';
 import LeaderboardScene from './scenes/LeaderboardScene.js';
 import StoryScene from './scenes/StoryScene.js';
 import { Audio } from './systems/Audio.js';
+import { Sync } from './systems/Save.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -39,6 +40,9 @@ async function start() {
 }
 
 start();
+
+// Upload any progress that was saved while offline
+Sync.now();
 
 // Sound can only start after the player touches the screen
 window.addEventListener('pointerdown', () => Audio.unlock());

@@ -204,7 +204,7 @@ An evil space emperor, **Lord Vorak**, sends his army to conquer the planet. Zen
 | 4 | Maze levels + pathfinding | Both level types |
 | 5 | All enemies + bosses | Full enemy set |
 | 6 | 30 levels, 3 maps, story, coins + shop + Lucky Spin, 4 heroes, bigger skill tree, endless, settings, music | Full game loop (done) |
-| 7 | Login, online save, leaderboard | Online features |
+| 7 | Login, online save, leaderboard | Online features (done - needs the Netlify site connected) |
 | 8 | AI art + sound + music | Looks and sounds good |
 | 9 | Endless mode, polish, balance | Ready for friends |
 | 10 | Android app (Capacitor) + PC app (Electron) | Store-ready |

@@ -2,7 +2,7 @@ import { HEROES, xpToNext, skillPoints } from '../data/hero.js';
 import { fighterPortrait } from '../art/fighterArt.js';
 import { drawMenuBackground, panel, xpBar } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
-import { Save, totalStars, activeHero } from '../systems/Save.js';
+import { Save, Sync, totalStars, activeHero } from '../systems/Save.js';
 import { Audio } from '../systems/Audio.js';
 import { textStyle } from '../ui/theme.js';
 
@@ -36,6 +36,22 @@ export default class HubScene extends Phaser.Scene {
       Save.logout();
       this.scene.start('Login');
     }, { fontSize: 22, color: 0x3a4470 });
+
+    // Cloud status: is the progress saved online?
+    const status = this.add.text(640, 690, '', textStyle(18, '#9aa3c7')).setOrigin(0.5);
+    const showStatus = (st) => {
+      const text = {
+        online: ['☁ Progress saved online', '#5be35b'],
+        pending: ['☁ Saving online...', '#ffd93b'],
+        login: ['Saved on this device. Log out and back in with internet to save online.', '#ffb35b'],
+        taken: ['This name belongs to another player online - progress is saved on this device only.', '#ff8a8a'],
+      }[st];
+      if (text) status.setText(text[0]).setColor(text[1]);
+    };
+    showStatus(Sync.status());
+    const off = Sync.onChange(showStatus);
+    this.events.once('shutdown', off);
+    Sync.now();
 
     // Hero card: the hero in use right now
     const hero = activeHero(player);

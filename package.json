@@ -1,0 +1,9 @@
+{
+  "name": "ki-defenders",
+  "private": true,
+  "type": "module",
+  "description": "Online save + leaderboard function for Ki Defenders (the game itself needs no build step)",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}

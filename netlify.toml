@@ -11,3 +11,8 @@
   for = "/manifest.webmanifest"
   [headers.values]
     Content-Type = "application/manifest+json"
+
+# The online save / leaderboard server (netlify/functions/api.mjs), reached at /api/...
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
