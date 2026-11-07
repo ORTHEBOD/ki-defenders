@@ -44,6 +44,9 @@ start();
 // Upload any progress that was saved while offline
 Sync.now();
 
+// Quiet while the app is in the background
+document.addEventListener('visibilitychange', () => Audio.sleep(document.hidden));
+
 // Sound can only start after the player touches the screen
 window.addEventListener('pointerdown', () => Audio.unlock());
 

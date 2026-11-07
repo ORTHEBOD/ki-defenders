@@ -1,5 +1,5 @@
 import { LEVELS, MAPS, levelById, endlessWave } from '../data/levels.js';
-import { storyAfter } from '../data/story.js';
+import { storyAfter, storyBefore } from '../data/story.js';
 import { battleCoins } from '../data/shop.js';
 import { Settings } from '../systems/Settings.js';
 import { Audio } from '../systems/Audio.js';
@@ -9,6 +9,8 @@ import { ENEMIES } from '../data/enemies.js';
 import { addXp } from '../data/hero.js';
 import Hero from '../objects/Hero.js';
 import { Save, activeHero } from '../systems/Save.js';
+import { levelOpen } from '../systems/Progress.js';
+import Tutorial from '../systems/Tutorial.js';
 import Path from '../systems/Path.js';
 import Grid from '../systems/Grid.js';
 import Enemy from '../objects/Enemy.js';
@@ -51,7 +53,7 @@ export default class GameScene extends Phaser.Scene {
     this.aimText = null;
     this.walls = [];
     this.heroSelected = false;
-    this.ki = this.level.startKi;
+    this.ki = Math.round(this.level.startKi * (this.diff.ki ?? 1));
     this.lives = this.level.lives;
     this.waveIndex = -1;
     this.waveActive = false;
@@ -106,6 +108,14 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this.floatText(W / 2, 600, 'Tap a glowing spot to place a fighter', '#ffe9c4', 28);
     }
+
+    this.floats = 0;
+    this.tutorial = this.level.id === 1 && !player?.tutorialDone ? new Tutorial(this) : null;
+
+    // Switching apps or locking the phone pauses the battle
+    const onHidden = () => this.state === 'playing' && this.pause();
+    this.game.events.on('hidden', onHidden);
+    this.events.once('shutdown', () => this.game.events.off('hidden', onHidden));
 
     this.input.on('pointerdown', (pointer, over) => {
       if (this.state !== 'playing') return;
@@ -772,6 +782,7 @@ export default class GameScene extends Phaser.Scene {
       else this.selectHero(false);
     }
     if (this.hero) this.refreshAbilities();
+    this.tutorial?.update(dt);
     this.updateProjectiles(dt);
     this.updateHazards(dt);
     this.updateBossBar();
@@ -1130,10 +1141,26 @@ export default class GameScene extends Phaser.Scene {
       if (after && !seen.includes(after)) this.scene.start('Story', { id: after, next: { scene: 'LevelSelect', data: { mapIndex: this.startData.mapIndex } } });
       else this.quitToMap();
     };
-    makeButton(this, W / 2 - 150, 540, 260, 64, win ? 'Continue' : this.endless ? 'Back' : 'Back to map', cont,
+    const nextId = this.level.id + 1;
+    const player = Save.current();
+    const hasNext = win && !this.endless && !after && player && levelOpen(player, nextId);
+    if (hasNext) {
+      makeButton(this, W / 2 - 290, 540, 260, 64, 'Next level', () => this.playNext(nextId), { color: 0x2f8a4a, depth: 202 });
+    }
+    const x0 = hasNext ? 0 : -150;
+    makeButton(this, W / 2 + x0, 540, 260, 64, win ? (hasNext ? 'Back to map' : 'Continue') : this.endless ? 'Back' : 'Back to map', cont,
       { color: 0xe0661a, depth: 202 });
-    makeButton(this, W / 2 + 150, 540, 260, 64, win ? 'Play again' : 'Try again', () => this.scene.restart(this.startData),
+    makeButton(this, W / 2 + x0 + (hasNext ? 290 : 300), 540, 260, 64, win ? 'Play again' : 'Try again', () => this.scene.restart(this.startData),
       { depth: 202 });
+  }
+
+  // Straight into the next level on the same difficulty (with its story first, if there is one)
+  playNext(id) {
+    const m = Math.floor((id - 1) / 10);
+    const game = { scene: 'Game', data: { levelId: id, difficulty: this.diffKey, mapIndex: m } };
+    const story = storyBefore(id);
+    if (story && !(Save.current()?.seenStory ?? []).includes(story)) this.scene.start('Story', { id: story, next: game });
+    else this.scene.start('Game', game.data);
   }
 
   // ---------- Effects ----------
@@ -1193,13 +1220,21 @@ export default class GameScene extends Phaser.Scene {
   }
 
   damageNumber(x, y, n) {
-    if (!Settings.get('damageNumbers')) return;
+    if (!Settings.get('damageNumbers') || this.floats > 30) return;
     this.floatText(x + Phaser.Math.Between(-8, 8), y, `${n}`, '#ffffff', 16);
   }
 
   floatText(x, y, str, color = '#ffffff', size = 20) {
+    if (size <= 20 && this.floats > 45) return;
+    this.floats++;
     const t = this.add.text(x, y, str, textStyle(size, color)).setOrigin(0.5).setDepth(150);
-    this.tweens.add({ targets: t, y: y - 36, alpha: 0, duration: 800, ease: 'Cubic.Out', onComplete: () => t.destroy() });
+    this.tweens.add({
+      targets: t, y: y - 36, alpha: 0, duration: 800, ease: 'Cubic.Out',
+      onComplete: () => {
+        this.floats--;
+        t.destroy();
+      },
+    });
   }
 
   banner(str) {

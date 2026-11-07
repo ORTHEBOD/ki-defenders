@@ -4,6 +4,7 @@ import { storyBefore } from '../data/story.js';
 import { drawMenuBackground, panel } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
 import { Save, totalStars } from '../systems/Save.js';
+import { mapOpen, levelOpen } from '../systems/Progress.js';
 import { textStyle } from '../ui/theme.js';
 
 const starText = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
@@ -40,17 +41,13 @@ export default class LevelSelectScene extends Phaser.Scene {
     return this.player.stars[id] || 0;
   }
 
-  // An area opens when the last level of the area before it is won AND you have enough stars
   mapOpen(i) {
-    if (i === 0 || this.player.super) return true;
-    return this.stars(i * 10) > 0 && totalStars(this.player) >= MAPS[i].needStars;
+    return mapOpen(this.player, i);
   }
 
   // A level opens once the level before it has been won (the first level of an area opens with the area)
   isUnlocked(id) {
-    const m = Math.floor((id - 1) / 10);
-    if (!this.mapOpen(m)) return false;
-    return this.player.super || id % 10 === 1 || this.stars(id - 1) > 0;
+    return levelOpen(this.player, id);
   }
 
   // Open the map that holds the newest unlocked level

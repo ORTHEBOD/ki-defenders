@@ -219,6 +219,13 @@ export const Audio = {
     if (!timer) timer = setInterval(tick, 25);
   },
 
+  // The app went to the background (or came back)
+  sleep(hidden) {
+    if (!ctx) return;
+    if (hidden) ctx.suspend();
+    else ctx.resume();
+  },
+
   stopMusic() {
     wanted = null;
     song = null;

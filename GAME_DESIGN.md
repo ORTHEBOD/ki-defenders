@@ -144,7 +144,7 @@ bonus currently makes nearby fighters attack faster (the hero boost comes with t
 |---|---|---|
 | Easy | Weaker, fewer | 1 ★ |
 | Normal | Standard | 2 ★ |
-| Hard | Stronger, faster, extra boss skill | 3 ★ |
+| Hard | 1.5x enemy HP, +15% starting Ki, extra boss skill | 3 ★ |
 
 - Stars (★) are saved per level. Stars open new maps.
 - **Coins** are won in every battle (more for winning, more stars, later levels and Endless waves).
@@ -208,7 +208,7 @@ An evil space emperor, **Lord Vorak**, sends his army to conquer the planet. Zen
 | 6 | 30 levels, 3 maps, story, coins + shop + Lucky Spin, 4 heroes, bigger skill tree, endless, settings, music | Full game loop (done) |
 | 7 | Login, online save, leaderboard | Online features (done - needs the Netlify site connected) |
 | 8 | AI art + sound + music | Art loader + ART_PROMPTS.md ready (waiting for the pictures); area music done |
-| 9 | Endless mode, polish, balance | Ready for friends |
+| 9 | Endless mode, polish, balance | Tutorial, daily reward, next-level button, auto-pause, balance (done) |
 | 10 | Android app (Capacitor) + PC app (Electron) | Store-ready |
 
 ---

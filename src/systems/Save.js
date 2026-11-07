@@ -89,6 +89,9 @@ function migrate(p) {
   p.items ??= [];
   p.endlessBest ??= 0;
   p.seenStory ??= [];
+  // Players who already won a level don't need the Level 1 tutorial
+  p.tutorialDone ??= Object.keys(p.stars ?? {}).length > 0;
+  p.daily ??= { last: null, streak: 0 };
   p.updatedAt ??= 0;
   return p;
 }

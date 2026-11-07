@@ -29,7 +29,7 @@ export default class TitleScene extends Phaser.Scene {
 
     const tap = this.add.text(640, 640, 'Tap to start', textStyle(40)).setOrigin(0.5);
     this.tweens.add({ targets: tap, alpha: 0.25, duration: 700, yoyo: true, repeat: -1 });
-    this.add.text(1265, 705, 'v0.8', textStyle(18, '#9aa3c7')).setOrigin(1, 1);
+    this.add.text(1265, 705, 'v0.9', textStyle(18, '#9aa3c7')).setOrigin(1, 1);
 
     Audio.music('menu');
     this.input.once('pointerdown', () => {

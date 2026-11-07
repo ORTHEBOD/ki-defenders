@@ -66,11 +66,38 @@ export default class HubScene extends Phaser.Scene {
         { color: 0xc99a00, fontSize: 30 });
     }
     this.buttons(player, hero);
+    this.dailyReward();
 
     if (data && data.welcome) {
       const t = this.add.text(830, 660, data.welcome, textStyle(30, '#5be35b')).setOrigin(0.5);
       this.tweens.add({ targets: t, alpha: 0, delay: 2200, duration: 600 });
     }
+  }
+
+  // Daily reward: coins for the first visit each day, more for days in a row (up to 7)
+  dailyReward() {
+    const day = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    const today = day(new Date());
+    const yesterday = day(new Date(Date.now() - 86400000));
+    const gift = Save.update((p) => {
+      if (p.daily.last === today) return null;
+      const streak = p.daily.last === yesterday ? Math.min(7, p.daily.streak + 1) : 1;
+      const coins = 50 + 25 * (streak - 1);
+      p.daily = { last: today, streak };
+      p.coins += coins;
+      return { streak, coins };
+    });
+    if (!gift) return;
+    Audio.sfx('coin');
+    const pop = this.add.container(0, 0).setDepth(300);
+    pop.add(this.add.rectangle(0, 0, 1280, 720, 0x000000, 0.6).setOrigin(0).setInteractive());
+    pop.add(panel(this, 640, 360, 560, 320, 0xffd93b));
+    pop.add(this.add.text(640, 255, 'Daily reward!', textStyle(52, '#ffd93b')).setOrigin(0.5));
+    pop.add(this.add.text(640, 320, `Day ${gift.streak} in a row`, textStyle(28, '#c9d3ff')).setOrigin(0.5));
+    pop.add(this.add.image(580, 375, 'coin').setScale(1.6));
+    pop.add(this.add.text(610, 375, `+${gift.coins} coins`, textStyle(40, '#ffd93b')).setOrigin(0, 0.5));
+    pop.add(this.add.text(640, 420, 'Come back tomorrow for more (up to 200 a day)', textStyle(20, '#9aa3c7')).setOrigin(0.5));
+    pop.add(makeButton(this, 640, 475, 200, 56, 'Collect', () => this.scene.restart(), { color: 0x2f8a4a, fontSize: 30, depth: 301 }));
   }
 
   heroCard(player, hero) {
