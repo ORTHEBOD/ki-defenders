@@ -1,0 +1,9 @@
+{
+  "appId": "com.orthebod.kidefenders",
+  "appName": "Ki Defenders",
+  "webDir": "www",
+  "backgroundColor": "#07090f",
+  "android": {
+    "backgroundColor": "#07090f"
+  }
+}

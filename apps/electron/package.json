@@ -1,0 +1,31 @@
+{
+  "name": "ki-defenders",
+  "productName": "Ki Defenders",
+  "version": "1.0.0",
+  "description": "Ki Defenders - anime tower defense",
+  "author": "ORTHEBOD",
+  "main": "main.js",
+  "scripts": {
+    "dist": "electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.orthebod.kidefenders",
+    "productName": "Ki Defenders",
+    "files": ["main.js", "game/**/*"],
+    "win": {
+      "icon": "game/icons/icon-512.png",
+      "target": ["nsis", "portable"]
+    },
+    "nsis": {
+      "oneClick": true,
+      "artifactName": "KiDefenders-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "KiDefenders-Portable.${ext}"
+    }
+  }
+}

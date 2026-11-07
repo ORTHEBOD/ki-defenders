@@ -2,10 +2,13 @@
 // Every call gives up after a few seconds and returns null when there is no internet,
 // so the game keeps working offline.
 
-// Where the server lives. On Netlify the game and the server share one address.
-// The GitHub Pages copy of the game talks to the Netlify one.
+// Where the server lives. On Netlify (and a local test server) the game and the server share
+// one address. Everywhere else - GitHub Pages, the Android app, the PC app - the game talks
+// to the Netlify one.
 const NETLIFY_SITE = 'https://ki-defenders.netlify.app';
-const API = location.hostname.endsWith('github.io') ? `${NETLIFY_SITE}/api` : '/api';
+const sameSite = location.hostname.endsWith('netlify.app')
+  || (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && location.port !== '');
+const API = sameSite ? '/api' : `${NETLIFY_SITE}/api`;
 
 async function call(method, route, body, timeout = 7000) {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;

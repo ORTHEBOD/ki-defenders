@@ -51,6 +51,7 @@ document.addEventListener('visibilitychange', () => Audio.sleep(document.hidden)
 window.addEventListener('pointerdown', () => Audio.unlock());
 
 // Save the game on the device so it can be played offline
-if ('serviceWorker' in navigator) {
+// (The Android and PC apps already carry every file, so they skip this.)
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.Capacitor) {
   navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Offline mode not available:', e));
 }

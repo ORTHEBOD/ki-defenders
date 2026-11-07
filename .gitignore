@@ -3,3 +3,10 @@ __pycache__/
 .netlify/
 Thumbs.db
 node_modules/
+apps/android/www/
+apps/android/android/
+apps/android/out/
+apps/android/assets/
+apps/electron/game/
+apps/electron/dist/
+.keys/
