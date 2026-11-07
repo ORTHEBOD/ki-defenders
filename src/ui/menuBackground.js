@@ -7,6 +7,10 @@ const H = 720;
 export function drawMenuBackground(scene) {
   const g = scene.add.graphics();
   g.fillGradientStyle(0x1b1442, 0x1b1442, 0x5a2a5e, 0x5a2a5e, 1).fillRect(0, 0, W, H);
+  // Twinkling stars high in the sky
+  for (let i = 0; i < 50; i++) {
+    g.fillStyle(0xffffff, Math.random() * 0.6 + 0.2).fillCircle(Math.random() * W, Math.random() * 300, Math.random() * 1.6 + 0.4);
+  }
   g.fillStyle(0xffb347, 0.12).fillCircle(980, 250, 230);
   g.fillStyle(0xffd27a, 0.22).fillCircle(980, 250, 150);
   g.fillStyle(0xffe9a8, 0.9).fillCircle(980, 250, 72);
@@ -39,8 +43,11 @@ export function drawMenuBackground(scene) {
 // A dark rounded panel
 export function panel(scene, x, y, w, h, stroke = 0xffd93b) {
   const g = scene.add.graphics();
-  g.fillStyle(0x10131c, 0.9).fillRoundedRect(x - w / 2, y - h / 2, w, h, 16);
+  g.fillStyle(0x000000, 0.3).fillRoundedRect(x - w / 2 + 4, y - h / 2 + 6, w, h, 16);
+  g.fillStyle(0x10131c, 0.92).fillRoundedRect(x - w / 2, y - h / 2, w, h, 16);
+  g.fillStyle(0xffffff, 0.04).fillRoundedRect(x - w / 2 + 4, y - h / 2 + 4, w - 8, Math.min(60, h / 3), 12);
   g.lineStyle(3, stroke, 0.9).strokeRoundedRect(x - w / 2, y - h / 2, w, h, 16);
+  g.lineStyle(1, 0xffffff, 0.12).strokeRoundedRect(x - w / 2 + 5, y - h / 2 + 5, w - 10, h - 10, 12);
   return g;
 }
 

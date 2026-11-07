@@ -1,15 +1,20 @@
-import { HERO, heroPower, heroMaxHp, learnedSkills } from '../data/hero.js';
+import { HEROES, ABILITIES, heroPower, heroMaxHp, learnedSkills } from '../data/hero.js';
+import { gearBonus } from '../data/shop.js';
+import { Audio } from '../systems/Audio.js';
 import { distToSegment } from '../systems/Path.js';
 import { textStyle } from '../ui/theme.js';
 
-const B = HERO.base;
-const A = HERO.abilities;
-
-// Zenko in battle: tap to move, auto-attacks when standing still, blocks enemies,
+// The hero in battle: tap to move, auto-attacks when standing still, blocks enemies,
 // has 4 abilities, and respawns at the base after being defeated.
 export default class Hero {
-  constructor(scene, x, y, saved) {
+  constructor(scene, x, y, saved, heroId = 'zenko') {
     this.scene = scene;
+    this.id = HEROES[heroId] ? heroId : 'zenko';
+    this.def = HEROES[this.id];
+    this.B = this.def.base;
+    this.A = ABILITIES;
+    this.mods = this.def.mods ?? {};
+    this.gear = gearBonus(saved.gear);
     this.level = saved.level;
     this.skills = new Set(learnedSkills(saved));
     this.x = x;
@@ -25,13 +30,21 @@ export default class Hero {
     this.channel = null;
     this.cd = { kaiWave: 0, flashStep: 0, powerUp: 0, spiritOrb: 0 };
 
-    this.ring = scene.add.ellipse(x, y + 16, 48, 16).setStrokeStyle(3, 0xd8442b).setDepth(18);
+    this.ring = scene.add.ellipse(x, y + 16, 48, 16).setStrokeStyle(3, this.def.look.gi).setDepth(18);
     this.aura = scene.add.ellipse(x, y - 14, 62, 86, 0xffd93b, 0).setDepth(21);
-    this.sprite = scene.add.image(x, y - 14, 'hero_0').setDepth(22);
+    this.sprite = scene.add.image(x, y - 14, this.tex(0)).setDepth(22);
     this.hpBar = scene.add.graphics().setDepth(23);
     this.label = scene.add.text(x, y - 62, `Lv ${this.level}`, textStyle(15, '#ffd93b')).setOrigin(0.5).setDepth(23);
     this.marker = scene.add.circle(0, 0, 10).setStrokeStyle(3, 0xffffff).setDepth(5).setVisible(false);
     this.draw();
+  }
+
+  tex(form) {
+    return `hero_${this.id}_${form}`;
+  }
+
+  mod(key, stat) {
+    return this.mods[key]?.[stat] ?? 1;
   }
 
   has(id) {
@@ -39,11 +52,11 @@ export default class Hero {
   }
 
   get maxHp() {
-    return heroMaxHp(this.level);
+    return Math.round(heroMaxHp(this.level, this.B.hp) * (1 + this.gear.hp));
   }
 
   get damage() {
-    let d = B.damage * heroPower(this.level);
+    let d = this.B.damage * heroPower(this.level) * (1 + this.gear.damage);
     if (this.has('heavyFists')) d *= 1.2;
     if (this.powerTime > 0) d *= 1.6;
     if (this.has('rage') && this.hp < this.maxHp / 2) d *= 1.4;
@@ -51,29 +64,31 @@ export default class Hero {
   }
 
   get attackCooldown() {
-    let c = B.cooldown;
+    let c = this.B.cooldown;
     if (this.has('fastStrikes')) c /= 1.25;
     if (this.powerTime > 0) c /= 1.5;
-    return c / this.scene.hasteAt(this);
+    return c / (1 + this.gear.attackSpeed) / this.scene.hasteAt(this);
   }
 
   get speed() {
-    let s = B.speed;
+    let s = this.B.speed;
     if (this.has('quickFeet')) s *= 1.25;
     if (this.powerTime > 0) s *= 1.4;
-    return s;
+    return s * (1 + this.gear.speed);
   }
 
   abilityCooldown(key) {
-    let c = A[key].cooldown;
+    let c = this.A[key].cooldown;
     if (key === 'flashStep' && this.has('flashStepPlus')) c *= 0.6;
     if (key === 'spiritOrb' && this.has('spiritOrbPlus')) c *= 0.75;
-    return c;
+    if (this.has('cooldownMaster')) c *= 0.8;
+    return c * this.mod(key, 'cooldown') * (1 - this.gear.cooldown);
   }
 
-  // Ability damage grows with the hero level (and Power Up / Oru's aura)
-  abilityDamage(base) {
-    return Math.round(base * heroPower(this.level) * (this.powerTime > 0 ? 1.6 : 1) * this.scene.boostAt(this));
+  // Ability damage grows with the hero level, gear, the hero's own strengths (and Power Up / Oru's aura)
+  abilityDamage(base, key) {
+    return Math.round(base * heroPower(this.level) * (1 + this.gear.damage) * this.mod(key, 'damage')
+      * (this.powerTime > 0 ? 1.6 : 1) * this.scene.boostAt(this));
   }
 
   get canBlock() {
@@ -93,9 +108,9 @@ export default class Hero {
     for (const e of enemies) e.blocked = false;
     if (!this.canBlock) return;
     enemies
-      .filter((e) => e.alive && !e.flying && Math.hypot(e.x - this.x, e.y - this.y) <= B.blockRadius)
+      .filter((e) => e.alive && !e.flying && Math.hypot(e.x - this.x, e.y - this.y) <= this.B.blockRadius)
       .sort((a, b) => b.dist - a.dist)
-      .slice(0, B.maxBlock)
+      .slice(0, this.B.maxBlock)
       .forEach((e) => { e.blocked = true; });
   }
 
@@ -104,7 +119,7 @@ export default class Hero {
 
     if (!this.alive) {
       this.respawnTimer -= dt;
-      this.respawnText.setText(`Zenko returns in ${Math.ceil(this.respawnTimer)}`);
+      this.respawnText.setText(`${this.def.name} returns in ${Math.ceil(this.respawnTimer)}`);
       if (this.respawnTimer <= 0) this.respawn();
       return;
     }
@@ -112,7 +127,7 @@ export default class Hero {
     if (this.powerTime > 0) {
       this.powerTime -= dt;
       if (this.powerTime <= 0) {
-        this.sprite.setTexture('hero_0');
+        this.sprite.setTexture(this.tex(0));
         this.aura.setFillStyle(0xffd93b, 0);
       }
     }
@@ -148,7 +163,7 @@ export default class Hero {
   attack(dt) {
     this.attackTimer -= dt;
     if (this.attackTimer > 0) return;
-    const e = this.scene.findNearest(this.x, this.y, B.range);
+    const e = this.scene.findNearest(this.x, this.y, this.B.range);
     if (!e) return;
     this.attackTimer = this.attackCooldown;
     this.sprite.setFlipX(e.x < this.x);
@@ -160,18 +175,32 @@ export default class Hero {
     this.scene.hitSpark(e.x, e.y - 6, 0xffd93b);
     this.scene.damageNumber(e.x, e.y - 20, dmg);
     if (crit) this.scene.floatText(e.x, e.y - 44, 'CRIT!', '#ff6b4a', 20);
+    Audio.sfx('hero', 0.08);
     this.hitEnemy(e, dmg);
+    // Chain Hit: the blast jumps to one more enemy close by
+    if (this.has('chainHit')) {
+      const next = this.scene.enemies.find((o) => o !== e && o.alive && Math.hypot(o.x - e.x, o.y - e.y) < 90);
+      if (next) {
+        this.scene.beamFx(e.x, e.y - 6, next.x, next.y - 6, 0xffd93b, 6);
+        this.hitEnemy(next, Math.round(dmg / 2));
+      }
+    }
   }
 
-  // Damage an enemy; Ki Harvest pays out when Zenko lands the final blow
+  // Damage an enemy. Boss Slayer hits bosses harder; a final blow gives Ki Harvest and bonus XP
   hitEnemy(e, dmg) {
+    if (e.def.boss && this.has('bossSlayer')) dmg *= 1.4;
     e.takeDamage(dmg);
-    if (!e.alive && this.has('kiHarvest')) this.scene.addKi(2, e.x, e.y - 54);
+    if (!e.alive) {
+      this.scene.onHeroKill?.(e);
+      if (this.has('kiHarvest')) this.scene.addKi(2, e.x, e.y - 54);
+    }
   }
 
   takeDamage(n) {
     if (!this.alive) return;
     if (this.has('afterimage')) n *= 0.8;
+    if (this.sinceHit > 0.5) Audio.sfx('hurt', 0.4);
     this.hp -= n;
     this.sinceHit = 0;
     if (this.hp <= 0) this.die();
@@ -188,8 +217,8 @@ export default class Hero {
     this.marker.setVisible(false);
     [this.sprite, this.aura, this.ring, this.label, this.hpBar].forEach((o) => o.setVisible(false));
     this.scene.poof(this.x, this.y);
-    this.scene.floatText(this.x, this.y - 50, 'Zenko is down!', '#ff6b6b', 26);
-    this.respawnTimer = B.respawn;
+    this.scene.floatText(this.x, this.y - 50, `${this.def.name} is down!`, '#ff6b6b', 26);
+    this.respawnTimer = this.B.respawn * (this.has('quickReturn') ? 0.5 : 1);
     this.respawnText = this.scene.add.text(this.spawn.x, this.spawn.y - 40, '', textStyle(20, '#ffb3b3'))
       .setOrigin(0.5).setDepth(40);
   }
@@ -199,7 +228,7 @@ export default class Hero {
     this.x = this.spawn.x;
     this.y = this.spawn.y;
     this.hp = this.maxHp;
-    this.sprite.setTexture('hero_0');
+    this.sprite.setTexture(this.tex(0));
     this.aura.setFillStyle(0xffd93b, 0);
     [this.sprite, this.aura, this.ring, this.label, this.hpBar].forEach((o) => o.setVisible(true));
     this.respawnText.destroy();
@@ -231,6 +260,7 @@ export default class Hero {
 
   cast(key, x, y) {
     if (!this.canUse(key)) return;
+    Audio.sfx('ability', 0.2);
     if (key === 'kaiWave') this.kaiWave(x, y);
     else if (key === 'flashStep') this.flashStep(x, y);
     else if (key === 'powerUp') this.powerUp();
@@ -238,11 +268,11 @@ export default class Hero {
   }
 
   kaiWave(tx, ty) {
-    const a = A.kaiWave;
+    const a = this.A.kaiWave;
     this.cd.kaiWave = this.abilityCooldown('kaiWave');
     const plus = this.has('kaiWavePlus');
     const width = plus ? 56 : a.width;
-    const dmg = this.abilityDamage(a.damage * (plus ? 1.6 : 1));
+    const dmg = this.abilityDamage(a.damage * (plus ? 1.6 : 1), 'kaiWave');
     const sx = this.x;
     const sy = this.y - 18;
     const ang = Math.atan2(ty - sy, tx - sx);
@@ -261,7 +291,7 @@ export default class Hero {
   }
 
   flashStep(tx, ty) {
-    const a = A.flashStep;
+    const a = this.A.flashStep;
     this.cd.flashStep = this.abilityCooldown('flashStep');
     this.scene.flashFx(this.x, this.y - 14, 50, a.color);
     this.target = null;
@@ -270,7 +300,7 @@ export default class Hero {
     this.x = Phaser.Math.Clamp(tx, 20, 1260);
     this.y = Phaser.Math.Clamp(ty, 80, 700);
     this.scene.flashFx(this.x, this.y - 14, a.radius, a.color);
-    const dmg = this.abilityDamage(a.damage * (this.has('flashStepPlus') ? 2 : 1));
+    const dmg = this.abilityDamage(a.damage * (this.has('flashStepPlus') ? 2 : 1), 'flashStep');
     for (const e of [...this.scene.enemies]) {
       if (e.alive && Math.hypot(e.x - this.x, e.y - this.y) <= a.radius) {
         this.scene.damageNumber(e.x, e.y - 20, dmg);
@@ -281,17 +311,17 @@ export default class Hero {
   }
 
   powerUp() {
-    const a = A.powerUp;
+    const a = this.A.powerUp;
     this.cd.powerUp = this.abilityCooldown('powerUp');
-    this.powerTime = a.duration;
-    this.sprite.setTexture('hero_1');
+    this.powerTime = a.duration * this.mod('powerUp', 'duration');
+    this.sprite.setTexture(this.tex(1));
     this.aura.setFillStyle(0xffd93b, 0.35);
     this.scene.flashFx(this.x, this.y - 14, 90, 0xffd93b);
     this.scene.floatText(this.x, this.y - 80, 'POWER UP!', '#ffd93b', 28);
   }
 
   spiritOrb(tx, ty) {
-    const a = A.spiritOrb;
+    const a = this.A.spiritOrb;
     this.cd.spiritOrb = this.abilityCooldown('spiritOrb');
     this.target = null;
     this.scene.tweens.killTweensOf(this.marker);
@@ -303,13 +333,13 @@ export default class Hero {
   }
 
   releaseOrb() {
-    const a = A.spiritOrb;
+    const a = this.A.spiritOrb;
     const { tx, ty, orb } = this.channel;
     this.channel = null;
     orb.destroy();
     const plus = this.has('spiritOrbPlus');
     this.scene.fireBlast(this.x, this.y - 70, { x: tx, y: ty, alive: false }, {
-      damage: this.abilityDamage(a.damage * (plus ? 1.5 : 1)),
+      damage: this.abilityDamage(a.damage * (plus ? 1.5 : 1), 'spiritOrb'),
       splash: a.radius * (plus ? 1.3 : 1),
       color: a.color,
       size: 28,

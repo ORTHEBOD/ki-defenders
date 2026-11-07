@@ -1,5 +1,5 @@
 import { ENEMIES } from '../data/enemies.js';
-import { textStyle } from '../ui/theme.js';
+import { Audio } from '../systems/Audio.js';
 
 export default class Enemy {
   // `from` = an enemy this one comes out of (a split or a boss summon), `back` = how far behind it
@@ -142,6 +142,7 @@ export default class Enemy {
     const f = Phaser.Utils.Array.GetRandom(targets);
     scene.beamFx(this.x, this.y - 30, f.x, f.y - 14, 0xb04cff, 14);
     f.stun(s.time);
+    Audio.sfx('stun');
     return true;
   }
 

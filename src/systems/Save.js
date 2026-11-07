@@ -51,7 +51,22 @@ async function hashPin(key, pin) {
 }
 
 function newPlayer(name) {
-  return { name, hero: { level: 1, xp: 0, skills: [] }, stars: {}, kills: 0, createdAt: Date.now() };
+  return migrate({ name, stars: {}, kills: 0, createdAt: Date.now() });
+}
+
+// Brings older saves up to date (adds coins, the hero list, gear and so on)
+function migrate(p) {
+  if (!p.heroes) {
+    p.heroes = { zenko: { level: 1, xp: 0, skills: [], ...(p.hero || {}) } };
+    delete p.hero;
+  }
+  for (const h of Object.values(p.heroes)) h.gear ??= {};
+  p.activeHero ??= 'zenko';
+  p.coins ??= 0;
+  p.items ??= [];
+  p.endlessBest ??= 0;
+  p.seenStory ??= [];
+  return p;
 }
 
 export const Save = {
@@ -80,14 +95,19 @@ export const Save = {
   current() {
     const key = getCurrentKey();
     const all = readAll();
-    return key && all[key] ? all[key].data : null;
+    return key && all[key] ? migrate(all[key].data) : null;
+  },
+
+  // Every player on this device (for the leaderboard)
+  allPlayers() {
+    return Object.values(readAll()).map((p) => migrate(p.data));
   },
 
   update(fn) {
     const key = getCurrentKey();
     const all = readAll();
     if (!key || !all[key]) return null;
-    const result = fn(all[key].data);
+    const result = fn(migrate(all[key].data));
     writeAll(all);
     return result;
   },
@@ -99,4 +119,9 @@ export const Save = {
 
 export function totalStars(player) {
   return Object.values(player.stars).reduce((a, b) => a + b, 0);
+}
+
+// The saved data of the hero the player is using now
+export function activeHero(player) {
+  return player.heroes[player.activeHero] ?? player.heroes.zenko;
 }

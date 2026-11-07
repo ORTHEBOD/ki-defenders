@@ -1,8 +1,9 @@
-import { HERO, xpToNext, skillPoints, learnedSkills, heroPower, heroMaxHp } from '../data/hero.js';
+import { HEROES, SKILL_TREE, xpToNext, skillPoints, learnedSkills, heroPower, heroMaxHp } from '../data/hero.js';
+import { GEAR, GEAR_SLOTS, gearBonus } from '../data/shop.js';
 import { fighterPortrait } from '../art/fighterArt.js';
 import { drawMenuBackground, panel, xpBar } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
-import { Save } from '../systems/Save.js';
+import { Save, activeHero } from '../systems/Save.js';
 import { textStyle } from '../ui/theme.js';
 
 const hex = (c) => `#${c.toString(16).padStart(6, '0')}`;
@@ -18,48 +19,99 @@ export default class HeroScene extends Phaser.Scene {
       this.scene.start('Login');
       return;
     }
-    const hero = player.hero;
+    const heroId = player.activeHero;
+    const def = HEROES[heroId];
+    const hero = activeHero(player);
     this.learned = new Set(learnedSkills(hero));
     this.points = skillPoints(hero);
     drawMenuBackground(this);
-    makeButton(this, 90, 50, 140, 50, '< Back', () => this.scene.start('Hub'), { fontSize: 26, color: 0x3a4470 });
-    this.add.text(640, 50, 'Hero', textStyle(56, '#ffd93b')).setOrigin(0.5);
+    makeButton(this, 90, 40, 140, 50, '< Back', () => this.scene.start('Hub'), { fontSize: 26, color: 0x3a4470 });
     if (this.learned.size > 0) {
-      makeButton(this, 1150, 50, 200, 50, 'Reset skills', () => {
-        Save.update((p) => { p.hero.skills = []; });
+      makeButton(this, 1170, 40, 180, 50, 'Reset skills', () => {
+        Save.update((p) => { activeHero(p).skills = []; });
         this.scene.restart();
-      }, { fontSize: 24, color: 0x8a2f3a });
+      }, { fontSize: 22, color: 0x8a2f3a });
     }
 
-    // Hero info
-    panel(this, 230, 400, 360, 540, 0xd8442b);
-    fighterPortrait(this, 230, 250, HERO.look, 3.2);
-    this.add.text(230, 390, HERO.name, textStyle(44)).setOrigin(0.5);
-    this.add.text(230, 436, `Level ${hero.level}`, textStyle(30, '#ffd93b')).setOrigin(0.5);
-    const need = xpToNext(hero.level);
-    xpBar(this, 90, 466, 280, 20, hero.xp / need);
-    this.add.text(230, 504, `XP ${hero.xp} / ${need}`, textStyle(20, '#c9d3ff')).setOrigin(0.5);
-    const dmg = Math.round(HERO.base.damage * heroPower(hero.level));
-    this.add.text(230, 540, `HP ${heroMaxHp(hero.level)}    Damage ${dmg}`, textStyle(22)).setOrigin(0.5);
-    this.add.text(230, 584, `Skill points: ${this.points}`, textStyle(28, this.points > 0 ? '#5be35b' : '#c9d3ff')).setOrigin(0.5);
-    this.add.text(230, 625, 'Win levels to earn XP. 1 point per level.', textStyle(17, '#9aa3c7')).setOrigin(0.5);
+    // Hero picker: tap an owned hero to use them
+    Object.entries(HEROES).forEach(([id, h], i) => {
+      const x = 400 + i * 160;
+      const owned = !!player.heroes[id];
+      const chosen = id === heroId;
+      const box = this.add.rectangle(x, 44, 150, 72, chosen ? 0x3a2a10 : 0x10131c, 0.9)
+        .setStrokeStyle(3, chosen ? 0xffd93b : owned ? h.look.gi : 0x3a3f52);
+      const face = fighterPortrait(this, x - 46, 50, h.look, 0.8);
+      face.setAlpha(owned ? 1 : 0.35);
+      this.add.text(x - 14, 34, h.name, textStyle(22, owned ? '#ffffff' : '#8a91ad')).setOrigin(0, 0.5);
+      this.add.text(x - 14, 60, owned ? (chosen ? 'In use' : `Lv ${player.heroes[id].level}`) : 'Lucky Spin', textStyle(15, chosen ? '#ffd93b' : '#9aa3c7'))
+        .setOrigin(0, 0.5);
+      if (owned && !chosen) {
+        box.setInteractive({ useHandCursor: true });
+        box.on('pointerdown', () => {
+          Save.update((p) => { p.activeHero = id; });
+          this.scene.restart();
+        });
+      }
+    });
 
-    // Skill tree: 3 branches, learned top to bottom
-    panel(this, 820, 400, 820, 540);
-    this.add.text(820, 160, 'Skill tree', textStyle(34)).setOrigin(0.5);
-    HERO.skillTree.forEach((branch, b) => {
-      const x = 560 + b * 260;
-      this.add.text(x, 205, branch.branch, textStyle(28, hex(branch.color))).setOrigin(0.5);
-      this.add.graphics().lineStyle(4, branch.color, 0.35).lineBetween(x, 250, x, 520);
+    // Hero info and gear
+    const bonus = gearBonus(hero.gear);
+    panel(this, 230, 405, 400, 560, def.look.gi);
+    fighterPortrait(this, 230, 210, def.look, 2.4);
+    this.add.text(230, 300, `${def.name}  Lv ${hero.level}`, textStyle(36)).setOrigin(0.5);
+    this.add.text(230, 334, def.title, textStyle(19, '#c9d3ff')).setOrigin(0.5);
+    const need = xpToNext(hero.level);
+    xpBar(this, 70, 352, 320, 16, hero.xp / need);
+    this.add.text(230, 382, `XP ${hero.xp} / ${need}`, textStyle(17, '#c9d3ff')).setOrigin(0.5);
+    const hp = Math.round(heroMaxHp(hero.level, def.base.hp) * (1 + bonus.hp));
+    const dmg = Math.round(def.base.damage * heroPower(hero.level) * (1 + bonus.damage));
+    this.add.text(230, 410, `HP ${hp}   Damage ${dmg}   Range ${def.base.range}`, textStyle(19)).setOrigin(0.5);
+    this.add.text(230, 438, `Skill points: ${this.points}`, textStyle(22, this.points > 0 ? '#5be35b' : '#c9d3ff')).setOrigin(0.5);
+    if (def.perk) {
+      this.add.text(230, 468, def.perk, { ...textStyle(15, '#ffe9c4'), wordWrap: { width: 360 }, align: 'center' }).setOrigin(0.5);
+    }
+
+    // Gear: tap a slot to switch between the items you own for it
+    this.add.text(230, 500, 'Gear (tap to change)', textStyle(18, '#9aa3c7')).setOrigin(0.5);
+    GEAR_SLOTS.forEach((slot, i) => {
+      const y = 532 + i * 34;
+      const id = hero.gear[slot.key];
+      const item = GEAR[id];
+      const row = this.add.rectangle(230, y, 360, 30, 0x1c2133).setStrokeStyle(2, item ? item.color : 0x3a3f52)
+        .setInteractive({ useHandCursor: true });
+      this.add.text(60, y, slot.name, textStyle(16, '#9aa3c7')).setOrigin(0, 0.5);
+      this.add.text(140, y, item ? item.name : '- empty -', textStyle(17, item ? '#ffffff' : '#6a7090')).setOrigin(0, 0.5);
+      row.on('pointerdown', () => {
+        const owned = player.items.filter((g) => GEAR[g].slot === slot.key);
+        if (!owned.length) {
+          this.flash('Buy gear in the Shop!');
+          return;
+        }
+        const choices = [undefined, ...owned];
+        const next = choices[(choices.indexOf(id) + 1) % choices.length];
+        Save.update((p) => {
+          if (next) activeHero(p).gear[slot.key] = next;
+          else delete activeHero(p).gear[slot.key];
+        });
+        this.scene.restart();
+      });
+    });
+
+    // Skill tree: 3 branches of 6, learned top to bottom
+    panel(this, 845, 405, 790, 560);
+    SKILL_TREE.forEach((branch, b) => {
+      const x = 590 + b * 255;
+      this.add.text(x, 152, branch.branch, textStyle(26, hex(branch.color))).setOrigin(0.5);
+      this.add.graphics().lineStyle(4, branch.color, 0.35).lineBetween(x, 190, x, 520);
       branch.skills.forEach((skill, i) => {
-        const y = 250 + i * 88;
+        const y = 192 + i * 66;
         const state = this.skillState(branch, i);
         const fill = state === 'learned' ? branch.color : 0x10131c;
-        const node = this.add.circle(x, y, 26, fill).setStrokeStyle(4, branch.color, state === 'locked' ? 0.35 : 1);
+        const node = this.add.circle(x, y, 21, fill).setStrokeStyle(4, branch.color, state === 'locked' ? 0.35 : 1);
         const icon = state === 'learned' ? '✔' : state === 'ready' ? '+' : '🔒';
-        this.add.text(x, y, icon, state === 'locked' ? { fontSize: '20px' } : textStyle(26, state === 'learned' ? '#10131c' : '#5be35b'))
+        this.add.text(x, y, icon, state === 'locked' ? { fontSize: '16px' } : textStyle(22, state === 'learned' ? '#10131c' : '#5be35b'))
           .setOrigin(0.5).setAlpha(state === 'locked' ? 0.6 : 1);
-        this.add.text(x, y + 38, skill.name, textStyle(19, state === 'locked' ? '#8a91ad' : '#ffffff')).setOrigin(0.5);
+        this.add.text(x, y + 31, skill.name, textStyle(16, state === 'locked' ? '#8a91ad' : '#ffffff')).setOrigin(0.5);
         if (state === 'ready') this.tweens.add({ targets: node, scale: 1.12, duration: 600, yoyo: true, repeat: -1 });
         node.setInteractive({ useHandCursor: true });
         node.on('pointerdown', () => this.showSkill(branch, i));
@@ -68,8 +120,13 @@ export default class HeroScene extends Phaser.Scene {
 
     this.info = this.add.container(0, 0);
     const sel = data.selected;
-    if (sel) this.showSkill(HERO.skillTree[sel.b], sel.i);
-    else this.info.add(this.add.text(820, 618, 'Tap a skill to see what it does', textStyle(22, '#ffe9c4')).setOrigin(0.5));
+    if (sel) this.showSkill(SKILL_TREE[sel.b], sel.i);
+    else this.info.add(this.add.text(845, 638, 'Tap a skill to see what it does', textStyle(22, '#ffe9c4')).setOrigin(0.5));
+  }
+
+  flash(text) {
+    const t = this.add.text(230, 470, text, textStyle(24, '#ffd93b')).setOrigin(0.5).setDepth(50);
+    this.tweens.add({ targets: t, y: 440, alpha: 0, duration: 1200, onComplete: () => t.destroy() });
   }
 
   // learned / ready (can learn now) / next (needs a point) / locked (learn the one above first)
@@ -85,21 +142,21 @@ export default class HeroScene extends Phaser.Scene {
     this.info.removeAll(true);
     const skill = branch.skills[i];
     const state = this.skillState(branch, i);
-    this.info.add(this.add.rectangle(820, 625, 790, 74, 0x10131c, 1));
-    this.info.add(this.add.text(450, 610, skill.name, textStyle(24, hex(branch.color))).setOrigin(0, 0.5));
-    this.info.add(this.add.text(450, 640, skill.desc, textStyle(19, '#ffffff')).setOrigin(0, 0.5));
+    this.info.add(this.add.rectangle(845, 642, 770, 70, 0x10131c, 1));
+    this.info.add(this.add.text(475, 626, skill.name, textStyle(24, hex(branch.color))).setOrigin(0, 0.5));
+    this.info.add(this.add.text(475, 656, skill.desc, textStyle(19, '#ffffff')).setOrigin(0, 0.5));
 
     let status = '';
     if (state === 'learned') status = 'Learned';
     else if (state === 'locked') status = `Learn ${branch.skills[i - 1].name} first`;
     else if (state === 'next') status = 'Needs 1 skill point';
     if (status) {
-      this.info.add(this.add.text(1195, 625, status, textStyle(20, state === 'learned' ? '#5be35b' : '#9aa3c7')).setOrigin(1, 0.5));
+      this.info.add(this.add.text(1215, 642, status, textStyle(20, state === 'learned' ? '#5be35b' : '#9aa3c7')).setOrigin(1, 0.5));
       return;
     }
-    const b = HERO.skillTree.indexOf(branch);
-    this.info.add(makeButton(this, 1110, 625, 160, 50, 'Learn', () => {
-      Save.update((p) => { p.hero.skills = [...learnedSkills(p.hero), skill.id]; });
+    const b = SKILL_TREE.indexOf(branch);
+    this.info.add(makeButton(this, 1135, 642, 150, 50, 'Learn', () => {
+      Save.update((p) => { const h = activeHero(p); h.skills = [...learnedSkills(h), skill.id]; });
       this.scene.restart({ selected: { b, i } });
     }, { color: 0x2f8a4a, fontSize: 28 }));
   }

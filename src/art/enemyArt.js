@@ -144,3 +144,104 @@ export function drawKrag(g) {
   eyes(g, 44, 56, 25, 0xff3b3b);
   g.lineStyle(2, O).lineBetween(45, 32, 55, 32);
 }
+
+// Mini boss of the desert: a giant scorpion (80x80)
+export function drawScorpion(g) {
+  g.fillStyle(0x000000, 0.28).fillEllipse(40, 72, 66, 10);
+  g.lineStyle(3, O);
+  g.lineStyle(4, O);
+  for (const [x, y] of [[18, 52], [26, 58], [54, 58], [62, 52]]) g.lineBetween(40, 54, x, y + 10);
+  g.lineStyle(3, O);
+  // Tail curling over the back with a stinger
+  g.fillStyle(0xb8601a);
+  [[58, 44, 9], [64, 34, 8], [64, 23, 7], [57, 15, 6]].forEach(([x, y, r]) => g.fillCircle(x, y, r).strokeCircle(x, y, r));
+  g.fillStyle(0xffe14d).fillPoints(pts([[52, 13], [44, 18], [50, 8]]), true);
+  // Body and claws
+  g.fillStyle(0xd0782a).fillEllipse(38, 52, 40, 24).strokeEllipse(38, 52, 40, 24);
+  g.fillStyle(0xe8944a).fillEllipse(34, 48, 18, 8);
+  g.fillStyle(0xd0782a);
+  g.fillCircle(12, 40, 9).strokeCircle(12, 40, 9);
+  g.fillPoints(pts([[6, 32], [12, 26], [18, 34]]), true);
+  g.fillCircle(22, 34, 6).strokeCircle(22, 34, 6);
+  // Crown
+  g.fillStyle(0xffd93b).fillPoints(pts([[26, 40], [28, 32], [32, 38], [36, 30], [40, 38], [44, 32], [46, 40]]), true);
+  g.lineStyle(2, O).strokePoints(pts([[26, 40], [28, 32], [32, 38], [36, 30], [40, 38], [44, 32], [46, 40]]), true);
+  eyes(g, 31, 41, 47, 0xff3b3b);
+}
+
+// Big boss of the desert: Sand King Ozul (100x100)
+export function drawSandKing(g) {
+  g.fillStyle(0x000000, 0.3).fillEllipse(50, 95, 76, 12);
+  g.lineStyle(3, O);
+  const robe = pts([[30, 36], [70, 36], [84, 90], [16, 90]]);
+  g.fillStyle(0xc9a23a).fillPoints(robe, true).strokePoints(robe, true);
+  g.fillStyle(0x8a5a1a).fillPoints(pts([[44, 36], [56, 36], [60, 90], [40, 90]]), true);
+  g.fillStyle(0xe8c86a).fillEllipse(24, 42, 22, 16).strokeEllipse(24, 42, 22, 16);
+  g.fillEllipse(76, 42, 22, 16).strokeEllipse(76, 42, 22, 16);
+  // Staff with a sun gem
+  g.lineStyle(4, 0x5a3a1a).lineBetween(88, 20, 88, 92);
+  g.fillStyle(0xff8a3d).fillCircle(88, 16, 8);
+  g.lineStyle(3, O).strokeCircle(88, 16, 8);
+  // Head with a tall sand-crown
+  g.fillStyle(0x7a5a3a).fillEllipse(50, 26, 28, 26).strokeEllipse(50, 26, 28, 26);
+  const crown = pts([[34, 18], [36, 0], [44, 10], [50, -2], [56, 10], [64, 0], [66, 18]]);
+  g.fillStyle(0xffd93b).fillPoints(crown, true).strokePoints(crown, true);
+  g.fillStyle(0x3fd0f5).fillCircle(50, 12, 3);
+  eyes(g, 44, 56, 27, 0xffe14d);
+  g.fillStyle(0xe8d8b0).fillPoints(pts([[42, 33], [58, 33], [50, 46]]), true);
+}
+
+// Mini boss of the mothership: War Mech (80x80)
+export function drawMech(g) {
+  g.fillStyle(0x000000, 0.28).fillEllipse(40, 75, 60, 10);
+  g.lineStyle(3, O);
+  g.fillStyle(0x4a5266);
+  g.fillRect(20, 54, 14, 18).strokeRect(20, 54, 14, 18);
+  g.fillRect(46, 54, 14, 18).strokeRect(46, 54, 14, 18);
+  g.fillStyle(0x6a7488).fillRoundedRect(14, 24, 52, 34, 6).strokeRoundedRect(14, 24, 52, 34, 6);
+  g.fillStyle(0x8a94a8).fillRect(18, 28, 20, 8);
+  // Arm cannons
+  g.fillStyle(0x4a5266);
+  g.fillRect(2, 30, 14, 22).strokeRect(2, 30, 14, 22);
+  g.fillRect(64, 30, 14, 22).strokeRect(64, 30, 14, 22);
+  g.fillStyle(0xff3b3b).fillCircle(9, 52, 3).fillCircle(71, 52, 3);
+  // Glowing core and cockpit
+  g.fillStyle(0x3fd0f5).fillCircle(40, 44, 6);
+  g.lineStyle(2, O).strokeCircle(40, 44, 6);
+  g.lineStyle(3, O);
+  g.fillStyle(0x6a7488).fillRoundedRect(26, 6, 28, 20, 6).strokeRoundedRect(26, 6, 28, 20, 6);
+  g.fillStyle(0xff3b3b).fillRect(30, 13, 20, 5);
+}
+
+// Final boss: Emperor Vorn (100x100)
+export function drawVorn(g) {
+  g.fillStyle(0x000000, 0.3).fillEllipse(50, 95, 76, 12);
+  g.lineStyle(3, O);
+  const cape = pts([[22, 32], [78, 32], [94, 92], [6, 92]]);
+  g.fillStyle(0x1a1030).fillPoints(cape, true).strokePoints(cape, true);
+  g.fillStyle(0x3a1a5a).fillPoints(pts([[26, 36], [74, 36], [84, 88], [16, 88]]), true);
+  g.fillStyle(0xeef2f8).fillRoundedRect(32, 36, 36, 44, 10).strokeRoundedRect(32, 36, 36, 44, 10);
+  g.fillStyle(0x9b59c6).fillRoundedRect(36, 40, 28, 18, 6);
+  g.fillStyle(0xffd93b).fillCircle(50, 49, 5);
+  g.fillStyle(0xeef2f8);
+  g.fillEllipse(26, 38, 20, 14).strokeEllipse(26, 38, 20, 14);
+  g.fillEllipse(74, 38, 20, 14).strokeEllipse(74, 38, 20, 14);
+  // Pale head, dark horns and a glowing gem
+  g.fillStyle(0xd8d0f0).fillEllipse(50, 22, 26, 26).strokeEllipse(50, 22, 26, 26);
+  const hornL = pts([[40, 14], [28, -2], [44, 8]]);
+  const hornR = pts([[60, 14], [72, -2], [56, 8]]);
+  g.fillStyle(0x2a1a3a).fillPoints(hornL, true).strokePoints(hornL, true);
+  g.fillPoints(hornR, true).strokePoints(hornR, true);
+  g.fillStyle(0xff3bb0).fillCircle(50, 12, 3.5);
+  eyes(g, 44, 56, 23, 0xff3bb0);
+  g.lineStyle(2, O).lineBetween(46, 30, 54, 30);
+}
+
+// A gold coin (28x28)
+export function drawCoin(g) {
+  g.fillStyle(0xc98a1a).fillCircle(14, 14, 12);
+  g.lineStyle(2, O).strokeCircle(14, 14, 12);
+  g.fillStyle(0xffd93b).fillCircle(13, 13, 9);
+  g.lineStyle(2, 0xc98a1a).strokeCircle(13, 13, 6);
+  g.fillStyle(0xffffff, 0.7).fillEllipse(10, 9, 5, 3);
+}

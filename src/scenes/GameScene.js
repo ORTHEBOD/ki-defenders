@@ -1,10 +1,14 @@
-import { LEVELS } from '../data/levels.js';
+import { LEVELS, MAPS, levelById, endlessWave } from '../data/levels.js';
+import { storyAfter } from '../data/story.js';
+import { battleCoins } from '../data/shop.js';
+import { Settings } from '../systems/Settings.js';
+import { Audio } from '../systems/Audio.js';
 import { FIGHTERS, WALL } from '../data/fighters.js';
 import { DIFFICULTY } from '../data/difficulty.js';
 import { ENEMIES } from '../data/enemies.js';
-import { HERO, addXp } from '../data/hero.js';
+import { addXp } from '../data/hero.js';
 import Hero from '../objects/Hero.js';
-import { Save } from '../systems/Save.js';
+import { Save, activeHero } from '../systems/Save.js';
 import Path from '../systems/Path.js';
 import Grid from '../systems/Grid.js';
 import Enemy from '../objects/Enemy.js';
@@ -22,7 +26,11 @@ export default class GameScene extends Phaser.Scene {
 
   create(data = {}) {
     this.startData = data;
-    this.level = LEVELS.find((l) => l.id === data.levelId) ?? LEVELS[0];
+    this.level = levelById(data.levelId) ?? LEVELS[0];
+    this.endless = !!this.level.endless;
+    this.theme = MAPS[this.level.map ?? 0].theme;
+    this.xpEarned = 0;
+    this.heroKillXp = 0;
     this.diffKey = data.difficulty ?? 'normal';
     this.diff = DIFFICULTY[this.diffKey];
     this.kills = 0;
@@ -53,11 +61,14 @@ export default class GameScene extends Phaser.Scene {
     this.fighters = [];
     this.projectiles = [];
     this.hazards = [];
-    this.speed = 1;
+    this.speed = Settings.get('startSpeed') ?? 1;
     this.state = 'playing';
+    // The "screen shake" setting: when off, camera shakes do nothing
+    if (!Settings.get('screenShake')) this.cameras.main.shake = () => this.cameras.main;
+    Audio.music('battle');
     this.menu = null;
-    this.tweens.timeScale = 1;
-    this.time.timeScale = 1;
+    this.tweens.timeScale = this.speed;
+    this.time.timeScale = this.speed;
 
     if (this.maze) this.drawMazeMap();
     else {
@@ -69,10 +80,12 @@ export default class GameScene extends Phaser.Scene {
     this.aiming = null;
     this.uiClickFrame = -1;
 
-    // Zenko starts next to the base, with his saved level and skills
-    const saved = Save.current()?.hero ?? { level: 1, skills: [] };
+    // The hero starts next to the base, with their saved level, skills and gear
+    const player = Save.current();
+    const saved = player ? activeHero(player) : { level: 1, skills: [], gear: {} };
     const end = this.route.end;
-    this.hero = new Hero(this, end.x - 90, end.y - 80, saved);
+    this.hero = new Hero(this, end.x - 90, end.y - 80, saved, player?.activeHero);
+    const heroName = this.hero.def.name;
     if (this.hero.has('overflow')) this.ki += 50;
 
     this.createHud();
@@ -81,9 +94,9 @@ export default class GameScene extends Phaser.Scene {
       this.heroSel = this.add.ellipse(0, 0, 66, 24).setStrokeStyle(4, 0xffffff).setDepth(17).setVisible(false);
       this.drawRoute();
       this.floatText(W / 2, 560, 'Tap empty ground to build. Fighters and walls block the way!', '#ffe9c4', 28);
-      this.time.delayedCall(1400, () => this.floatText(W / 2, 560, 'Tap Zenko, then tap where he should go', '#ffe9c4', 28));
+      this.time.delayedCall(1400, () => this.floatText(W / 2, 560, `Tap ${heroName}, then tap where to send them`, '#ffe9c4', 28));
     } else {
-      this.floatText(W / 2, 600, 'Tap the ground to move Zenko', '#ffe9c4', 28);
+      this.floatText(W / 2, 600, `Tap the ground to move ${heroName}`, '#ffe9c4', 28);
     }
 
     this.input.on('pointerdown', (pointer, over) => {
@@ -107,7 +120,7 @@ export default class GameScene extends Phaser.Scene {
   // ---------- Hero ability bar ----------
 
   createAbilityBar() {
-    this.abilityButtons = Object.entries(HERO.abilities).map(([key, a], i) => {
+    this.abilityButtons = Object.entries(this.hero.A).map(([key, a], i) => {
       const r = key === 'spiritOrb' ? 42 : 38;
       const c = this.add.container(640 + i * 92, 670).setDepth(110);
       const bg = this.add.circle(0, 0, r, COLORS.panel, 0.92).setStrokeStyle(4, a.color);
@@ -135,12 +148,12 @@ export default class GameScene extends Phaser.Scene {
     this.selectHero(false);
     const hero = this.hero;
     if (!hero.alive) {
-      this.floatText(W / 2, 600, 'Zenko is down', '#ff6b6b', 26);
+      this.floatText(W / 2, 600, `${hero.def.name} is down`, '#ff6b6b', 26);
       return;
     }
     if (!hero.canUse(key)) return;
     this.closeMenu();
-    const a = HERO.abilities[key];
+    const a = this.hero.A[key];
     if (!a.aim) {
       hero.cast(key);
       return;
@@ -177,20 +190,26 @@ export default class GameScene extends Phaser.Scene {
     const g = this.add.graphics().setDepth(0);
     const rnd = new Phaser.Math.RandomDataGenerator([`map-${this.level.id}`]);
 
-    g.fillStyle(0x6fb552).fillRect(0, 0, W, H);
-    for (let i = 0; i < 140; i++) {
-      g.fillStyle(rnd.pick([0x64a84a, 0x7cc25e, 0x5d9e44]), 1);
-      g.fillEllipse(rnd.between(0, W), rnd.between(0, H), rnd.between(30, 90), rnd.between(14, 40));
-    }
+    const th = this.theme;
+    this.drawGround(g, rnd);
 
     const pts = this.path.points;
-    g.lineStyle(66, 0xa8864f).strokePoints(pts);
-    pts.forEach((p) => g.fillStyle(0xa8864f).fillCircle(p.x, p.y, 33));
-    g.lineStyle(54, 0xe0c08c).strokePoints(pts);
-    pts.forEach((p) => g.fillStyle(0xe0c08c).fillCircle(p.x, p.y, 27));
-    for (let i = 0; i < 60; i++) {
-      const p = this.path.pointAt(rnd.between(0, this.path.length));
-      g.fillStyle(0xc9a66b).fillCircle(p.x + rnd.between(-20, 20), p.y + rnd.between(-20, 20), rnd.between(2, 4));
+    g.lineStyle(70, 0x000000, 0.12).strokePoints(pts.map((p) => ({ x: p.x + 4, y: p.y + 6 })));
+    g.lineStyle(66, th.edge).strokePoints(pts);
+    pts.forEach((p) => g.fillStyle(th.edge).fillCircle(p.x, p.y, 33));
+    g.lineStyle(54, th.road).strokePoints(pts);
+    pts.forEach((p) => g.fillStyle(th.road).fillCircle(p.x, p.y, 27));
+    if (th.metal) {
+      // Glowing guide lights along the metal walkway
+      for (let d = 0; d < this.path.length; d += 36) {
+        const p = this.path.pointAt(d);
+        g.fillStyle(th.pebble, 0.7).fillCircle(p.x, p.y, 3);
+      }
+    } else {
+      for (let i = 0; i < 60; i++) {
+        const p = this.path.pointAt(rnd.between(0, this.path.length));
+        g.fillStyle(th.pebble).fillCircle(p.x + rnd.between(-20, 20), p.y + rnd.between(-20, 20), rnd.between(2, 4));
+      }
     }
 
     for (let i = 0, placed = 0; i < 500 && placed < 34; i++) {
@@ -200,12 +219,91 @@ export default class GameScene extends Phaser.Scene {
       if (this.level.spots.some(([sx, sy]) => Math.hypot(sx - x, sy - y) < 60)) continue;
       if ((x < 340 || (x > 580 && x < 960)) && y > 620) continue;
       placed++;
-      if (rnd.frac() < 0.6) this.drawTree(g, x, y, rnd);
-      else this.drawRock(g, x, y, rnd);
+      this.drawDeco(g, x, y, rnd);
     }
+    this.addAmbience();
 
     this.drawPortal(pts[0].x + 60, pts[0].y);
     this.drawBase(pts[pts.length - 1].x, pts[pts.length - 1].y);
+  }
+
+  // Ground color with soft patches, plus a light-to-dark shading from top to bottom
+  drawGround(g, rnd) {
+    const th = this.theme;
+    g.fillStyle(th.ground).fillRect(0, 0, W, H);
+    if (th.metal) {
+      g.lineStyle(2, 0x000000, 0.25);
+      for (let x = 0; x < W; x += 80) g.lineBetween(x, 0, x, H);
+      for (let y = 0; y < H; y += 80) g.lineBetween(0, y, W, y);
+      for (let i = 0; i < 40; i++) {
+        g.fillStyle(rnd.pick(th.blobs), 1).fillRect(rnd.between(0, 15) * 80 + 2, rnd.between(0, 9) * 80 + 2, 76, 76);
+      }
+    } else {
+      for (let i = 0; i < 140; i++) {
+        g.fillStyle(rnd.pick(th.blobs), 1);
+        g.fillEllipse(rnd.between(0, W), rnd.between(0, H), rnd.between(30, 90), rnd.between(14, 40));
+      }
+    }
+    g.fillGradientStyle(0xffffff, 0xffffff, 0x000000, 0x000000, 0.06, 0.06, 0.12, 0.12).fillRect(0, 0, W, H);
+  }
+
+  // A decoration that fits the map: trees and bushes, cacti and bones, or crates and lights
+  drawDeco(g, x, y, rnd) {
+    const kind = rnd.pick(this.theme.deco);
+    if (kind === 'tree') this.drawTree(g, x, y, rnd);
+    else if (kind === 'rock') this.drawRock(g, x, y, rnd);
+    else if (kind === 'bush') {
+      g.lineStyle(2, COLORS.outline).fillStyle(0x3b9447);
+      [[-8, 0, 9], [8, 0, 9], [0, -6, 10]].forEach(([dx, dy, r]) => g.fillCircle(x + dx, y + dy, r).strokeCircle(x + dx, y + dy, r));
+      g.fillStyle(0xff6b8a).fillCircle(x - 4, y - 8, 2.5).fillCircle(x + 6, y - 2, 2.5);
+    } else if (kind === 'cactus') {
+      const s = rnd.realInRange(0.8, 1.2);
+      g.fillStyle(0x000000, 0.18).fillEllipse(x + 4, y + 18 * s, 30 * s, 8 * s);
+      g.lineStyle(2, COLORS.outline).fillStyle(0x4a9a4a);
+      g.fillRoundedRect(x - 6 * s, y - 22 * s, 12 * s, 40 * s, 6 * s).strokeRoundedRect(x - 6 * s, y - 22 * s, 12 * s, 40 * s, 6 * s);
+      g.fillRoundedRect(x - 17 * s, y - 10 * s, 8 * s, 16 * s, 4 * s).strokeRoundedRect(x - 17 * s, y - 10 * s, 8 * s, 16 * s, 4 * s);
+      g.fillRoundedRect(x + 9 * s, y - 16 * s, 8 * s, 16 * s, 4 * s).strokeRoundedRect(x + 9 * s, y - 16 * s, 8 * s, 16 * s, 4 * s);
+      g.fillStyle(0x6aba6a).fillRect(x - 3 * s, y - 18 * s, 2 * s, 30 * s);
+    } else if (kind === 'sandrock') {
+      const s = rnd.realInRange(0.8, 1.4);
+      g.lineStyle(2, COLORS.outline).fillStyle(0xb8865a);
+      g.fillRoundedRect(x - 18 * s, y - 12 * s, 36 * s, 24 * s, 8 * s).strokeRoundedRect(x - 18 * s, y - 12 * s, 36 * s, 24 * s, 8 * s);
+      g.fillStyle(0xd8a87a).fillRect(x - 14 * s, y - 8 * s, 28 * s, 5 * s);
+    } else if (kind === 'bones') {
+      g.lineStyle(4, 0xf2e6c4);
+      g.lineBetween(x - 12, y - 4, x + 12, y + 4);
+      g.lineBetween(x - 10, y + 6, x + 10, y - 6);
+      g.fillStyle(0xf2e6c4).fillCircle(x - 18, y - 2, 6).fillCircle(x - 15, y + 5, 4);
+    } else if (kind === 'crate') {
+      g.lineStyle(2, COLORS.outline).fillStyle(0x5a6378).fillRect(x - 16, y - 16, 32, 32).strokeRect(x - 16, y - 16, 32, 32);
+      g.lineStyle(2, 0x2e3442).lineBetween(x - 16, y - 16, x + 16, y + 16).lineBetween(x + 16, y - 16, x - 16, y + 16);
+      g.fillStyle(0xffd93b).fillRect(x - 16, y - 4, 32, 4);
+    } else if (kind === 'light') {
+      g.fillStyle(0x3fd0f5, 0.18).fillCircle(x, y, 26);
+      g.lineStyle(2, COLORS.outline).fillStyle(0x2e3442).fillCircle(x, y, 10).strokeCircle(x, y, 10);
+      g.fillStyle(0x9fe8ff).fillCircle(x, y, 5);
+    } else if (kind === 'pipe') {
+      g.lineStyle(2, COLORS.outline).fillStyle(0x6a7488).fillRect(x - 30, y - 7, 60, 14).strokeRect(x - 30, y - 7, 60, 14);
+      g.fillStyle(0x8a94a8).fillRect(x - 30, y - 5, 60, 3);
+      g.fillStyle(0x4a5266).fillRect(x - 6, y - 10, 12, 20).strokeRect(x - 6, y - 10, 12, 20);
+    }
+  }
+
+  // Small moving details: drifting leaves, blowing sand, or blinking ship lights
+  addAmbience() {
+    const th = this.theme;
+    const color = th.metal ? 0x3fd0f5 : th.deco.includes('cactus') ? 0xf2d49a : 0xa8e070;
+    for (let i = 0; i < 14; i++) {
+      const p = this.add.circle(Phaser.Math.Between(0, W), Phaser.Math.Between(70, H), Phaser.Math.Between(2, 3), color, 0.6).setDepth(3);
+      if (th.metal) {
+        this.tweens.add({ targets: p, alpha: 0.1, duration: Phaser.Math.Between(600, 1600), yoyo: true, repeat: -1 });
+      } else {
+        this.tweens.add({
+          targets: p, x: p.x + Phaser.Math.Between(120, 300), y: p.y + Phaser.Math.Between(-40, 40), alpha: 0,
+          duration: Phaser.Math.Between(4000, 8000), delay: Phaser.Math.Between(0, 4000), repeat: -1,
+        });
+      }
+    }
   }
 
   drawTree(g, x, y, rnd) {
@@ -267,11 +365,7 @@ export default class GameScene extends Phaser.Scene {
     const grid = this.route;
     const g = this.add.graphics().setDepth(0);
     const rnd = new Phaser.Math.RandomDataGenerator([`map-${this.level.id}`]);
-    g.fillStyle(0x6fb552).fillRect(0, 0, W, H);
-    for (let i = 0; i < 140; i++) {
-      g.fillStyle(rnd.pick([0x64a84a, 0x7cc25e, 0x5d9e44]), 1);
-      g.fillEllipse(rnd.between(0, W), rnd.between(0, H), rnd.between(30, 90), rnd.between(14, 40));
-    }
+    this.drawGround(g, rnd);
     // Checkered field so the cells are easy to see
     for (let r = 0; r < grid.rows; r++) {
       for (let c = 0; c < grid.cols; c++) {
@@ -285,15 +379,16 @@ export default class GameScene extends Phaser.Scene {
     const inY = grid.start.y;
     const outY = grid.end.y;
     const right = grid.ox + grid.cols * grid.size;
-    g.fillStyle(0xa8864f).fillRect(-10, inY - 33, grid.ox + 10, 66).fillRect(right, outY - 33, W - right + 10, 66);
-    g.fillStyle(0xe0c08c).fillRect(-10, inY - 27, grid.ox + 10, 54).fillRect(right, outY - 27, W - right + 10, 54);
+    g.fillStyle(this.theme.edge).fillRect(-10, inY - 33, grid.ox + 10, 66).fillRect(right, outY - 33, W - right + 10, 66);
+    g.fillStyle(this.theme.road).fillRect(-10, inY - 27, grid.ox + 10, 54).fillRect(right, outY - 27, W - right + 10, 54);
     for (const [c, r] of grid.rocks) {
       const p = grid.center(c, r);
       this.drawBoulder(g, p.x, p.y, rnd);
     }
     for (const [x, y] of [[1220, 110], [1250, 200], [1215, 520], [1252, 600], [30, 130], [28, 590]]) {
-      this.drawTree(g, x, y, rnd);
+      this.drawDeco(g, x, y, rnd);
     }
+    this.addAmbience();
     this.routeLine = this.add.graphics().setDepth(2);
     this.drawPortal(grid.start.x, grid.start.y);
     this.drawBase(grid.end.x, grid.end.y);
@@ -302,7 +397,7 @@ export default class GameScene extends Phaser.Scene {
   drawBoulder(g, x, y, rnd) {
     g.fillStyle(0x000000, 0.2).fillEllipse(x + 2, y + 18, 58, 18);
     g.lineStyle(3, COLORS.outline);
-    g.fillStyle(0x8c8f99).fillEllipse(x, y + 2, 58, 46).strokeEllipse(x, y + 2, 58, 46);
+    g.fillStyle(this.theme.boulder).fillEllipse(x, y + 2, 58, 46).strokeEllipse(x, y + 2, 58, 46);
     g.fillStyle(0xa3a6b0).fillEllipse(x - 6 + rnd.between(-3, 3), y - 8, 30, 16);
     g.fillStyle(0xc4c7d0).fillEllipse(x - 10, y - 11, 10, 5);
   }
@@ -357,7 +452,7 @@ export default class GameScene extends Phaser.Scene {
     this.heroHint = null;
     if (this.heroSelected) {
       this.heroSel.setPosition(this.hero.x, this.hero.y + 16);
-      this.heroHint = this.add.text(W / 2, 96, 'Tap where Zenko should go', textStyle(30, '#ffffff')).setOrigin(0.5).setDepth(150);
+      this.heroHint = this.add.text(W / 2, 96, `Tap where ${this.hero.def.name} should go`, textStyle(30, '#ffffff')).setOrigin(0.5).setDepth(150);
     }
   }
 
@@ -436,15 +531,15 @@ export default class GameScene extends Phaser.Scene {
     makeButton(this, W - 60, 28, 100, 42, 'Menu', () => this.pause(), { fontSize: 24, color: 0x3a4470, depth: 102 });
 
     this.startBtn = makeButton(this, 120, 672, 200, 56, '', () => this.startWave(), { color: 0xe0661a });
-    this.speedBtn = makeButton(this, 272, 672, 84, 56, '1x', () => this.toggleSpeed());
+    this.speedBtn = makeButton(this, 272, 672, 84, 56, `${this.speed}x`, () => this.toggleSpeed());
     this.refreshHud();
   }
 
   refreshHud() {
     this.kiText.setText(`${this.ki}`);
     this.livesText.setText(`${this.lives}`);
-    const total = this.level.waves.length;
-    this.waveText.setText(`Wave ${Math.max(0, this.waveIndex + 1)}/${total}`);
+    const total = this.endless ? '' : `/${this.level.waves.length}`;
+    this.waveText.setText(`Wave ${Math.max(0, this.waveIndex + 1)}${total}`);
     if (this.waveActive) {
       this.startBtn.setLabel('Fighting...');
       this.startBtn.setEnabled(false);
@@ -455,7 +550,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   toggleSpeed() {
-    this.speed = this.speed === 1 ? 2 : 1;
+    this.speed = this.speed >= 3 ? 1 : this.speed + 1;
     this.tweens.timeScale = this.speed;
     this.time.timeScale = this.speed;
     this.speedBtn.setLabel(`${this.speed}x`);
@@ -569,6 +664,7 @@ export default class GameScene extends Phaser.Scene {
         return;
       }
       this.ki -= next.cost;
+      if (!f.nextIsTransform) Audio.sfx('upgrade');
       f.upgrade();
       this.refreshHud();
       this.selectFighter(f);
@@ -595,6 +691,7 @@ export default class GameScene extends Phaser.Scene {
     const f = new Fighter(this, spot, type);
     spot.fighter = f;
     this.fighters.push(f);
+    Audio.sfx('build');
     this.setCell(spot, true);
     this.closeMenu();
     this.refreshHud();
@@ -604,30 +701,32 @@ export default class GameScene extends Phaser.Scene {
 
   startWave() {
     if (this.waveActive || this.state !== 'playing') return;
-    if (this.waveIndex + 1 >= this.level.waves.length) return;
+    if (!this.endless && this.waveIndex + 1 >= this.level.waves.length) return;
     this.waveIndex++;
+    const wave = this.endless ? endlessWave(this.waveIndex) : this.level.waves[this.waveIndex];
     this.waveActive = true;
     this.waveTime = 0;
     this.spawnQueue = [];
-    for (const gr of this.level.waves[this.waveIndex].groups) {
+    for (const gr of wave.groups) {
       for (let i = 0; i < gr.count; i++) {
         this.spawnQueue.push({ time: (gr.delay ?? 0) + i * gr.interval, type: gr.type, hpScale: gr.hpScale ?? 1 });
       }
     }
     this.spawnQueue.sort((a, b) => a.time - b.time);
-    this.showNewEnemyTips(this.level.waves[this.waveIndex].groups.map((gr) => gr.type));
-    const last = this.waveIndex === this.level.waves.length - 1;
+    this.showNewEnemyTips(wave.groups.map((gr) => gr.type));
+    const last = !this.endless && this.waveIndex === this.level.waves.length - 1;
+    Audio.sfx('wave');
     this.banner(last ? 'Final wave!' : `Wave ${this.waveIndex + 1}`);
     this.refreshHud();
   }
 
   endWave() {
     this.waveActive = false;
-    if (this.waveIndex === this.level.waves.length - 1) {
+    if (!this.endless && this.waveIndex === this.level.waves.length - 1) {
       this.endGame(true);
       return;
     }
-    const bonus = 20 + this.waveIndex * 10;
+    const bonus = Math.min(150, 20 + this.waveIndex * 10);
     this.ki += bonus;
     this.floatText(W / 2, H / 2 + 50, `Wave clear!  +${bonus} Ki`, '#ffd93b', 34);
     this.refreshHud();
@@ -695,7 +794,10 @@ export default class GameScene extends Phaser.Scene {
     let boost = o ? 1 + o.stats.boost : 1;
     // Zenko's Battle Aura skill
     const h = this.hero;
-    if (h && f !== h && h.alive && h.has('battleAura') && Math.hypot(h.x - f.x, h.y - f.y) <= 150) boost *= 1.15;
+    if (h && f !== h && h.alive && h.has('battleAura')) {
+      const great = h.has('greatAura');
+      if (Math.hypot(h.x - f.x, h.y - f.y) <= (great ? 220 : 150)) boost *= great ? 1.25 : 1.15;
+    }
     return boost;
   }
 
@@ -755,7 +857,10 @@ export default class GameScene extends Phaser.Scene {
   explode(p) {
     p.ball.destroy();
     this.explosionFx(p.tx, p.ty, p.splash, p.color);
-    if (p.big) this.cameras.main.shake(300, 0.012);
+    if (p.big) {
+      this.cameras.main.shake(300, 0.012);
+      Audio.sfx('explode');
+    }
     this.damageNumber(p.tx, p.ty - 24, p.damage);
     for (const e of [...this.enemies]) {
       if (e.alive && Math.hypot(e.x - p.tx, e.y - p.ty) <= p.splash) e.takeDamage(p.damage);
@@ -816,6 +921,8 @@ export default class GameScene extends Phaser.Scene {
 
   showBoss(e) {
     this.boss = e;
+    Audio.sfx('boss');
+    Audio.music('boss');
     this.cameras.main.shake(400, 0.008);
     this.banner(`BOSS: ${e.def.name}!`);
     this.bossBar?.destroy();
@@ -845,6 +952,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   healFx(x, y, radius, healed) {
+    if (healed) Audio.sfx('heal', 0.3);
     const ring = this.add.circle(x, y, radius, 0x5be35b, 0.18).setStrokeStyle(3, 0x9bff7a, 0.8).setDepth(8).setScale(0.3);
     this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 500, onComplete: () => ring.destroy() });
     if (healed) this.floatText(x, y - 44, '+', '#9bff7a', 30);
@@ -859,15 +967,24 @@ export default class GameScene extends Phaser.Scene {
 
   onEnemyKilled(e) {
     if (e.def.boss) {
+      Audio.sfx('explode');
+      Audio.music('battle');
       this.explosionFx(e.x, e.y, 120, 0xff8a3d);
       this.cameras.main.shake(500, 0.012);
       this.banner(`${e.def.name} defeated!`);
     }
     this.kills++;
+    this.xpEarned += e.def.xp ?? 2;
     this.ki += e.def.reward;
+    Audio.sfx('pop', 0.04);
     this.floatText(e.x, e.y - 34, `+${e.def.reward}`, '#ffd93b', 20);
     this.poof(e.x, e.y);
     this.refreshHud();
+  }
+
+  // The hero landed the final blow: that enemy's XP counts twice
+  onHeroKill(e) {
+    this.heroKillXp += e.def.xp ?? 2;
   }
 
   loseLives(n) {
@@ -895,25 +1012,47 @@ export default class GameScene extends Phaser.Scene {
       this.time.delayedCall(1, () => m.destroy());
     }, { color: 0xe0661a }));
     m.add(makeButton(this, W / 2, 404, 300, 64, 'Restart level', () => this.scene.restart(this.startData)));
-    m.add(makeButton(this, W / 2, 488, 300, 64, 'Quit to map', () => this.quitToMap()));
+    m.add(makeButton(this, W / 2, 488, 300, 64, this.endless ? 'Quit' : 'Quit to map', () => this.quitToMap()));
+    const musicLabel = () => `Music: ${Settings.get('music') > 0 ? 'On' : 'Off'}`;
+    const mb = makeButton(this, W / 2, 572, 300, 54, musicLabel(), () => {
+      Settings.set('music', Settings.get('music') > 0 ? 0 : 0.5);
+      Audio.applyVolumes();
+      mb.setLabel(musicLabel());
+    }, { fontSize: 24, color: 0x3a4470 });
+    m.add(mb);
   }
 
   quitToMap() {
-    this.scene.start('LevelSelect', { mapIndex: this.startData.mapIndex });
+    if (this.endless) this.scene.start('Hub');
+    else this.scene.start('LevelSelect', { mapIndex: this.startData.mapIndex });
   }
 
   // Saves stars and hero XP, and returns what was earned
   saveRewards(win) {
-    const xp = this.kills * 2 + (win ? 40 * this.diff.stars : 10);
+    const wavesDone = this.waveIndex + (this.waveActive ? 0 : 1);
+    const bonus = this.endless ? wavesDone * 10 : win ? 40 * this.diff.stars : 10;
+    const xp = this.xpEarned + this.heroKillXp + bonus;
     const stars = win ? this.diff.stars : 0;
-    const result = Save.update((p) => {
-      const newBest = stars > (p.stars[this.level.id] || 0);
-      if (newBest) p.stars[this.level.id] = stars;
-      p.kills += this.kills;
-      const gained = addXp(p.hero, xp);
-      return { newBest, gained, heroLevel: p.hero.level };
+    const coins = battleCoins({
+      win, stars, levelNumber: this.level.id, kills: this.kills, bounty: this.hero.has('bounty'),
+      endlessWaves: this.endless ? wavesDone : undefined,
     });
-    return { xp, stars, ...(result || { newBest: false, gained: 0 }) };
+    const result = Save.update((p) => {
+      let newBest = false;
+      if (this.endless) {
+        newBest = wavesDone > p.endlessBest;
+        if (newBest) p.endlessBest = wavesDone;
+      } else {
+        newBest = stars > (p.stars[this.level.id] || 0);
+        if (newBest) p.stars[this.level.id] = stars;
+      }
+      p.kills += this.kills;
+      p.coins += coins;
+      const hero = activeHero(p);
+      const gained = addXp(hero, xp);
+      return { newBest, gained, heroLevel: hero.level, best: p.endlessBest };
+    });
+    return { xp, stars, coins, wavesDone, ...(result || { newBest: false, gained: 0 }) };
   }
 
   endGame(win) {
@@ -925,11 +1064,18 @@ export default class GameScene extends Phaser.Scene {
     this.startBtn.setVisible(false);
     this.speedBtn.setVisible(false);
     const r = this.saveRewards(win);
+    Audio.stopMusic();
+    Audio.sfx(win ? 'victory' : 'defeat');
+    const heroName = this.hero.def.name;
 
     this.add.rectangle(0, 0, W, H, 0x000000, 0.65).setOrigin(0).setDepth(200).setInteractive();
-    this.add.text(W / 2, 150, win ? 'Victory!' : 'Defeat', textStyle(96, win ? '#ffd93b' : '#ff5a5a'))
+    this.add.text(W / 2, 150, this.endless ? 'Game Over' : win ? 'Victory!' : 'Defeat', textStyle(96, win ? '#ffd93b' : '#ff5a5a'))
       .setOrigin(0.5).setDepth(201);
-    if (win) {
+    if (this.endless) {
+      this.add.text(W / 2, 250, `You held out for ${r.wavesDone} waves!`, textStyle(48, '#ffd93b')).setOrigin(0.5).setDepth(201);
+      this.add.text(W / 2, 305, r.newBest ? 'New personal best!' : `Your best: ${r.best} waves`, textStyle(28))
+        .setOrigin(0.5).setDepth(201);
+    } else if (win) {
       this.add.text(W / 2, 245, '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars), textStyle(64, '#ffd93b'))
         .setOrigin(0.5).setDepth(201);
       this.add.text(W / 2, 305, `${this.diff.label} cleared${r.newBest ? '  -  New best!' : ''}`, textStyle(28))
@@ -938,17 +1084,26 @@ export default class GameScene extends Phaser.Scene {
       this.add.text(W / 2, 260, 'The army broke through. Train harder and try again.', textStyle(28))
         .setOrigin(0.5).setDepth(201);
     }
-    this.add.text(W / 2, 360, `Zenko +${r.xp} XP   (${this.kills} enemies defeated)`, textStyle(30, '#3fd0f5'))
+    this.add.text(W / 2, 360, `${heroName} +${r.xp} XP   (${this.kills} enemies defeated)`, textStyle(30, '#3fd0f5'))
       .setOrigin(0.5).setDepth(201);
+    this.add.image(W / 2 - 70, 400, 'coin').setDepth(201);
+    this.add.text(W / 2 - 50, 400, `+${r.coins} coins`, textStyle(30, '#ffd93b')).setOrigin(0, 0.5).setDepth(201);
     if (r.gained > 0) {
-      const lv = this.add.text(W / 2, 410, `LEVEL UP!  Zenko is now level ${r.heroLevel}`, textStyle(36, '#5be35b'))
+      const lv = this.add.text(W / 2, 448, `LEVEL UP!  ${heroName} is now level ${r.heroLevel}`, textStyle(36, '#5be35b'))
         .setOrigin(0.5).setDepth(201);
       this.tweens.add({ targets: lv, scale: 1.1, duration: 400, yoyo: true, repeat: -1 });
     }
 
-    makeButton(this, W / 2 - 150, 520, 260, 64, win ? 'Continue' : 'Back to map', () => this.quitToMap(),
+    // After the last level, play the ending story before going back
+    const after = win && storyAfter(this.level.id);
+    const cont = () => {
+      const seen = Save.current()?.seenStory ?? [];
+      if (after && !seen.includes(after)) this.scene.start('Story', { id: after, next: { scene: 'LevelSelect', data: { mapIndex: this.startData.mapIndex } } });
+      else this.quitToMap();
+    };
+    makeButton(this, W / 2 - 150, 540, 260, 64, win ? 'Continue' : this.endless ? 'Back' : 'Back to map', cont,
       { color: 0xe0661a, depth: 202 });
-    makeButton(this, W / 2 + 150, 520, 260, 64, win ? 'Play again' : 'Try again', () => this.scene.restart(this.startData),
+    makeButton(this, W / 2 + 150, 540, 260, 64, win ? 'Play again' : 'Try again', () => this.scene.restart(this.startData),
       { depth: 202 });
   }
 
@@ -988,6 +1143,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   transformFx(f) {
+    Audio.sfx('transform');
     const color = f.formInfo.aura;
     this.cameras.main.shake(180, 0.006);
     this.cameras.main.flash(120, 255, 255, 255);
@@ -1008,6 +1164,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   damageNumber(x, y, n) {
+    if (!Settings.get('damageNumbers')) return;
     this.floatText(x + Phaser.Math.Between(-8, 8), y, `${n}`, '#ffffff', 16);
   }
 

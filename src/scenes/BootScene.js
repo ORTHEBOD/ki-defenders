@@ -1,7 +1,10 @@
 import { FIGHTERS, FORMS } from '../data/fighters.js';
-import { HERO } from '../data/hero.js';
+import { HEROES } from '../data/hero.js';
 import { drawFighterArt, pts } from '../art/fighterArt.js';
-import { drawBrute, drawFlyer, drawSplitter, drawSplitling, drawMedic, drawOgre, drawKrag } from '../art/enemyArt.js';
+import {
+  drawBrute, drawFlyer, drawSplitter, drawSplitling, drawMedic, drawOgre, drawKrag,
+  drawScorpion, drawSandKing, drawMech, drawVorn, drawCoin,
+} from '../art/enemyArt.js';
 
 // Placeholder art drawn in code. When the AI art is ready, this scene will load PNG files instead,
 // using the same texture keys, so nothing else in the game needs to change.
@@ -18,9 +21,11 @@ export default class BootScene extends Phaser.Scene {
     for (const def of Object.values(FIGHTERS)) {
       FORMS.forEach((form, i) => this.makeFighter(`${def.texture}_${i}`, { ...def.look, hair: form.hair ?? def.look.hair }));
     }
-    // Zenko: normal, and gold-haired while Power Up is active
-    this.makeFighter('hero_0', HERO.look);
-    this.makeFighter('hero_1', { ...HERO.look, hair: FORMS[1].hair });
+    // Each hero: normal, and gold-haired while Power Up is active (hero_zenko_0, hero_zenko_1)
+    for (const [id, h] of Object.entries(HEROES)) {
+      this.makeFighter(`hero_${id}_0`, h.look);
+      this.makeFighter(`hero_${id}_1`, { ...h.look, hair: FORMS[1].hair });
+    }
     this.makeGrunt();
     this.makeRunner();
     this.makeArt('brute', 56, drawBrute);
@@ -30,6 +35,11 @@ export default class BootScene extends Phaser.Scene {
     this.makeArt('medic', 48, drawMedic);
     this.makeArt('ogre', 80, drawOgre);
     this.makeArt('krag', 100, drawKrag);
+    this.makeArt('scorpion', 80, drawScorpion);
+    this.makeArt('sandKing', 100, drawSandKing);
+    this.makeArt('mech', 80, drawMech);
+    this.makeArt('vorn', 100, drawVorn);
+    this.makeArt('coin', 28, drawCoin);
     this.makeSpot();
     this.makeWall();
     this.makeKi();

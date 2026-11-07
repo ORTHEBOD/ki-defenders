@@ -125,13 +125,16 @@ bonus currently makes nearby fighters attack faster (the hero boost comes with t
 
 ## 8. Maps and levels
 
-| Map | Theme | Levels | Types |
+| Map | Theme | Levels | Opens when |
 |---|---|---|---|
-| 1 | **Green Valley** (grass, rocks, a small village) | 1–4 | 3 fixed path + 1 maze |
-| 2 | **Desert Wasteland** (canyons, ruins) | 5–7 | 2 fixed path + 1 maze |
-| 3 | **Enemy Mothership** (sci-fi, metal, space) | 8–10 | 2 fixed path + 1 maze (final boss) |
+| 1 | **Green Valley** (grass, trees, rocks) | 1–10 | From the start |
+| 2 | **Desert Wasteland** (sand, cacti, bones) | 11–20 | Level 10 won + 15 stars |
+| 3 | **Enemy Mothership** (metal, lights, crates) | 21–30 | Level 20 won + 40 stars |
 
-New fighters unlock as you play (e.g., start with 2, unlock the rest by level 5).
+- Each map: 8 road levels + 2 maze levels (levels x4 and x8). Every level ends with a boss wave.
+- Level 10 / 20 / 30 bring the big bosses: General Krag, Sand King Ozul, Emperor Vorn.
+- Mini bosses: Ogre Captain (valley), Scorpion King (desert), War Mech (mothership).
+- Levels 2-30 are built from data: road shapes, auto-placed build spots, and waves that grow level by level.
 
 ---
 
@@ -143,14 +146,18 @@ New fighters unlock as you play (e.g., start with 2, unlock the rest by level 5)
 | Normal | Standard | 2 ★ |
 | Hard | Stronger, faster, extra boss skill | 3 ★ |
 
-- Stars (★) are saved per level. Total stars unlock bonus things (hero skins, extra skill points, Endless mode maps).
-- **Zeni** is a currency kept between levels, for permanent bonuses (e.g., +10 starting Ki).
+- Stars (★) are saved per level. Stars open new maps.
+- **Coins** are won in every battle (more for winning, more stars, later levels and Endless waves).
+- **Shop:** equipment for the hero (weapon, armor, boots, amulet - 3 tiers each), and the **Lucky Spin**:
+  coins, gear, or a new hero (a hero you already have turns into coins).
+- **Hero XP:** every enemy type gives its own XP; enemies the hero defeats personally give double.
+- **Heroes:** Zenko (start), Mira (speed), Goran (tank), Sora (ki master). Each has their own level, skills and gear.
 - **Fun idea:** hidden **Star Orbs** (7 total) found in levels. Collect all 7 and make a wish (a big permanent reward).
 
 ---
 
 ## 10. Endless mode
-- Unlocked after finishing map 1.
+- Unlocked after winning level 3. A boss every 10 waves.
 - Waves never stop and get harder each wave.
 - Score = the wave you reach, which goes to the **leaderboard**.
 
@@ -171,7 +178,7 @@ An evil space emperor, **Lord Vorak**, sends his army to conquer the planet. Zen
 
 ## 13. Settings
 - Music volume / sound effects volume
-- Game speed (1x / 2x)
+- Start speed (1x / 2x / 3x), screen shake, full screen
 - Screen orientation (landscape now, portrait later)
 - Show damage numbers on/off
 
@@ -196,7 +203,7 @@ An evil space emperor, **Lord Vorak**, sends his army to conquer the planet. Zen
 | 3 | Hero: move, abilities, XP, skill tree | Hero working |
 | 4 | Maze levels + pathfinding | Both level types |
 | 5 | All enemies + bosses | Full enemy set |
-| 6 | 10 levels, 3 maps, difficulties, rewards, story scenes | Full story mode |
+| 6 | 30 levels, 3 maps, story, coins + shop + Lucky Spin, 4 heroes, bigger skill tree, endless, settings, music | Full game loop (done) |
 | 7 | Login, online save, leaderboard | Online features |
 | 8 | AI art + sound + music | Looks and sounds good |
 | 9 | Endless mode, polish, balance | Ready for friends |

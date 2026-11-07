@@ -1,6 +1,7 @@
 import { FIGHTERS, FORMS } from '../data/fighters.js';
 import { distToSegment } from '../systems/Path.js';
 import { textStyle } from '../ui/theme.js';
+import { Audio } from '../systems/Audio.js';
 
 export default class Fighter {
   constructor(scene, spot, type) {
@@ -120,6 +121,7 @@ export default class Fighter {
     if (this.def.attack === 'flash') {
       if (!this.scene.findTarget(this.x, this.y, s.range, this.def.hitsAir)) return;
       this.cooldown = s.cooldown;
+      Audio.sfx('flash', 0.1);
       this.flash(damage);
       return;
     }
@@ -128,6 +130,7 @@ export default class Fighter {
     if (!target) return;
     this.sprite.setFlipX(target.x < this.x);
     this.cooldown = s.cooldown;
+    Audio.sfx(this.def.attack, 0.07);
     if (this.def.attack === 'punch') this.punch(target, damage);
     else if (this.def.attack === 'beam') this.beam(target, damage);
     else if (this.def.attack === 'blast') this.blast(target, damage);

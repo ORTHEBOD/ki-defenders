@@ -5,6 +5,11 @@ import HubScene from './scenes/HubScene.js';
 import HeroScene from './scenes/HeroScene.js';
 import LevelSelectScene from './scenes/LevelSelectScene.js';
 import GameScene from './scenes/GameScene.js';
+import ShopScene from './scenes/ShopScene.js';
+import SettingsScene from './scenes/SettingsScene.js';
+import LeaderboardScene from './scenes/LeaderboardScene.js';
+import StoryScene from './scenes/StoryScene.js';
+import { Audio } from './systems/Audio.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -17,7 +22,10 @@ const config = {
     width: 1280,
     height: 720,
   },
-  scene: [BootScene, TitleScene, LoginScene, HubScene, HeroScene, LevelSelectScene, GameScene],
+  scene: [
+    BootScene, TitleScene, LoginScene, HubScene, HeroScene, LevelSelectScene, GameScene,
+    ShopScene, SettingsScene, LeaderboardScene, StoryScene,
+  ],
 };
 
 async function start() {
@@ -31,6 +39,9 @@ async function start() {
 }
 
 start();
+
+// Sound can only start after the player touches the screen
+window.addEventListener('pointerdown', () => Audio.unlock());
 
 // Save the game on the device so it can be played offline
 if ('serviceWorker' in navigator) {
