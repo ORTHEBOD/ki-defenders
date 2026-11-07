@@ -125,7 +125,8 @@ async function save(body) {
 }
 
 async function leaderboard() {
-  const rows = (await store().get('leaderboard', { type: 'json' })) ?? [];
+  // Only players who have played Endless Battle are listed
+  const rows = ((await store().get('leaderboard', { type: 'json' })) ?? []).filter((r) => r.wave > 0);
   return reply({ ok: true, rows: rows.slice(0, 50) });
 }
 
