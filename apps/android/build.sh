@@ -21,8 +21,7 @@ sed -i "s/versionCode 1$/versionCode ${VERSION_CODE}/; s/versionName \"1.0\"/ver
 
 # App icon and splash from the game's icon
 mkdir -p assets
-cp ../../icons/icon-512.png assets/icon-only.png
-cp ../../icons/icon-512.png assets/icon-foreground.png
+cp icon-only.png icon-foreground.png icon-background.png assets/
 npx --yes @capacitor/assets@3 generate --android --assetPath assets \
   --iconBackgroundColor '#1b1442' --splashBackgroundColor '#07090f' || echo "Icon step skipped"
 
