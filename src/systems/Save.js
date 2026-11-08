@@ -109,6 +109,7 @@ export const Save = {
     const all = readAll();
     const hash = await hashPin(key, pin);
     const local = all[key];
+    if (local && !local.pin && local.google) return { ok: false, error: 'This player signs in with Google.' };
     if (local && local.pin !== hash) return { ok: false, error: 'Wrong PIN for this player.' };
 
     if (key === SUPER_NAME) {
@@ -155,6 +156,43 @@ export const Save = {
     }
     setCurrentKey(key);
     return { ok: true, created, online: false };
+  },
+
+  // Signs in with a Google account (needs internet). The first time, the server asks for a name:
+  // then this returns { ok: false, needName: true } and the game asks the player and calls again.
+  async loginGoogle(idToken, name, pin) {
+    const all = readAll();
+    const guess = name ? all[name.trim().toLowerCase()] : null;
+    const res = await Online.google(idToken, name?.trim(), pin, guess ? migrate(guess.data) : undefined);
+    if (!res) return { ok: false, error: 'No internet - Google sign-in needs a connection.' };
+    if (!res.ok) {
+      const error = {
+        need_name: null,
+        taken: 'That name is taken. Enter its PIN to link it, or pick another name.',
+        wrong_pin: 'Wrong PIN for this player.',
+        locked: `Too many wrong PINs. Try again in ${res.minutes} min.`,
+        bad_google: 'Google sign-in failed. Please try again.',
+        google_off: 'Google sign-in is not set up yet.',
+      }[res.error] ?? 'Something went wrong. Please try again.';
+      return res.error === 'need_name' ? { ok: false, needName: true } : { ok: false, error };
+    }
+    const key = res.name.toLowerCase();
+    const local = all[key];
+    const remote = res.data ? migrate(res.data) : null;
+    let data = remote;
+    let dirty = false;
+    if (!remote) {
+      data = local ? local.data : newPlayer(res.name);
+      dirty = true;
+    } else if (local && (local.data.updatedAt ?? 0) > (remote.updatedAt ?? 0)) {
+      data = local.data;
+      dirty = true;
+    }
+    all[key] = { pin: local?.pin ?? null, google: true, data, token: res.token, dirty, online: 'ok' };
+    writeAll(all);
+    setCurrentKey(key);
+    if (dirty) Sync.soon(200);
+    return { ok: true, created: res.created, name: res.name };
   },
 
   current() {

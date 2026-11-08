@@ -1,11 +1,15 @@
-// Reward videos: watch one, get coins. A few per day.
-// For now a short stand-in video plays. When the game is on Google Play, only show() changes:
-// it will call the AdMob plugin (e.g. @capacitor-community/admob) and resolve true when the
-// player watched to the end.
+// Ads. Two kinds:
+// - Reward videos in the shop: watch one, get coins. A few per day.
+// - A short ad between battles that every player sees (no reward).
+// For now stand-in screens play. When the game is on Google Play, show() and between() will call
+// the AdMob plugin (e.g. @capacitor-community/admob): a rewarded ad and an interstitial ad.
 import { Save } from './Save.js';
 
 export const AD_REWARD = 100;
 export const ADS_PER_DAY = 3;
+// Ads between battles: at most one every 3 minutes
+const BREAK_GAP = 3 * 60 * 1000;
+let lastBreak = 0;
 
 const today = () => {
   const d = new Date();
@@ -42,6 +46,42 @@ export const Ads = {
           }
         },
       });
+    });
+  },
+
+  // A short ad between battles (no reward, does not use up the shop's reward videos).
+  // Runs `next` when it is done. At most one every BREAK_GAP, and never for the tester account.
+  between(scene, next) {
+    const player = Save.current();
+    if (!player || player.super || Date.now() - lastBreak < BREAK_GAP) {
+      next();
+      return;
+    }
+    lastBreak = Date.now();
+    const SKIP_AFTER = 5;
+    const pop = scene.add.container(0, 0).setDepth(500);
+    pop.add(scene.add.rectangle(0, 0, 1280, 720, 0x000000, 0.95).setOrigin(0).setInteractive());
+    pop.add(scene.add.text(640, 320, '📺', { fontSize: '90px' }).setOrigin(0.5));
+    pop.add(scene.add.text(640, 420, 'Advertisement', { fontFamily: 'Bangers, Arial Black', fontSize: '40px', color: '#ffffff' }).setOrigin(0.5));
+    const close = scene.add.text(1200, 60, `${SKIP_AFTER}`, { fontFamily: 'Bangers, Arial Black', fontSize: '36px', color: '#9aa3c7' }).setOrigin(0.5);
+    pop.add(close);
+    let left = SKIP_AFTER;
+    scene.time.addEvent({
+      delay: 1000,
+      repeat: SKIP_AFTER - 1,
+      callback: () => {
+        left -= 1;
+        if (left > 0) {
+          close.setText(`${left}`);
+          return;
+        }
+        // The player can close the ad now
+        close.setText('✕  Close').setColor('#ffffff').setInteractive({ useHandCursor: true });
+        close.on('pointerdown', () => {
+          pop.destroy();
+          next();
+        });
+      },
     });
   },
 

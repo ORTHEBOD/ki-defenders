@@ -1,6 +1,7 @@
 import { LEVELS, MAPS, levelById, endlessWave } from '../data/levels.js';
 import { storyAfter, storyBefore } from '../data/story.js';
 import { battleCoins } from '../data/shop.js';
+import { Ads } from '../systems/Ads.js';
 import { Settings } from '../systems/Settings.js';
 import { Audio } from '../systems/Audio.js';
 import { FIGHTERS, WALL } from '../data/fighters.js';
@@ -1141,16 +1142,18 @@ export default class GameScene extends Phaser.Scene {
       if (after && !seen.includes(after)) this.scene.start('Story', { id: after, next: { scene: 'LevelSelect', data: { mapIndex: this.startData.mapIndex } } });
       else this.quitToMap();
     };
+    // Every way out of this screen goes through the between-battles ad first
+    const thenAd = (fn) => () => Ads.between(this, fn);
     const nextId = this.level.id + 1;
     const player = Save.current();
     const hasNext = win && !this.endless && !after && player && levelOpen(player, nextId);
     if (hasNext) {
-      makeButton(this, W / 2 - 290, 540, 260, 64, 'Next level', () => this.playNext(nextId), { color: 0x2f8a4a, depth: 202 });
+      makeButton(this, W / 2 - 290, 540, 260, 64, 'Next level', thenAd(() => this.playNext(nextId)), { color: 0x2f8a4a, depth: 202 });
     }
     const x0 = hasNext ? 0 : -150;
-    makeButton(this, W / 2 + x0, 540, 260, 64, win ? (hasNext ? 'Back to map' : 'Continue') : this.endless ? 'Back' : 'Back to map', cont,
+    makeButton(this, W / 2 + x0, 540, 260, 64, win ? (hasNext ? 'Back to map' : 'Continue') : this.endless ? 'Back' : 'Back to map', thenAd(cont),
       { color: 0xe0661a, depth: 202 });
-    makeButton(this, W / 2 + x0 + (hasNext ? 290 : 300), 540, 260, 64, win ? 'Play again' : 'Try again', () => this.scene.restart(this.startData),
+    makeButton(this, W / 2 + x0 + (hasNext ? 290 : 300), 540, 260, 64, win ? 'Play again' : 'Try again', thenAd(() => this.scene.restart(this.startData)),
       { depth: 202 });
   }
 

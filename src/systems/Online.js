@@ -38,6 +38,10 @@ export const Online = {
     return call('POST', 'login', { name, pin, data });
   },
 
+  google(idToken, name, pin, data) {
+    return call('POST', 'google', { idToken, name, pin, data }, 12000);
+  },
+
   save(name, token, data) {
     return call('POST', 'save', { name, token, data });
   },

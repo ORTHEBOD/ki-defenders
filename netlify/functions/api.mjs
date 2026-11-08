@@ -5,16 +5,24 @@
 //   POST /api/save         { name, token, data }  -> { ok, updatedAt }
 //   GET  /api/leaderboard                          -> { ok, rows }
 //   GET  /api/ping                                 -> { ok }
+//   POST /api/google       { idToken, name?, pin? } -> { ok, token, created, data, name } or { ok:false, error:'need_name' }
+//        Signs in with a Google account. The first time, the player picks a new name, or links
+//        an existing player by giving its name and PIN.
 //
 // PINs are stored only as salted hashes. After 5 wrong PINs a name is locked for 15 minutes.
 
 import { getStore } from '@netlify/blobs';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { GOOGLE_CLIENT_ID } from '../../src/data/google.js';
 
 const MAX_FAILS = 5;
 const LOCK_MS = 15 * 60 * 1000;
 const MAX_DATA = 200_000; // bytes of save data
 const HEROES = ['zenko', 'mira', 'goran', 'sora'];
+// Google sign-in tokens must be made for the game's client ID (src/data/google.js).
+// More IDs can be added with the GOOGLE_CLIENT_IDS environment variable (comma separated).
+const GOOGLE_CLIENT_IDS = [GOOGLE_CLIENT_ID, ...(process.env.GOOGLE_CLIENT_IDS ?? '').split(',')]
+  .map((v) => v.trim()).filter(Boolean);
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -91,6 +99,7 @@ async function login(body) {
     return reply({ ok: true, created: true, token, data });
   }
 
+  if (!user.pinHash) return reply({ ok: false, error: 'google_only' }, 401);
   if (user.lockUntil > Date.now()) {
     return reply({ ok: false, error: 'locked', minutes: Math.ceil((user.lockUntil - Date.now()) / 60000) }, 429);
   }
@@ -107,6 +116,77 @@ async function login(body) {
   user.lockUntil = 0;
   const token = newToken(user);
   await s.setJSON(key, user);
+  return reply({ ok: true, created: false, token, data: user.data, name: user.name });
+}
+
+// Asks Google whether the sign-in token is real and made for this game. Returns the account id.
+async function googleAccount(idToken) {
+  if (typeof idToken !== 'string' || idToken.length > 4096 || !GOOGLE_CLIENT_IDS.length) return null;
+  const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+  if (!res.ok) return null;
+  const t = await res.json();
+  const issuer = t.iss === 'accounts.google.com' || t.iss === 'https://accounts.google.com';
+  if (!issuer || !GOOGLE_CLIENT_IDS.includes(t.aud) || Number(t.exp) * 1000 < Date.now() || !t.sub) return null;
+  return t.sub;
+}
+
+async function google(body) {
+  if (!GOOGLE_CLIENT_IDS.length) return reply({ ok: false, error: 'google_off' }, 503);
+  const sub = await googleAccount(body.idToken);
+  if (!sub) return reply({ ok: false, error: 'bad_google' }, 401);
+  const s = store();
+  const linkKey = `google/${sub}`;
+  const link = await s.get(linkKey, { type: 'json' });
+
+  // Signed in with Google before: open that player
+  if (link) {
+    const key = userKey(link.name);
+    const user = await s.get(key, { type: 'json' });
+    if (user) {
+      const token = newToken(user);
+      await s.setJSON(key, user);
+      return reply({ ok: true, created: false, token, data: user.data, name: user.name });
+    }
+  }
+
+  // First time: the game must ask for a name (and a PIN, to link an existing player)
+  const name = cleanName(body.name);
+  if (!name) return reply({ ok: false, error: 'need_name' });
+  const key = userKey(name);
+  const user = await s.get(key, { type: 'json' });
+
+  if (!user) {
+    // A new player that signs in with Google only
+    const data = validData(body.data) ? body.data : null;
+    const fresh = { name, salt: null, pinHash: null, google: sub, fails: 0, lockUntil: 0, data, updatedAt: data?.updatedAt ?? 0 };
+    const token = newToken(fresh);
+    await s.setJSON(key, fresh);
+    await s.setJSON(linkKey, { name });
+    if (data) await updateLeaderboard(s, name, data);
+    return reply({ ok: true, created: true, token, data, name });
+  }
+
+  // The name is taken: linking it needs its PIN (with the same lock as normal log in)
+  const pin = String(body.pin ?? '');
+  if (user.google && user.google !== sub) return reply({ ok: false, error: 'taken' }, 409);
+  if (!user.pinHash || !/^\d{4}$/.test(pin)) return reply({ ok: false, error: 'taken' }, 409);
+  if (user.lockUntil > Date.now()) {
+    return reply({ ok: false, error: 'locked', minutes: Math.ceil((user.lockUntil - Date.now()) / 60000) }, 429);
+  }
+  if (!sameHash(hashPin(user.salt, key, pin), user.pinHash)) {
+    user.fails = (user.fails ?? 0) + 1;
+    if (user.fails >= MAX_FAILS) {
+      user.fails = 0;
+      user.lockUntil = Date.now() + LOCK_MS;
+    }
+    await s.setJSON(key, user);
+    return reply({ ok: false, error: 'wrong_pin' }, 401);
+  }
+  user.fails = 0;
+  user.google = sub;
+  const token = newToken(user);
+  await s.setJSON(key, user);
+  await s.setJSON(linkKey, { name: user.name });
   return reply({ ok: true, created: false, token, data: user.data, name: user.name });
 }
 
@@ -140,6 +220,7 @@ export default async (req) => {
       const body = await req.json().catch(() => ({}));
       if (route === 'login') return await login(body);
       if (route === 'save') return await save(body);
+      if (route === 'google') return await google(body);
     }
     return reply({ ok: false, error: 'not_found' }, 404);
   } catch (e) {
