@@ -4,10 +4,8 @@ import { drawMenuBackground, panel, xpBar } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
 import { Save, Sync, totalStars, activeHero } from '../systems/Save.js';
 import { Audio } from '../systems/Audio.js';
+import { SHOP_STARS, ENDLESS_STARS, shopOpen, endlessOpen } from '../systems/Progress.js';
 import { textStyle } from '../ui/theme.js';
-
-// Endless mode opens with this many stars
-export const ENDLESS_STARS = 10;
 
 export default class HubScene extends Phaser.Scene {
   constructor() {
@@ -62,8 +60,10 @@ export default class HubScene extends Phaser.Scene {
       this.add.text(330, 250, 'No hero yet', textStyle(48, '#ffd93b')).setOrigin(0.5);
       this.add.text(330, 340, 'Your fighters defend the base alone\nfor now. Earn coins in battle and\nwin a hero in the Lucky Spin!',
         { ...textStyle(24), align: 'center' }).setOrigin(0.5);
-      makeButton(this, 330, 470, 300, 64, 'Lucky Spin', () => this.scene.start('Shop', { tab: 'spin' }),
-        { color: 0xc99a00, fontSize: 30 });
+      const open = shopOpen(player);
+      const spin = makeButton(this, 330, 470, 360, 64, open ? 'Lucky Spin' : `Lucky Spin (needs ★ ${SHOP_STARS})`,
+        () => this.scene.start('Shop', { tab: 'spin' }), { color: 0xc99a00, fontSize: open ? 30 : 24 });
+      spin.setEnabled(open);
     }
     this.buttons(player, hero);
     this.dailyReward();
@@ -120,12 +120,13 @@ export default class HubScene extends Phaser.Scene {
     // Main buttons
     makeButton(this, 830, 190, 420, 100, 'Play', () => this.scene.start('LevelSelect'), { color: 0xe0661a, fontSize: 56 });
     makeButton(this, 830, 300, 420, 76, 'Heroes', () => this.scene.start('Hero'), { color: 0xb8303a, fontSize: 36 });
-    makeButton(this, 830, 392, 420, 76, 'Shop', () => this.scene.start('Shop'), { color: 0x2f8a4a, fontSize: 36 });
-    const endlessOpen = player.super || totalStars(player) >= ENDLESS_STARS;
+    const shop = makeButton(this, 830, 392, 420, 76, shopOpen(player) ? 'Shop' : `Shop  (needs ★ ${SHOP_STARS})`,
+      () => this.scene.start('Shop'), { color: 0x2f8a4a, fontSize: shopOpen(player) ? 36 : 28 });
+    shop.setEnabled(shopOpen(player));
     const endless = makeButton(this, 830, 484, 420, 76,
-      endlessOpen ? `Endless Battle  (best: wave ${player.endlessBest})` : `Endless Battle  (needs ★ ${ENDLESS_STARS})`,
+      endlessOpen(player) ? `Endless Battle  (best: wave ${player.endlessBest})` : `Endless Battle  (needs ★ ${ENDLESS_STARS})`,
       () => this.scene.start('Game', { levelId: 'endless', difficulty: 'normal' }), { color: 0x6a3ab8, fontSize: 28 });
-    endless.setEnabled(endlessOpen);
+    endless.setEnabled(endlessOpen(player));
     makeButton(this, 830, 576, 420, 76, 'Leaderboard', () => this.scene.start('Leaderboard'), { fontSize: 32 });
     if (hero && skillPoints(hero) > 0) {
       const dot = this.add.circle(1015, 278, 14, 0x5be35b).setStrokeStyle(3, 0x10131c).setDepth(120);

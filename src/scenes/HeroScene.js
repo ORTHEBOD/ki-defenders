@@ -4,6 +4,7 @@ import { fighterPortrait } from '../art/fighterArt.js';
 import { drawMenuBackground, panel, xpBar } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
 import { Save, activeHero } from '../systems/Save.js';
+import { SHOP_STARS, shopOpen } from '../systems/Progress.js';
 import { textStyle } from '../ui/theme.js';
 
 const hex = (c) => `#${c.toString(16).padStart(6, '0')}`;
@@ -31,8 +32,9 @@ export default class HeroScene extends Phaser.Scene {
       this.add.text(640, 320, 'No hero yet!', textStyle(56, '#ffd93b')).setOrigin(0.5);
       this.add.text(640, 390, 'Win your first hero in the Lucky Spin.\nPlay levels to earn coins for spins.',
         { ...textStyle(26), align: 'center' }).setOrigin(0.5);
-      makeButton(this, 640, 490, 320, 70, 'Go to the Shop', () => this.scene.start('Shop', { tab: 'spin' }),
-        { color: 0x2f8a4a, fontSize: 32 });
+      const open = shopOpen(player);
+      makeButton(this, 640, 490, 360, 70, open ? 'Go to the Shop' : `Shop opens at ★ ${SHOP_STARS}`,
+        () => this.scene.start('Shop', { tab: 'spin' }), { color: 0x2f8a4a, fontSize: 32 }).setEnabled(open);
       return;
     }
     this.learned = new Set(learnedSkills(hero));

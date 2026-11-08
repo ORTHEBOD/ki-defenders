@@ -5,7 +5,16 @@ import { drawMenuBackground, panel } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
 import { Save, activeHero } from '../systems/Save.js';
 import { Audio } from '../systems/Audio.js';
+import { Ads, AD_REWARD, ADS_PER_DAY } from '../systems/Ads.js';
+import { shopOpen, gearTier, tierNeed } from '../systems/Progress.js';
 import { textStyle } from '../ui/theme.js';
+
+// Gear tiers: card frame and label colour
+const RARITY = [
+  { name: 'Common', color: 0x8c96b0, text: '#c9d3ff' },
+  { name: 'Rare', color: 0x3fa8ff, text: '#7ac8ff' },
+  { name: 'Epic', color: 0xc86bff, text: '#e0a8ff' },
+];
 
 export default class ShopScene extends Phaser.Scene {
   constructor() {
@@ -18,6 +27,10 @@ export default class ShopScene extends Phaser.Scene {
       this.scene.start('Login');
       return;
     }
+    if (!shopOpen(this.player)) {
+      this.scene.start('Hub');
+      return;
+    }
     drawMenuBackground(this);
     makeButton(this, 90, 40, 140, 50, '< Back', () => this.scene.start('Hub'), { fontSize: 26, color: 0x3a4470 });
     this.add.text(640, 40, 'Shop', textStyle(52, '#ffd93b')).setOrigin(0.5);
@@ -26,8 +39,9 @@ export default class ShopScene extends Phaser.Scene {
 
     this.tab = data.tab ?? 'gear';
     this.tabs = [
-      makeButton(this, 480, 112, 300, 54, 'Equipment', () => this.show('gear'), { fontSize: 28, color: 0x2a3350 }),
-      makeButton(this, 800, 112, 300, 54, 'Lucky Spin', () => this.show('spin'), { fontSize: 28, color: 0x2a3350 }),
+      makeButton(this, 340, 112, 280, 54, 'Equipment', () => this.show('gear'), { fontSize: 28, color: 0x2a3350 }),
+      makeButton(this, 640, 112, 280, 54, 'Lucky Spin', () => this.show('spin'), { fontSize: 28, color: 0x2a3350 }),
+      makeButton(this, 940, 112, 280, 54, '🎬 Free coins', () => this.show('video'), { fontSize: 28, color: 0x2a3350 }),
     ];
     this.layer = this.add.container(0, 0);
     this.show(this.tab);
@@ -36,11 +50,11 @@ export default class ShopScene extends Phaser.Scene {
   show(tab) {
     if (this.spinning) return;
     this.tab = tab;
-    this.tabs[0].setAlpha(tab === 'gear' ? 1 : 0.6);
-    this.tabs[1].setAlpha(tab === 'spin' ? 1 : 0.6);
+    ['gear', 'spin', 'video'].forEach((t, i) => this.tabs[i].setAlpha(tab === t ? 1 : 0.6));
     this.layer.removeAll(true);
     if (tab === 'gear') this.showGear();
-    else this.showSpin();
+    else if (tab === 'spin') this.showSpin();
+    else this.showVideo();
   }
 
   refreshCoins() {
@@ -63,10 +77,25 @@ export default class ShopScene extends Phaser.Scene {
       L.add(this.add.text(x, 200, slot.name, textStyle(26, '#ffd93b')).setOrigin(0.5));
       Object.entries(GEAR).filter(([, g]) => g.slot === slot.key).forEach(([id, item], row) => {
         const y = 300 + row * 140;
+        if (item.tier > gearTier(this.player)) {
+          // Not sold yet: a locked card that says what opens it
+          L.add(panel(this, x, y, 240, 124, 0x3a3f52));
+          L.add(this.add.text(x, y - 18, '🔒', { fontSize: '30px' }).setOrigin(0.5).setAlpha(0.8));
+          L.add(this.add.text(x, y + 26, tierNeed(item.tier), textStyle(18, '#9aa3c7')).setOrigin(0.5));
+          return;
+        }
         const owned = this.player.items.includes(id);
         const wearing = worn[slot.key] === id;
-        L.add(panel(this, x, y, 240, 124, item.color));
-        L.add(this.gearIcon(x - 92, y - 10, slot.key, item.color));
+        const rarity = RARITY[item.tier - 1];
+        L.add(panel(this, x, y, 240, 124, rarity.color));
+        const badge = this.add.graphics();
+        badge.fillStyle(rarity.color, 0.25).fillCircle(x - 92, y - 12, 25);
+        badge.lineStyle(2, rarity.color, 0.9).strokeCircle(x - 92, y - 12, 25);
+        L.add(badge);
+        const icon = this.gearIcon(0, 0, slot.key, item.color);
+        icon.setPosition(x - 92, y - 12).setScale(1.25);
+        L.add(icon);
+        L.add(this.add.text(x - 92, y + 30, rarity.name, textStyle(14, rarity.text)).setOrigin(0.5));
         L.add(this.add.text(x - 64, y - 38, item.name, textStyle(19)).setOrigin(0, 0.5));
         L.add(this.add.text(x - 64, y - 4, gearText(item), { ...textStyle(14, '#9bff7a'), wordWrap: { width: 170 } }).setOrigin(0, 0.5));
         let label;
@@ -93,24 +122,43 @@ export default class ShopScene extends Phaser.Scene {
     });
   }
 
+  // A small shaded picture of a gear piece
   gearIcon(x, y, slot, color) {
     const g = this.add.graphics();
-    g.lineStyle(2, 0x0d0d12).fillStyle(color);
+    const dark = Phaser.Display.Color.ValueToColor(color).darken(30).color;
+    const O = 0x0d0d12;
+    g.lineStyle(2, O);
     if (slot === 'weapon') {
-      g.fillRoundedRect(x - 12, y - 10, 24, 22, 6).strokeRoundedRect(x - 12, y - 10, 24, 22, 6);
-      g.fillStyle(0xffffff, 0.5).fillRect(x - 8, y - 6, 16, 4);
+      // A fist glove with a cuff
+      g.fillStyle(dark).fillRoundedRect(x - 9, y + 4, 18, 10, 3).strokeRoundedRect(x - 9, y + 4, 18, 10, 3);
+      g.fillStyle(color).fillRoundedRect(x - 12, y - 13, 24, 19, 7).strokeRoundedRect(x - 12, y - 13, 24, 19, 7);
+      g.lineStyle(1.5, O).lineBetween(x - 4, y - 13, x - 4, y - 5).lineBetween(x + 4, y - 13, x + 4, y - 5);
+      g.fillStyle(0xffffff, 0.45).fillRoundedRect(x - 9, y - 11, 7, 4, 2);
     } else if (slot === 'armor') {
-      g.fillRoundedRect(x - 14, y - 14, 28, 28, 6).strokeRoundedRect(x - 14, y - 14, 28, 28, 6);
-      g.lineStyle(2, 0x0d0d12).lineBetween(x, y - 14, x, y + 14);
-    } else if (slot === 'accessory') {
-      g.fillCircle(x, y, 13).strokeCircle(x, y, 13);
-      g.fillStyle(0xffffff, 0.6).fillCircle(x - 4, y - 4, 4);
+      // A chest plate with shoulder pads
+      g.fillStyle(color).fillPoints([{ x: x - 14, y: y - 12 }, { x: x + 14, y: y - 12 }, { x: x + 11, y: y + 14 }, { x: x - 11, y: y + 14 }], true);
+      g.strokePoints([{ x: x - 14, y: y - 12 }, { x: x + 14, y: y - 12 }, { x: x + 11, y: y + 14 }, { x: x - 11, y: y + 14 }], true);
+      g.fillStyle(dark).fillCircle(x - 14, y - 11, 6).fillCircle(x + 14, y - 11, 6);
+      g.lineStyle(2, O).strokeCircle(x - 14, y - 11, 6).strokeCircle(x + 14, y - 11, 6);
+      g.lineStyle(2, dark).lineBetween(x, y - 10, x, y + 12);
+      g.fillStyle(0xffffff, 0.35).fillRect(x - 9, y - 8, 6, 12);
     } else if (slot === 'boots') {
-      g.fillRect(x - 10, y - 14, 10, 22).strokeRect(x - 10, y - 14, 10, 22);
-      g.fillRoundedRect(x - 10, y + 4, 22, 10, 4).strokeRoundedRect(x - 10, y + 4, 22, 10, 4);
+      g.fillStyle(color).fillRoundedRect(x - 9, y - 14, 11, 22, 3).strokeRoundedRect(x - 9, y - 14, 11, 22, 3);
+      g.fillStyle(color).fillRoundedRect(x - 9, y + 3, 22, 10, 5).strokeRoundedRect(x - 9, y + 3, 22, 10, 5);
+      g.fillStyle(dark).fillRect(x - 9, y + 10, 22, 3);
+      g.fillStyle(0xffffff, 0.4).fillRect(x - 7, y - 12, 3, 14);
+      g.fillStyle(0xffffff, 0.8).fillTriangle(x + 4, y - 10, x + 14, y - 6, x + 4, y - 3);
+    } else if (slot === 'amulet') {
+      g.lineStyle(2, 0xffd93b).beginPath().arc(x, y - 8, 11, Math.PI * 0.95, Math.PI * 0.05, false).strokePath();
+      g.fillStyle(0xffd93b).fillCircle(x, y + 6, 11).lineStyle(2, O).strokeCircle(x, y + 6, 11);
+      g.fillStyle(color).fillCircle(x, y + 6, 7);
+      g.fillStyle(0xffffff, 0.7).fillCircle(x - 3, y + 3, 2.5);
     } else {
-      g.lineStyle(2, 0xffd93b).strokeCircle(x, y - 6, 12);
-      g.fillCircle(x, y + 8, 9).lineStyle(2, 0x0d0d12).strokeCircle(x, y + 8, 9);
+      // A glowing orb lens
+      g.fillStyle(color, 0.3).fillCircle(x, y, 17);
+      g.fillStyle(color).fillCircle(x, y, 12).lineStyle(2, O).strokeCircle(x, y, 12);
+      g.fillStyle(dark).fillCircle(x + 3, y + 3, 6);
+      g.fillStyle(0xffffff, 0.7).fillCircle(x - 4, y - 4, 4);
     }
     return g;
   }
@@ -139,6 +187,34 @@ export default class ShopScene extends Phaser.Scene {
     });
     this.refreshCoins();
     this.show('gear');
+  }
+
+  // ---------- Free coins (reward videos) ----------
+
+  showVideo() {
+    const L = this.layer;
+    const left = Ads.left(this.player);
+    L.add(panel(this, 640, 410, 620, 440, 0x5be35b));
+    L.add(this.add.text(640, 255, '🎬', { fontSize: '84px' }).setOrigin(0.5));
+    L.add(this.add.text(640, 340, 'Watch a video', textStyle(46, '#ffd93b')).setOrigin(0.5));
+    L.add(this.add.image(585, 395, 'coin').setScale(1.5));
+    L.add(this.add.text(612, 395, `+${AD_REWARD} coins`, textStyle(38, '#5be35b')).setOrigin(0, 0.5));
+    L.add(this.add.text(640, 450, `Videos left today: ${left} / ${ADS_PER_DAY}`, textStyle(26, left ? '#c9d3ff' : '#ff8a8a')).setOrigin(0.5));
+    const b = makeButton(this, 640, 530, 340, 80, left ? 'Watch' : 'Come back tomorrow', async () => {
+      if (this.watching || Ads.left(Save.current()) <= 0) return;
+      this.watching = true;
+      const done = await Ads.show(this);
+      this.watching = false;
+      if (!this.scene.isActive() || !done || !Ads.reward()) return;
+      Audio.sfx('coin');
+      this.refreshCoins();
+      this.show('video');
+      const t = this.add.text(640, 600, `+${AD_REWARD} coins!`, textStyle(36, '#5be35b')).setOrigin(0.5);
+      this.layer.add(t);
+      this.tweens.add({ targets: t, y: 570, alpha: 0, delay: 900, duration: 700 });
+    }, { color: 0x2f8a4a, fontSize: left ? 38 : 28 });
+    b.setEnabled(left > 0);
+    L.add(b);
   }
 
   // ---------- Lucky Spin ----------
@@ -240,14 +316,15 @@ export default class ShopScene extends Phaser.Scene {
         p.coins += slice.amount;
         text = `You won ${slice.amount} coins!`;
       } else if (slice.kind === 'gear') {
-        const free = Object.keys(GEAR).filter((id) => !p.items.includes(id)).sort((a, b) => GEAR[a].cost - GEAR[b].cost);
+        const tier = gearTier(p);
+        const free = Object.keys(GEAR).filter((id) => !p.items.includes(id) && GEAR[id].tier <= tier).sort((a, b) => GEAR[a].cost - GEAR[b].cost);
         if (free.length) {
           const id = free[Math.floor(Math.random() * Math.min(4, free.length))];
           p.items.push(id);
           text = `You won ${GEAR[id].name}!\nWear it from the Equipment tab.`;
         } else {
           p.coins += 500;
-          text = 'You own all gear: +500 coins!';
+          text = 'You own all the gear sold so far:\n+500 coins!';
         }
       } else if (p.heroes[slice.hero]) {
         p.coins += SPIN.dupeCoins;

@@ -3,6 +3,7 @@
 // Equipment: each hero can wear one item per slot. Bought items can be worn by any hero.
 // stats: damage / hp / speed / attackSpeed / range / coins = +%, cooldown = -% ability recharge time,
 // regen = extra healing speed (2 = heals 3x faster).
+// tier: 1 = sold when the shop opens, 2 = after beating area 1, 3 = after beating area 2.
 export const GEAR_SLOTS = [
   { key: 'weapon', name: 'Weapon' },
   { key: 'armor', name: 'Armor' },
@@ -12,25 +13,25 @@ export const GEAR_SLOTS = [
 ];
 
 export const GEAR = {
-  trainingGloves: { slot: 'weapon', name: 'Training Gloves', cost: 250, color: 0xc98a3a, stats: { damage: 0.1 } },
-  powerBracers: { slot: 'weapon', name: 'Power Bracers', cost: 800, color: 0x8c8f99, stats: { damage: 0.2 } },
-  dragonGauntlets: { slot: 'weapon', name: 'Dragon Gauntlets', cost: 2200, color: 0xffd93b, stats: { damage: 0.35 } },
+  trainingGloves: { tier: 1, slot: 'weapon', name: 'Training Gloves', cost: 250, color: 0xc98a3a, stats: { damage: 0.1 } },
+  powerBracers: { tier: 2, slot: 'weapon', name: 'Power Bracers', cost: 800, color: 0x8c8f99, stats: { damage: 0.2 } },
+  dragonGauntlets: { tier: 3, slot: 'weapon', name: 'Dragon Gauntlets', cost: 2200, color: 0xffd93b, stats: { damage: 0.35 } },
 
-  clothVest: { slot: 'armor', name: 'Cloth Vest', cost: 250, color: 0xc98a3a, stats: { hp: 0.15 } },
-  battleArmor: { slot: 'armor', name: 'Battle Armor', cost: 800, color: 0x8c8f99, stats: { hp: 0.3 } },
-  divineArmor: { slot: 'armor', name: 'Divine Armor', cost: 2200, color: 0x5ad8ff, stats: { hp: 0.5, damage: 0.05 } },
+  clothVest: { tier: 1, slot: 'armor', name: 'Cloth Vest', cost: 250, color: 0xc98a3a, stats: { hp: 0.15 } },
+  battleArmor: { tier: 2, slot: 'armor', name: 'Battle Armor', cost: 800, color: 0x8c8f99, stats: { hp: 0.3 } },
+  divineArmor: { tier: 3, slot: 'armor', name: 'Divine Armor', cost: 2200, color: 0x5ad8ff, stats: { hp: 0.5, damage: 0.05 } },
 
-  sandals: { slot: 'boots', name: 'Swift Sandals', cost: 200, color: 0xc98a3a, stats: { speed: 0.12 } },
-  windBoots: { slot: 'boots', name: 'Wind Boots', cost: 700, color: 0x8c8f99, stats: { speed: 0.2, attackSpeed: 0.1 } },
-  cloudBoots: { slot: 'boots', name: 'Cloud Boots', cost: 1900, color: 0xffffff, stats: { speed: 0.3, attackSpeed: 0.2 } },
+  sandals: { tier: 1, slot: 'boots', name: 'Swift Sandals', cost: 200, color: 0xc98a3a, stats: { speed: 0.12 } },
+  windBoots: { tier: 2, slot: 'boots', name: 'Wind Boots', cost: 700, color: 0x8c8f99, stats: { speed: 0.2, attackSpeed: 0.1 } },
+  cloudBoots: { tier: 3, slot: 'boots', name: 'Cloud Boots', cost: 1900, color: 0xffffff, stats: { speed: 0.3, attackSpeed: 0.2 } },
 
-  kiCharm: { slot: 'amulet', name: 'Ki Charm', cost: 300, color: 0xc98a3a, stats: { cooldown: 0.1 } },
-  spiritPendant: { slot: 'amulet', name: 'Spirit Pendant', cost: 1000, color: 0x9fe8ff, stats: { cooldown: 0.2 } },
-  dragonPearl: { slot: 'amulet', name: 'Dragon Pearl', cost: 2600, color: 0xff8a3d, stats: { cooldown: 0.3, damage: 0.1 } },
+  kiCharm: { tier: 1, slot: 'amulet', name: 'Ki Charm', cost: 300, color: 0xc98a3a, stats: { cooldown: 0.1 } },
+  spiritPendant: { tier: 2, slot: 'amulet', name: 'Spirit Pendant', cost: 1000, color: 0x9fe8ff, stats: { cooldown: 0.2 } },
+  dragonPearl: { tier: 3, slot: 'amulet', name: 'Dragon Pearl', cost: 2600, color: 0xff8a3d, stats: { cooldown: 0.3, damage: 0.1 } },
 
-  scouter: { slot: 'accessory', name: 'Scouter Lens', cost: 600, color: 0x5be35b, stats: { range: 0.3 } },
-  healingBand: { slot: 'accessory', name: 'Healing Band', cost: 900, color: 0xff6b8a, stats: { regen: 2, hp: 0.1 } },
-  luckyCoin: { slot: 'accessory', name: 'Lucky Coin', cost: 1500, color: 0xffd93b, stats: { coins: 0.3 } },
+  scouter: { tier: 1, slot: 'accessory', name: 'Scouter Lens', cost: 600, color: 0x5be35b, stats: { range: 0.3 } },
+  healingBand: { tier: 2, slot: 'accessory', name: 'Healing Band', cost: 900, color: 0xff6b8a, stats: { regen: 2, hp: 0.1 } },
+  luckyCoin: { tier: 3, slot: 'accessory', name: 'Lucky Coin', cost: 1500, color: 0xffd93b, stats: { coins: 0.3 } },
 };
 
 const STAT_TEXT = {
@@ -62,7 +63,7 @@ export function gearBonus(gear = {}) {
 // The Lucky Spin wheel. `weight` = how likely that slice is.
 // A hero you already have turns into `dupeCoins` coins.
 export const SPIN = {
-  cost: 250,
+  cost: 300,
   dupeCoins: 400,
   slices: [
     { kind: 'hero', hero: 'zenko', label: 'Zenko', color: 0xd8442b, weight: 8 },
@@ -81,6 +82,7 @@ export const SPIN = {
 export function battleCoins({ win, stars, levelNumber, kills, endlessWaves, bounty, extra = 0 }) {
   let c;
   if (endlessWaves !== undefined) c = endlessWaves * 12 + kills;
-  else c = kills + (win ? 40 + 25 * stars + 4 * levelNumber : 15);
+  // Levels pay half of what they used to (kills + win bonus)
+  else c = (kills + (win ? 40 + 25 * stars + 4 * levelNumber : 15)) * 0.5;
   return Math.round(c * (bounty ? 1.25 : 1) * (1 + extra));
 }
