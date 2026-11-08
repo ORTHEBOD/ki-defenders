@@ -3,7 +3,7 @@
 // when online, so the next launch gets the newest version.
 // Bump CACHE when the file list changes.
 
-const CACHE = 'ki-defenders-v12';
+const CACHE = 'ki-defenders-v13';
 
 const FILES = [
   './',
@@ -39,6 +39,8 @@ const FILES = [
   'src/systems/Grid.js',
   'src/systems/Save.js',
   'src/systems/Ads.js',
+  'src/systems/Analytics.js',
+  'src/data/analytics.js',
   'src/systems/Google.js',
   'src/systems/Online.js',
   'src/systems/Tutorial.js',

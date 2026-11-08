@@ -11,6 +11,7 @@ import LeaderboardScene from './scenes/LeaderboardScene.js';
 import StoryScene from './scenes/StoryScene.js';
 import { Audio } from './systems/Audio.js';
 import { Sync } from './systems/Save.js';
+import { Analytics } from './systems/Analytics.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -36,6 +37,7 @@ async function start() {
   } catch (e) {
     // Font blocked: the fallback font is fine
   }
+  Analytics.start();
   window.game = new Phaser.Game(config);
 }
 

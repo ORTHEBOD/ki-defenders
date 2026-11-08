@@ -6,6 +6,7 @@ import { Settings } from '../systems/Settings.js';
 import { Audio } from '../systems/Audio.js';
 import { FIGHTERS, WALL } from '../data/fighters.js';
 import { DIFFICULTY } from '../data/difficulty.js';
+import { Analytics } from '../systems/Analytics.js';
 import { ENEMIES } from '../data/enemies.js';
 import { addXp } from '../data/hero.js';
 import Hero from '../objects/Hero.js';
@@ -37,6 +38,7 @@ export default class GameScene extends Phaser.Scene {
     this.diffKey = data.difficulty ?? 'normal';
     this.diff = DIFFICULTY[this.diffKey];
     this.kills = 0;
+    Analytics.event('level_start', this.statsInfo());
     // Fixed levels follow a drawn road; maze levels use an open grid the player builds on
     this.maze = !!this.level.maze;
     this.route = this.maze ? new Grid(this.level.maze) : new Path(this.level.path);
@@ -1062,6 +1064,11 @@ export default class GameScene extends Phaser.Scene {
     m.add(mb);
   }
 
+  // What the play stats say about this battle
+  statsInfo() {
+    return { level: this.endless ? 'endless' : `${this.level.id}`, area: MAPS[this.level.map ?? 0].name, difficulty: this.diffKey };
+  }
+
   quitToMap() {
     if (this.endless) this.scene.start('Hub');
     else this.scene.start('LevelSelect', { mapIndex: this.startData.mapIndex });
@@ -1104,6 +1111,7 @@ export default class GameScene extends Phaser.Scene {
     this.startBtn.setVisible(false);
     this.speedBtn.setVisible(false);
     const r = this.saveRewards(win);
+    Analytics.event(this.endless ? 'endless_end' : 'level_end', { ...this.statsInfo(), win: this.endless ? 0 : win ? 1 : 0, stars: r.stars, waves: r.wavesDone });
     Audio.stopMusic();
     Audio.sfx(win ? 'victory' : 'defeat');
     const heroName = this.hero?.def.name;
