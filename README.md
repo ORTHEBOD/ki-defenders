@@ -15,6 +15,18 @@ python -m http.server 8080
 
 Then open http://localhost:8080 (online saving needs the Netlify site; locally the game saves on the device).
 
+## Publishing the website
+
+Netlify publishes only the `live` branch. Work is pushed to `main` as usual, and the website changes only
+when `main` is copied to `live`:
+
+```bash
+git push origin main:live
+```
+
+Each publish costs 15 of the free plan's 300 monthly Netlify credits, so publish a batch of changes at once.
+Players playing costs almost nothing.
+
 ## Project layout
 
 - `src/data/` – fighters, heroes, enemies, levels, shop, story, AI art list (change names, stats and waves here)
