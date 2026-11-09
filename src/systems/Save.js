@@ -173,13 +173,13 @@ export const Save = {
     if (!res.ok) {
       const error = {
         need_name: null,
-        taken: 'That name is taken. Enter its PIN to link it, or pick another name.',
+        taken: 'This name already has a player. Is it yours? Enter its PIN. If not, pick another name.',
         wrong_pin: 'Wrong PIN for this player.',
         locked: `Too many wrong PINs. Try again in ${res.minutes} min.`,
         bad_google: 'Google sign-in failed. Please try again.',
         google_off: 'Google sign-in is not set up yet.',
       }[res.error] ?? 'Something went wrong. Please try again.';
-      return res.error === 'need_name' ? { ok: false, needName: true } : { ok: false, error };
+      return res.error === 'need_name' ? { ok: false, needName: true } : { ok: false, error, taken: res.error === 'taken' };
     }
     const key = res.name.toLowerCase();
     const local = all[key];

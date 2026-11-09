@@ -54,6 +54,7 @@ export default class LoginScene extends Phaser.Scene {
 
     // ----- Google sign-in -----
     // After Google says who the player is, the first time they also choose a player name.
+    // The PIN box only shows when that name already belongs to a player (to link it).
     let googleToken = null;
     const go = el.querySelector('.kd-go');
     const googleBox = el.querySelector('.kd-google');
@@ -70,11 +71,13 @@ export default class LoginScene extends Phaser.Scene {
       if (result.needName) {
         // First Google sign-in: switch the form to "choose your name"
         title.setText('Choose your name');
-        sub.setText('New name = new player. Your player already exists? Enter its PIN to link it.');
+        sub.setText('Pick a name for your player. No PIN needed!');
         el.querySelector('.kd-chips')?.remove();
         el.querySelector('.kd-or')?.remove();
         googleBox.remove();
-        pinIn.placeholder = 'PIN (only to link a player)';
+        pinIn.value = '';
+        pinIn.style.display = 'none';
+        pinIn.placeholder = 'PIN of that player';
         go.textContent = 'Continue';
         nameIn.focus();
         return;
@@ -82,7 +85,15 @@ export default class LoginScene extends Phaser.Scene {
       error.textContent = result.error;
       if (!name) googleToken = null;
       pinIn.value = '';
+      if (result.taken) {
+        pinIn.style.display = '';
+        pinIn.focus();
+      }
     };
+    // A different name: hide the PIN box again
+    nameIn.addEventListener('input', () => {
+      if (googleToken) pinIn.style.display = 'none';
+    });
     if (google) {
       const onToken = (token) => {
         googleToken = token;
