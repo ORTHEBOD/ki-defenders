@@ -3,7 +3,7 @@
 //
 // Every fighter has 18 steps: each of the 6 forms, then 2 normal upgrades (+1, +2) before the next form.
 // Moving into a new form is a TRANSFORMATION (new hair, aura and a bigger power jump).
-// Fighters earn EXP by defeating enemies; a step can only be bought (with Ki) once its EXP is reached.
+// Fighters earn EXP by hurting enemies (shared by damage); a step can only be bought (with Ki) once its EXP is reached.
 
 export const FORMS = [
   { name: 'Base', hair: null, aura: null, color: '#ffffff' },

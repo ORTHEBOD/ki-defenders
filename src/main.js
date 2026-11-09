@@ -10,9 +10,11 @@ import SettingsScene from './scenes/SettingsScene.js';
 import LeaderboardScene from './scenes/LeaderboardScene.js';
 import StoryScene from './scenes/StoryScene.js';
 import FightersScene from './scenes/FightersScene.js';
+import FeedbackScene from './scenes/FeedbackScene.js';
 import { Audio } from './systems/Audio.js';
 import { Sync } from './systems/Save.js';
 import { Analytics } from './systems/Analytics.js';
+import { Feedback } from './systems/Feedback.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -27,7 +29,7 @@ const config = {
   },
   scene: [
     BootScene, TitleScene, LoginScene, HubScene, HeroScene, LevelSelectScene, GameScene,
-    ShopScene, SettingsScene, LeaderboardScene, StoryScene, FightersScene,
+    ShopScene, SettingsScene, LeaderboardScene, StoryScene, FightersScene, FeedbackScene,
   ],
 };
 
@@ -44,8 +46,9 @@ async function start() {
 
 start();
 
-// Upload any progress that was saved while offline
+// Upload any progress (and tips or bug reports) that was saved while offline
 Sync.now();
+Feedback.flush();
 
 // Quiet while the app is in the background
 document.addEventListener('visibilitychange', () => Audio.sleep(document.hidden));

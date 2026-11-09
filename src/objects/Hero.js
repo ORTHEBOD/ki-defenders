@@ -1,6 +1,7 @@
 import { HEROES, ABILITIES, FREE_ABILITY, heroPower, heroMaxHp, learnedSkills, heroForm, formDamage, formHp } from '../data/hero.js';
 import { FORMS } from '../data/fighters.js';
 import { gearBonus } from '../data/shop.js';
+import { heroTexture } from '../art/fighterArt.js';
 import { Audio } from '../systems/Audio.js';
 import { distToSegment } from '../systems/Path.js';
 import { textStyle } from '../ui/theme.js';
@@ -16,6 +17,7 @@ export default class Hero {
     this.A = ABILITIES;
     this.mods = this.def.mods ?? {};
     this.gear = gearBonus(saved.gear);
+    this.worn = saved.gear ?? {};
     this.level = saved.level;
     this.skills = new Set(learnedSkills(saved));
     this.form = heroForm(saved);
@@ -42,8 +44,9 @@ export default class Hero {
     this.draw();
   }
 
+  // The form's look, wearing the hero's gear
   tex(form) {
-    return `hero_${this.id}_${form}`;
+    return heroTexture(this.scene, this.id, form, this.def.look, this.worn);
   }
 
   // The hero's own form (Forms skills), with its aura. Power Up shows one form higher for a while.
@@ -196,7 +199,7 @@ export default class Hero {
   }
 
   // Damage an enemy. Boss Slayer hits bosses harder; a final blow gives Ki Harvest.
-  // The hero's XP comes only from enemies it hits (see GameScene.heroXpFor).
+  // The hero's XP comes only from enemies it hits by how much damage it does (see GameScene.shareExp).
   hitEnemy(e, dmg) {
     if (e.def.boss && this.has('bossSlayer')) dmg *= 1.4;
     e.takeDamage(dmg, true, this);

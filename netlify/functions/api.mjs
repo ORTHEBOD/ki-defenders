@@ -8,6 +8,10 @@
 //   POST /api/google       { idToken, name?, pin? } -> { ok, token, created, data, name } or { ok:false, error:'need_name' }
 //        Signs in with a Google account. The first time, the player picks a new name, or links
 //        an existing player by giving its name and PIN.
+//   POST /api/feedback     { name, kind, text, platform } -> { ok }
+//        A tip or a bug report from a player (kind: 'tip' or 'bug'). Saved as feedback/<time>.
+//   GET  /api/feedback?key=FEEDBACK_KEY            -> { ok, rows }  (newest first)
+//        For the game's maker. Works only when the FEEDBACK_KEY setting is set on Netlify.
 //
 // PINs are stored only as salted hashes. After 5 wrong PINs a name is locked for 15 minutes.
 
@@ -208,6 +212,37 @@ async function save(body) {
   return reply({ ok: true, updatedAt: user.updatedAt });
 }
 
+// Each player's device can send up to 10 messages an hour
+async function feedback(body, req) {
+  const kind = body.kind === 'bug' ? 'bug' : 'tip';
+  const text = String(body.text ?? '').trim().slice(0, 1000);
+  if (text.length < 3) return reply({ ok: false, error: 'short' }, 400);
+  const s = store();
+  const ip = req.headers.get('x-nf-client-connection-ip') ?? 'unknown';
+  const hour = Math.floor(Date.now() / 3600000);
+  const rateKey = `feedback-rate/${createHash('sha256').update(ip).digest('hex').slice(0, 16)}/${hour}`;
+  const count = (await s.get(rateKey, { type: 'json' })) ?? 0;
+  if (count >= 10) return reply({ ok: false, error: 'too_many' }, 429);
+  await s.setJSON(rateKey, count + 1);
+  const row = {
+    time: new Date().toISOString(), kind, text,
+    name: cleanName(body.name) ?? 'guest',
+    platform: ['web', 'android', 'pc'].includes(body.platform) ? body.platform : 'web',
+  };
+  await s.setJSON(`feedback/${Date.now()}-${randomBytes(3).toString('hex')}`, row);
+  return reply({ ok: true });
+}
+
+async function readFeedback(req) {
+  const key = process.env.FEEDBACK_KEY;
+  if (!key || new URL(req.url).searchParams.get('key') !== key) return reply({ ok: false, error: 'no' }, 403);
+  const s = store();
+  const { blobs } = await s.list({ prefix: 'feedback/' });
+  const newest = blobs.map((b) => b.key).sort().reverse().slice(0, 200);
+  const rows = await Promise.all(newest.map((k) => s.get(k, { type: 'json' })));
+  return reply({ ok: true, rows: rows.filter(Boolean) });
+}
+
 async function leaderboard() {
   // Only players who have played Endless Battle are listed
   const rows = ((await store().get('leaderboard', { type: 'json' })) ?? []).filter((r) => r.wave > 0 && r.name.toLowerCase() !== TESTER);
@@ -220,11 +255,13 @@ export default async (req) => {
   try {
     if (req.method === 'GET' && route === 'ping') return reply({ ok: true });
     if (req.method === 'GET' && route === 'leaderboard') return await leaderboard();
+    if (req.method === 'GET' && route === 'feedback') return await readFeedback(req);
     if (req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
       if (route === 'login') return await login(body);
       if (route === 'save') return await save(body);
       if (route === 'google') return await google(body);
+      if (route === 'feedback') return await feedback(body, req);
     }
     return reply({ ok: false, error: 'not_found' }, 404);
   } catch (e) {

@@ -1,7 +1,7 @@
 import { FIGHTERS, FORMS } from '../data/fighters.js';
 import { HEROES } from '../data/hero.js';
 import { ART_FILES, artSize } from '../data/art.js';
-import { drawFighterArt, pts } from '../art/fighterArt.js';
+import { drawFighterArt, formLook, pts } from '../art/fighterArt.js';
 import {
   drawBrute, drawFlyer, drawSplitter, drawSplitling, drawMedic, drawOgre, drawKrag,
   drawScorpion, drawSandKing, drawMech, drawVorn, drawCoin,
@@ -24,10 +24,17 @@ export default class BootScene extends Phaser.Scene {
   }
 
   create() {
-    // One texture per form: kaito_0 (base), kaito_1 (gold hair) ... kaito_5 (blue hair)
+    // One texture per form: kaito_0 (base), kaito_1 (gold hair) ... kaito_5 (blue hair).
+    // Each form also has its 2nd and 3rd upgrade: kaito_1_2 (headband), kaito_1_3 (headband and cape).
     for (const def of Object.values(FIGHTERS)) {
-      FORMS.forEach((form, i) => this.makeFighter(`${def.texture}_${i}`,
-        { ...def.look, hair: form.hair ?? def.look.hair, longHair: form.longHair, sparks: form.sparks }));
+      FORMS.forEach((form, i) => {
+        const key = `${def.texture}_${i}`;
+        const look = formLook(def.look, i);
+        this.makeFighter(key, look);
+        if (ART_FILES.includes(key)) return;
+        const trim = i > 0 ? form.aura : def.color;
+        for (const rank of [2, 3]) this.makeFighter(`${key}_${rank}`, { ...look, rank, trim });
+      });
     }
     // Each hero in every form (hero_zenko_0 ... hero_zenko_5): learned in the Forms branch, and Power Up
     for (const [id, h] of Object.entries(HEROES)) {

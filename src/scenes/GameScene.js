@@ -722,7 +722,7 @@ export default class GameScene extends Phaser.Scene {
     m.add(this.add.text(0, -30, `${FORMS[BONUS_FORM].name} ${bonusOn ? 'bonus' : 'unlocks'}: ${f.def.bonusText}`,
       { ...textStyle(15, bonusOn ? '#5be35b' : '#8a91ad'), wordWrap: { width: w - 24 }, align: 'center' }).setOrigin(0.5));
 
-    // EXP bar: the fighter earns EXP by defeating enemies; a full bar opens the next upgrade
+    // EXP bar: the fighter earns EXP by hurting enemies; a full bar opens the next upgrade
     const next = f.next;
     const ready = f.expReady;
     if (next) {
@@ -737,7 +737,7 @@ export default class GameScene extends Phaser.Scene {
     const transform = f.nextIsTransform;
     let upLabel = 'Max power';
     if (f.closedForm) upLabel = `🔒 ${FORMS[f.closedForm].name}: beat level ${FORM_LEVELS[f.closedForm]}`;
-    if (next) upLabel = !ready ? '🔒 Defeat enemies for EXP' : transform ? `TRANSFORM!  ${next.cost} Ki` : `Upgrade  ${next.cost} Ki`;
+    if (next) upLabel = !ready ? '🔒 Fight enemies for EXP' : transform ? `TRANSFORM!  ${next.cost} Ki` : `Upgrade  ${next.cost} Ki`;
     const up = makeButton(this, 0, 62, 300, 48, upLabel, () => {
       if (!next || !f.expReady) return;
       if (this.ki < next.cost) {
@@ -1041,8 +1041,8 @@ export default class GameScene extends Phaser.Scene {
     this.floatText(x, y - 80, 'STOMP!', '#ffe9c4', 30);
   }
 
-  onEnemyKilled(e, by) {
-    this.fighterExp(e, by);
+  onEnemyKilled(e) {
+    this.shareExp(e);
     if (e.def.boss) {
       Audio.sfx('explode');
       Audio.music(this.areaMusic);
@@ -1051,7 +1051,6 @@ export default class GameScene extends Phaser.Scene {
       this.banner(`${e.def.name} defeated!`);
     }
     this.kills++;
-    this.heroXpFor(e, by);
     this.ki += e.def.reward;
     Audio.sfx('pop', 0.04);
     this.floatText(e.x, e.y - 34, `+${e.def.reward}`, '#ffd93b', 20);
@@ -1059,26 +1058,27 @@ export default class GameScene extends Phaser.Scene {
     this.refreshHud();
   }
 
-  // The fighter that defeated the enemy gets its EXP. Helpers get half: Lumi-type fighters when the
-  // enemy fell inside their range, and support fighters when the winner stood in their aura.
-  fighterExp(e, by) {
+  // The enemy's EXP is shared by everyone who hurt it, by how much of the damage each one did:
+  // 10 EXP and three fighters that each did a third = about 3.3 EXP each.
+  // The hero's share counts double (hero levels need more XP). A hero that only watches gets nothing.
+  // Support fighters (they don't attack) earn half of what the fighters in their aura earn.
+  shareExp(e) {
     const xp = e.def.xp ?? 2;
-    const winner = this.fighters.includes(by) ? by : null;
-    winner?.gainExp(xp);
-    for (const f of this.fighters) {
-      if (f === winner) continue;
-      const near = (o) => Math.hypot(o.x - f.x, o.y - f.y) <= f.stats.range;
-      const helped = f.def.attack === 'flash' ? near(e) : f.def.attack === 'support' && winner && near(winner);
-      if (helped) f.gainExp(xp / 2);
+    const dealt = e.dealt ?? new Map();
+    let total = 0;
+    for (const d of dealt.values()) total += d;
+    if (!total) return;
+    for (const [who, d] of dealt) {
+      const share = (xp * d) / total;
+      if (who === this.hero) {
+        this.heroXp += share * 2;
+      } else if (this.fighters.includes(who)) {
+        who.gainExp(share);
+        for (const f of this.fighters) {
+          if (f !== who && f.def.attack === 'support' && Math.hypot(who.x - f.x, who.y - f.y) <= f.stats.range) f.gainExp(share / 2);
+        }
+      }
     }
-  }
-
-  // The hero earns XP only for its own work: double for a final blow, normal when it helped
-  // (hit the enemy before someone else finished it). A hero that only watches earns nothing.
-  heroXpFor(e, by) {
-    const xp = e.def.xp ?? 2;
-    if (by && by === this.hero) this.heroXp += xp * 2;
-    else if (e.heroHit) this.heroXp += xp;
   }
 
   loseLives(n) {

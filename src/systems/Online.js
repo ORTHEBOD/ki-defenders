@@ -49,4 +49,8 @@ export const Online = {
   leaderboard() {
     return call('GET', 'leaderboard');
   },
+
+  feedback(message) {
+    return call('POST', 'feedback', message);
+  },
 };

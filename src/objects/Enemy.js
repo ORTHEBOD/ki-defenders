@@ -207,11 +207,16 @@ export default class Enemy {
     this.stunTime = Math.max(this.stunTime, time);
   }
 
-  // `by` is the fighter that hit it (it gets the EXP if this hit defeats the enemy)
+  // `by` is the fighter or hero that hit it. Each one's damage is counted in `dealt`,
+  // so the EXP can be shared by how much each one did (see GameScene.shareExp).
   takeDamage(amount, flash = true, by = null) {
     if (!this.alive) return;
-    if (by && by === this.scene.hero) this.heroHit = true;
     if (this.def.armor) amount = Math.max(amount * 0.3, amount - this.def.armor);
+    if (by) {
+      const work = Math.min(amount, Math.max(0, this.hp) + this.shield);
+      this.dealt ??= new Map();
+      this.dealt.set(by, (this.dealt.get(by) ?? 0) + work);
+    }
     if (this.shield > 0) {
       const soaked = Math.min(this.shield, amount);
       this.shield -= soaked;
@@ -222,7 +227,7 @@ export default class Enemy {
     this.applyTint();
     this.drawHpBar();
     if (this.hp <= 0) {
-      this.scene.onEnemyKilled(this, by);
+      this.scene.onEnemyKilled(this);
       this.destroy();
       const split = this.def.splitInto;
       if (split && !this.reachedEnd) {

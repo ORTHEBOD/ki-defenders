@@ -1,5 +1,5 @@
 import { FIGHTERS, FORMS, FORM_LEVELS } from '../data/fighters.js';
-import { fighterPortrait } from '../art/fighterArt.js';
+import { fighterPortrait, formLook } from '../art/fighterArt.js';
 import { drawMenuBackground, panel } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
 import { Save } from '../systems/Save.js';
@@ -24,7 +24,7 @@ export default class FightersScene extends Phaser.Scene {
     drawMenuBackground(this);
     makeButton(this, 90, 40, 140, 50, '< Back', () => this.scene.start('Hub'), { fontSize: 26, color: 0x3a4470 });
     this.add.text(640, 40, 'Fighters', textStyle(44, '#ffd93b')).setOrigin(0.5);
-    this.add.text(640, 84, 'In battle, fighters earn EXP by defeating enemies. Spend Ki to upgrade them.',
+    this.add.text(640, 84, 'In battle, fighters share the EXP of each enemy by the damage they did. Spend Ki to upgrade them.',
       textStyle(20, '#c9d3ff')).setOrigin(0.5);
 
     const top = maxForm(player);
@@ -35,7 +35,8 @@ export default class FightersScene extends Phaser.Scene {
       const x = 160 + i * 240;
       const joined = player.super || def.unlock === 1 || levelOpen(player, def.unlock);
       panel(this, x, 270, 220, 300, joined ? def.color : 0x3a3f52);
-      const look = { ...def.look, hair: form.hair ?? def.look.hair, longHair: form.longHair, sparks: form.sparks };
+      // The top upgrade of that form: headband and cape
+      const look = { ...formLook(def.look, top), rank: 3, trim: top > 0 ? form.aura : def.color };
       const art = fighterPortrait(this, x, 220, joined ? look : { ...def.look, gi: 0x202430, skin: 0x202430, hair: 0x202430, belt: 0x202430, boots: 0x202430 }, 2.6);
       if (!joined) this.add.text(x, 220, '🔒', { fontSize: '44px' }).setOrigin(0.5);
       else this.tweens.add({ targets: art, y: art.y - 6, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: i * 150 });

@@ -20,7 +20,7 @@ function deviceId() {
   }
 }
 
-function platform() {
+export function platform() {
   if (navigator.userAgent.includes('Electron')) return 'pc';
   if (window.Capacitor?.isNativePlatform?.()) return 'android';
   return 'web';

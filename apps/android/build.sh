@@ -19,6 +19,34 @@ sed -i 's/android:name=".MainActivity"/android:name=".MainActivity"\n           
 sed -i '/<style name="AppTheme.NoActionBar"/a\        <item name="android:windowFullscreen">true</item>' android/app/src/main/res/values/styles.xml
 sed -i "s/versionCode 1$/versionCode ${VERSION_CODE}/; s/versionName \"1.0\"/versionName \"${VERSION_NAME}\"/" android/app/build.gradle
 
+# Google sign-in: the main screen passes Google's "allow access" answer back to the sign-in plugin
+cat > android/app/src/main/java/com/orthebod/kidefenders/MainActivity.java <<'JAVA'
+package com.orthebod.kidefenders;
+
+import android.content.Intent;
+import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.PluginHandle;
+import ee.forgr.capacitor.social.login.GoogleProvider;
+import ee.forgr.capacitor.social.login.ModifiedMainActivityForSocialLoginPlugin;
+import ee.forgr.capacitor.social.login.SocialLoginPlugin;
+
+public class MainActivity extends BridgeActivity implements ModifiedMainActivityForSocialLoginPlugin {
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode >= GoogleProvider.REQUEST_AUTHORIZE_GOOGLE_MIN && requestCode < GoogleProvider.REQUEST_AUTHORIZE_GOOGLE_MAX) {
+            PluginHandle handle = getBridge().getPlugin("SocialLogin");
+            if (handle != null && handle.getInstance() instanceof SocialLoginPlugin) {
+                ((SocialLoginPlugin) handle.getInstance()).handleGoogleLoginIntent(requestCode, data);
+            }
+        }
+    }
+
+    @Override
+    public void IHaveModifiedTheMainActivityForTheUseWithSocialLoginPlugin() {}
+}
+JAVA
+
 # App icon and splash from the game's icon
 mkdir -p assets
 cp icon-only.png icon-foreground.png icon-background.png assets/

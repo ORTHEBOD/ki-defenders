@@ -92,9 +92,9 @@ export default class LoginScene extends Phaser.Scene {
       const onError = (msg) => { error.textContent = msg; };
       if (Google.isNative()) {
         googleBox.querySelector('.kd-gbtn').addEventListener('click', async () => {
-          const token = await Google.signInNative();
+          const { token, error: why } = await Google.signInNative();
           if (token) onToken(token);
-          else onError('Google sign-in was cancelled.');
+          else onError(why);
         });
       } else Google.renderButton(googleBox, onToken, onError);
     }

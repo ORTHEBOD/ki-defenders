@@ -49,16 +49,20 @@ export const Google = {
     window.google.accounts.id.renderButton(el, { theme: 'filled_blue', size: 'large', shape: 'pill', text: 'signin_with', width: 440 });
   },
 
-  // Android: opens the Google account picker. Returns the token, or null if cancelled.
+  // Android: opens the Google account picker. Returns { token } or { error } (the reason, to show the player).
+  // Email and profile are always asked for; passing `scopes` makes the plugin refuse to sign in.
   async signInNative() {
     const p = plugin();
-    if (!p) return null;
+    if (!p) return { error: 'Google sign-in is not in this app.' };
     try {
       await p.initialize({ google: { webClientId: GOOGLE_CLIENT_ID } });
-      const res = await p.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
-      return res?.result?.idToken ?? null;
+      const res = await p.login({ provider: 'google', options: {} });
+      const token = res?.result?.idToken;
+      return token ? { token } : { error: 'Google did not send a sign-in token.' };
     } catch (e) {
-      return null;
+      const msg = String(e?.message ?? e);
+      if (/cancel/i.test(msg)) return { error: 'Google sign-in was cancelled.' };
+      return { error: `Google sign-in failed: ${msg}` };
     }
   },
 };

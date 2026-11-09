@@ -1,6 +1,6 @@
 import { HEROES, xpToNext, skillPoints, heroForm } from '../data/hero.js';
 import { FORMS } from '../data/fighters.js';
-import { fighterPortrait } from '../art/fighterArt.js';
+import { fighterPortrait, formLook, gearLook } from '../art/fighterArt.js';
 import { drawMenuBackground, panel, xpBar } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
 import { Save, Sync, totalStars, activeHero } from '../systems/Save.js';
@@ -104,8 +104,7 @@ export default class HubScene extends Phaser.Scene {
   heroCard(player, hero) {
     const def = HEROES[player.activeHero];
     panel(this, 330, 400, 500, 520, def.look.gi);
-    const form = FORMS[heroForm(hero)];
-    const art = fighterPortrait(this, 330, 290, { ...def.look, hair: form.hair ?? def.look.hair, longHair: form.longHair, sparks: form.sparks },
+    const art = fighterPortrait(this, 330, 290, { ...formLook(def.look, heroForm(hero)), ...gearLook(hero.gear) },
       3.6, `hero_${player.activeHero}_${heroForm(hero)}`);
     this.tweens.add({ targets: art, y: art.y - 8, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     this.add.text(330, 440, def.name, textStyle(48)).setOrigin(0.5);
@@ -132,6 +131,7 @@ export default class HubScene extends Phaser.Scene {
       () => this.scene.start('Game', { levelId: 'endless', difficulty: 'normal' }), { color: 0x6a3ab8, fontSize: 28 });
     endless.setEnabled(endlessOpen(player));
     makeButton(this, 830, 576, 420, 76, 'Leaderboard', () => this.scene.start('Leaderboard'), { fontSize: 32 });
+    makeButton(this, 1160, 690, 200, 44, '💡 Tips & bugs', () => this.scene.start('Feedback'), { fontSize: 22, color: 0x3a4470 });
     if (hero && skillPoints(hero) > 0) {
       const dot = this.add.circle(808, 278, 14, 0x5be35b).setStrokeStyle(3, 0x10131c).setDepth(120);
       this.add.text(808, 278, '!', textStyle(20)).setOrigin(0.5).setDepth(121);

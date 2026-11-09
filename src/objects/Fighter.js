@@ -109,8 +109,11 @@ export default class Fighter {
     return this.def.tiers.slice(0, this.tier + 1).filter((t) => t.form === this.form).length;
   }
 
+  // The form's look, with a headband at the 2nd upgrade and a cape at the 3rd (see BootScene)
   textureKey() {
-    return `${this.def.texture}_${this.form}`;
+    const key = `${this.def.texture}_${this.form}`;
+    const ranked = `${key}_${this.formStars}`;
+    return this.formStars > 1 && this.scene.textures.exists(ranked) ? ranked : key;
   }
 
   refreshStars() {
@@ -136,7 +139,9 @@ export default class Fighter {
       }
       this.scene.transformFx(this);
     } else {
+      this.sprite.setTexture(this.textureKey());
       this.scene.hitSpark(this.x, this.y - 14, this.def.color, 2);
+      this.scene.floatText(this.x, this.y - 74, this.formStars === 3 ? 'New cape!' : 'New headband!', '#ffe9c4', 18);
     }
   }
 

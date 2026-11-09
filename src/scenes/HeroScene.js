@@ -1,7 +1,7 @@
 import { HEROES, SKILL_TREE, xpToNext, skillPoints, learnedSkills, heroPower, heroMaxHp, heroForm, formDamage, formHp } from '../data/hero.js';
 import { FORMS } from '../data/fighters.js';
 import { GEAR, GEAR_SLOTS, gearBonus } from '../data/shop.js';
-import { fighterPortrait } from '../art/fighterArt.js';
+import { fighterPortrait, formLook, gearLook } from '../art/fighterArt.js';
 import { drawMenuBackground, panel, xpBar } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
 import { Save, activeHero } from '../systems/Save.js';
@@ -79,8 +79,7 @@ export default class HeroScene extends Phaser.Scene {
   drawInfo(player, hero, def) {
     const bonus = gearBonus(hero.gear);
     panel(this, 230, 405, 400, 560, def.look.gi);
-    const form = FORMS[heroForm(hero)];
-    fighterPortrait(this, 230, 210, { ...def.look, hair: form.hair ?? def.look.hair, longHair: form.longHair, sparks: form.sparks }, 2.4,
+    fighterPortrait(this, 230, 210, { ...formLook(def.look, heroForm(hero)), ...gearLook(hero.gear) }, 2.4,
       `hero_${player.activeHero}_${heroForm(hero)}`);
     this.add.text(230, 300, `${def.name}  Lv ${hero.level}`, textStyle(36)).setOrigin(0.5);
     this.add.text(230, 334, def.title, textStyle(19, '#c9d3ff')).setOrigin(0.5);
