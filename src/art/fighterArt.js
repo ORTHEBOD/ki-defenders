@@ -3,7 +3,7 @@
 // Extra look parts:
 // - rank (fighter upgrades inside a form): 2 = headband and glowing wristbands, 3 = also a cape.
 //   `trim` is their color.
-// - gear (what a hero wears, see gearLook): gloves, plate, bootsColor, pendant, scouter, band, coin.
+// - gear (what a hero wears, see gearLook): gloves, plate, pants, bootsColor, pendant, scouter, band, coin.
 import { GEAR } from '../data/shop.js';
 import { FORMS } from '../data/fighters.js';
 import { ART_FILES } from '../data/art.js';
@@ -34,11 +34,13 @@ export function drawFighterArt(g, look) {
     g.fillStyle(shade(look.trim, 0.8)).fillPoints(cape, true);
     g.strokePoints(cape, true);
   }
-  // Legs (gi pants) and boots
-  g.fillStyle(look.gi);
+  // Legs (gi pants, or the hero's Pants gear) and boots
+  const legs = look.pants ?? look.gi;
+  g.fillStyle(legs);
   g.fillRect(23, 47, 8, 10).strokeRect(23, 47, 8, 10);
   g.fillRect(33, 47, 8, 10).strokeRect(33, 47, 8, 10);
-  g.fillStyle(shade(look.gi, 0.75)).fillRect(29, 48, 2, 8).fillRect(39, 48, 2, 8);
+  g.fillStyle(shade(legs, 0.75)).fillRect(29, 48, 2, 8).fillRect(39, 48, 2, 8);
+  if (look.pants) g.fillStyle(shade(legs, 1.4)).fillRect(24, 48, 2, 7).fillRect(34, 48, 2, 7);
   g.fillStyle(look.bootsColor ?? look.boots);
   g.fillRoundedRect(22, 54, 10, 6, 2).strokeRoundedRect(22, 54, 10, 6, 2);
   g.fillRoundedRect(32, 54, 10, 6, 2).strokeRoundedRect(32, 54, 10, 6, 2);
@@ -139,6 +141,7 @@ export function gearLook(gear = {}) {
     if (!item) continue;
     if (item.slot === 'weapon') look.gloves = item.color;
     else if (item.slot === 'armor') look.plate = item.color;
+    else if (item.slot === 'pants') look.pants = item.color;
     else if (item.slot === 'boots') look.bootsColor = item.color;
     else if (item.slot === 'amulet') look.pendant = item.color;
     else if (id === 'scouter') look.scouter = true;

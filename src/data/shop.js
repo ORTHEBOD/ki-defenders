@@ -7,6 +7,7 @@
 export const GEAR_SLOTS = [
   { key: 'weapon', name: 'Weapon' },
   { key: 'armor', name: 'Armor' },
+  { key: 'pants', name: 'Pants' },
   { key: 'boots', name: 'Boots' },
   { key: 'amulet', name: 'Amulet' },
   { key: 'accessory', name: 'Accessory' },
@@ -20,6 +21,10 @@ export const GEAR = {
   clothVest: { tier: 1, slot: 'armor', name: 'Cloth Vest', cost: 250, color: 0xc98a3a, stats: { hp: 0.15 } },
   battleArmor: { tier: 2, slot: 'armor', name: 'Battle Armor', cost: 800, color: 0x8c8f99, stats: { hp: 0.3 } },
   divineArmor: { tier: 3, slot: 'armor', name: 'Divine Armor', cost: 2200, color: 0x5ad8ff, stats: { hp: 0.5, damage: 0.05 } },
+
+  trainingPants: { tier: 1, slot: 'pants', name: 'Training Pants', cost: 220, color: 0x3a6ad8, stats: { hp: 0.08, speed: 0.05 } },
+  weightedPants: { tier: 2, slot: 'pants', name: 'Weighted Pants', cost: 750, color: 0x6a4a9a, stats: { hp: 0.15, speed: 0.1 } },
+  dragonPants: { tier: 3, slot: 'pants', name: 'Dragon Gi Pants', cost: 2000, color: 0xe0661a, stats: { hp: 0.25, speed: 0.15, damage: 0.05 } },
 
   sandals: { tier: 1, slot: 'boots', name: 'Swift Sandals', cost: 200, color: 0xc98a3a, stats: { speed: 0.12 } },
   windBoots: { tier: 2, slot: 'boots', name: 'Wind Boots', cost: 700, color: 0x8c8f99, stats: { speed: 0.2, attackSpeed: 0.1 } },

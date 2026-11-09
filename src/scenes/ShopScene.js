@@ -73,13 +73,13 @@ export default class ShopScene extends Phaser.Scene {
       : 'Bought gear can be worn by any hero - win your first hero in the Lucky Spin!';
     L.add(this.add.text(640, 160, note, textStyle(20, '#c9d3ff')).setOrigin(0.5));
     GEAR_SLOTS.forEach((slot, col) => {
-      const x = 134 + col * 253;
+      const x = 115 + col * 210;
       L.add(this.add.text(x, 200, slot.name, textStyle(26, '#ffd93b')).setOrigin(0.5));
       Object.entries(GEAR).filter(([, g]) => g.slot === slot.key).forEach(([id, item], row) => {
         const y = 300 + row * 140;
         if (item.tier > gearTier(this.player)) {
           // Not sold yet: a locked card that says what opens it
-          L.add(panel(this, x, y, 240, 124, 0x3a3f52));
+          L.add(panel(this, x, y, 200, 124, 0x3a3f52));
           L.add(this.add.text(x, y - 18, '🔒', { fontSize: '30px' }).setOrigin(0.5).setAlpha(0.8));
           L.add(this.add.text(x, y + 26, tierNeed(item.tier), textStyle(18, '#9aa3c7')).setOrigin(0.5));
           return;
@@ -87,17 +87,17 @@ export default class ShopScene extends Phaser.Scene {
         const owned = this.player.items.includes(id);
         const wearing = worn[slot.key] === id;
         const rarity = RARITY[item.tier - 1];
-        L.add(panel(this, x, y, 240, 124, rarity.color));
+        L.add(panel(this, x, y, 200, 124, rarity.color));
         const badge = this.add.graphics();
-        badge.fillStyle(rarity.color, 0.25).fillCircle(x - 92, y - 12, 25);
-        badge.lineStyle(2, rarity.color, 0.9).strokeCircle(x - 92, y - 12, 25);
+        badge.fillStyle(rarity.color, 0.25).fillCircle(x - 74, y - 12, 22);
+        badge.lineStyle(2, rarity.color, 0.9).strokeCircle(x - 74, y - 12, 22);
         L.add(badge);
         const icon = this.gearIcon(0, 0, slot.key, item.color);
-        icon.setPosition(x - 92, y - 12).setScale(1.25);
+        icon.setPosition(x - 74, y - 12).setScale(1.1);
         L.add(icon);
-        L.add(this.add.text(x - 92, y + 30, rarity.name, textStyle(14, rarity.text)).setOrigin(0.5));
-        L.add(this.add.text(x - 64, y - 38, item.name, textStyle(19)).setOrigin(0, 0.5));
-        L.add(this.add.text(x - 64, y - 4, gearText(item), { ...textStyle(14, '#9bff7a'), wordWrap: { width: 170 } }).setOrigin(0, 0.5));
+        L.add(this.add.text(x - 74, y + 30, rarity.name, textStyle(13, rarity.text)).setOrigin(0.5));
+        L.add(this.add.text(x - 48, y - 38, item.name, textStyle(17)).setOrigin(0, 0.5));
+        L.add(this.add.text(x - 48, y - 4, gearText(item), { ...textStyle(13, '#9bff7a'), wordWrap: { width: 140 } }).setOrigin(0, 0.5));
         let label;
         let action;
         let color = 0x2f8a4a;
@@ -115,7 +115,7 @@ export default class ShopScene extends Phaser.Scene {
           color = 0xc99a00;
           action = () => this.buy(id);
         }
-        const b = makeButton(this, x + 22, y + 36, 180, 40, label, () => action?.(), { fontSize: 19, color });
+        const b = makeButton(this, x + 22, y + 36, 140, 38, label, () => action?.(), { fontSize: 18, color });
         if (!action || (!owned && this.player.coins < item.cost)) b.setEnabled(false);
         L.add(b);
       });
@@ -142,6 +142,13 @@ export default class ShopScene extends Phaser.Scene {
       g.lineStyle(2, O).strokeCircle(x - 14, y - 11, 6).strokeCircle(x + 14, y - 11, 6);
       g.lineStyle(2, dark).lineBetween(x, y - 10, x, y + 12);
       g.fillStyle(0xffffff, 0.35).fillRect(x - 9, y - 8, 6, 12);
+    } else if (slot === 'pants') {
+      // Two pant legs with a belt
+      const leg = (lx) => [{ x: lx, y: y - 8 }, { x: lx + 11, y: y - 8 }, { x: lx + 10, y: y + 15 }, { x: lx + 1, y: y + 15 }];
+      g.fillStyle(color).fillPoints(leg(x - 12), true).strokePoints(leg(x - 12), true);
+      g.fillPoints(leg(x + 1), true).strokePoints(leg(x + 1), true);
+      g.fillStyle(dark).fillRect(x - 13, y - 14, 26, 7).strokeRect(x - 13, y - 14, 26, 7);
+      g.fillStyle(0xffffff, 0.4).fillRect(x - 9, y - 5, 3, 16);
     } else if (slot === 'boots') {
       g.fillStyle(color).fillRoundedRect(x - 9, y - 14, 11, 22, 3).strokeRoundedRect(x - 9, y - 14, 11, 22, 3);
       g.fillStyle(color).fillRoundedRect(x - 9, y + 3, 22, 10, 5).strokeRoundedRect(x - 9, y + 3, 22, 10, 5);

@@ -97,10 +97,10 @@ export default class HeroScene extends Phaser.Scene {
     // Gear: tap a slot to switch between the items you own for it
     this.add.text(230, 496, 'Gear (tap to change)', textStyle(18, '#9aa3c7')).setOrigin(0.5);
     GEAR_SLOTS.forEach((slot, i) => {
-      const y = 526 + i * 32;
+      const y = 522 + i * 28;
       const id = hero.gear[slot.key];
       const item = GEAR[id];
-      const row = this.add.rectangle(230, y, 360, 28, 0x1c2133).setStrokeStyle(2, item ? item.color : 0x3a3f52)
+      const row = this.add.rectangle(230, y, 360, 25, 0x1c2133).setStrokeStyle(2, item ? item.color : 0x3a3f52)
         .setInteractive({ useHandCursor: true });
       this.add.text(60, y, slot.name, textStyle(16, '#9aa3c7')).setOrigin(0, 0.5);
       this.add.text(140, y, item ? item.name : '- empty -', textStyle(17, item ? '#ffffff' : '#6a7090')).setOrigin(0, 0.5);
