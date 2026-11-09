@@ -7,8 +7,9 @@ import { Save } from './Save.js';
 
 export const AD_REWARD = 100;
 export const ADS_PER_DAY = 3;
-// Ads between battles: at most one every 3 minutes
-const BREAK_GAP = 3 * 60 * 1000;
+// Ads between battles: at most one every 5 minutes, and none after the first levels
+const BREAK_GAP = 5 * 60 * 1000;
+const FREE_LEVELS = 5;
 let lastBreak = 0;
 
 const today = () => {
@@ -50,10 +51,12 @@ export const Ads = {
   },
 
   // A short ad between battles (no reward, does not use up the shop's reward videos).
-  // Runs `next` when it is done. At most one every BREAK_GAP, and never for the tester account.
+  // Runs `next` when it is done. At most one every BREAK_GAP, none in levels 1 to FREE_LEVELS,
+  // and never for the tester account.
   between(scene, next) {
     const player = Save.current();
-    if (!player || player.super || Date.now() - lastBreak < BREAK_GAP) {
+    const early = !scene.endless && scene.level?.id <= FREE_LEVELS;
+    if (!player || player.super || early || Date.now() - lastBreak < BREAK_GAP) {
       next();
       return;
     }

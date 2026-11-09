@@ -4,7 +4,7 @@ import { battleCoins } from '../data/shop.js';
 import { Ads } from '../systems/Ads.js';
 import { Settings } from '../systems/Settings.js';
 import { Audio } from '../systems/Audio.js';
-import { FIGHTERS, WALL } from '../data/fighters.js';
+import { FIGHTERS, FORMS, BONUS_FORM, EXP_TOTAL, WALL, fightersFor } from '../data/fighters.js';
 import { DIFFICULTY } from '../data/difficulty.js';
 import { Analytics } from '../systems/Analytics.js';
 import { ENEMIES } from '../data/enemies.js';
@@ -114,6 +114,9 @@ export default class GameScene extends Phaser.Scene {
 
     this.floats = 0;
     this.tutorial = this.level.id === 1 && !player?.tutorialDone ? new Tutorial(this) : null;
+    // A fighter that joins the team on this level
+    const joined = this.endless ? [] : Object.values(FIGHTERS).filter((d) => d.unlock > 1 && d.unlock === this.level.id);
+    joined.forEach((d, i) => this.time.delayedCall(800 + i * 2500, () => this.banner(`New fighter: ${d.name}!`)));
 
     // Switching apps or locking the phone pauses the battle
     const onHidden = () => this.state === 'playing' && this.pause();
@@ -591,6 +594,7 @@ export default class GameScene extends Phaser.Scene {
   closeMenu() {
     this.rangeCircle.clear();
     this.cellMark.clear();
+    this.menuFighter = null;
     if (!this.menu) return;
     const m = this.menu;
     this.menu = null;
@@ -615,6 +619,7 @@ export default class GameScene extends Phaser.Scene {
   openBuildMenu(spot) {
     this.closeMenu();
     const types = Object.keys(FIGHTERS);
+    const open = fightersFor(this.level.id, this.endless);
     if (spot.maze) types.push('wall');
     const cardW = 124;
     const cardH = 140;
@@ -630,9 +635,22 @@ export default class GameScene extends Phaser.Scene {
       const range = def.tiers?.[0].range;
       const cx = -w / 2 + 10 + cardW / 2 + i * (cardW + gap);
       const afford = this.ki >= def.cost;
+      // Fighters join the team as the player gets further in the game
+      const locked = type !== 'wall' && !open.includes(type);
       const card = this.add.rectangle(cx, 0, cardW, cardH, COLORS.card)
-        .setStrokeStyle(2, afford ? 0xffffff : 0x555a6a)
+        .setStrokeStyle(2, afford && !locked ? 0xffffff : 0x555a6a)
         .setInteractive({ useHandCursor: true });
+      if (locked) {
+        card.on('pointerdown', () => this.floatText(pos.x + cx, pos.y, `Unlocks at level ${def.unlock}`, '#ffd93b', 22));
+        m.add([
+          card,
+          this.add.image(cx, -34, `${def.texture}_0`).setTint(0x202430),
+          this.add.text(cx, -34, '🔒', { fontSize: '30px' }).setOrigin(0.5),
+          this.add.text(cx, 10, def.name, textStyle(22, '#8a91ad')).setOrigin(0.5),
+          this.add.text(cx, 40, `Level ${def.unlock}`, textStyle(20, '#ffd93b')).setOrigin(0.5),
+        ]);
+        return;
+      }
       card.on('pointerover', () => (range ? this.showRange(spot.x, spot.y, range, def.color) : this.rangeCircle.clear()));
       card.on('pointerdown', () => {
         if (this.ki < def.cost) {
@@ -672,23 +690,35 @@ export default class GameScene extends Phaser.Scene {
     this.showRange(f.x, f.y, f.stats.range, f.def.color);
 
     const w = 340;
-    const h = 236;
+    const h = 280;
     const pos = this.menuPosition(f.spot, w, h);
+    this.menuFighter = f;
     const m = this.add.container(pos.x, pos.y).setDepth(120);
     m.add(this.add.rectangle(0, 0, w, h, COLORS.panel, 0.94).setStrokeStyle(2, f.form > 0 ? f.formInfo.aura : f.def.color));
-    m.add(this.add.text(0, -92, `${f.def.name}  ${'★'.repeat(f.formStars)}`, textStyle(28)).setOrigin(0.5));
-    m.add(this.add.text(0, -62, f.formInfo.name, textStyle(20, f.formInfo.color)).setOrigin(0.5));
-    m.add(this.add.text(0, -36, f.describe(), textStyle(17, '#c9d3ff')).setOrigin(0.5));
-    const bonusOn = f.form === 2;
-    m.add(this.add.text(0, -12, `${bonusOn ? 'Ascended bonus' : 'Ascended unlocks'}: ${f.def.bonusText}`,
+    m.add(this.add.text(0, -110, `${f.def.name}  ${'★'.repeat(f.formStars)}`, textStyle(28)).setOrigin(0.5));
+    m.add(this.add.text(0, -80, f.formInfo.name, textStyle(20, f.formInfo.color)).setOrigin(0.5));
+    m.add(this.add.text(0, -54, f.describe(), textStyle(17, '#c9d3ff')).setOrigin(0.5));
+    const bonusOn = f.form >= BONUS_FORM;
+    m.add(this.add.text(0, -30, `${FORMS[BONUS_FORM].name} ${bonusOn ? 'bonus' : 'unlocks'}: ${f.def.bonusText}`,
       { ...textStyle(15, bonusOn ? '#5be35b' : '#8a91ad'), wordWrap: { width: w - 24 }, align: 'center' }).setOrigin(0.5));
 
+    // EXP bar: the fighter earns EXP by defeating enemies; a full bar opens the next upgrade
     const next = f.next;
+    const ready = f.expReady;
+    if (next) {
+      const bar = this.add.graphics();
+      const from = EXP_TOTAL[f.tier];
+      const frac = Math.min(1, (f.exp - from) / (f.expNeed - from));
+      bar.fillStyle(0x000000, 0.7).fillRoundedRect(-140, 8, 280, 16, 6);
+      bar.fillStyle(ready ? 0x5be35b : 0x7fd8ff).fillRoundedRect(-140, 8, Math.max(8, 280 * frac), 16, 6);
+      m.add([bar, this.add.text(0, 16, ready ? 'LEVEL UP!' : `EXP  ${Math.floor(f.exp - from)} / ${f.expNeed - from}`, textStyle(14)).setOrigin(0.5)]);
+    }
+
     const transform = f.nextIsTransform;
     let upLabel = 'Max power';
-    if (next) upLabel = transform ? `TRANSFORM!  ${next.cost} Ki` : `Upgrade  ${next.cost} Ki`;
-    const up = makeButton(this, 0, 38, 300, 48, upLabel, () => {
-      if (!next) return;
+    if (next) upLabel = !ready ? '🔒 Defeat enemies for EXP' : transform ? `TRANSFORM!  ${next.cost} Ki` : `Upgrade  ${next.cost} Ki`;
+    const up = makeButton(this, 0, 62, 300, 48, upLabel, () => {
+      if (!next || !f.expReady) return;
       if (this.ki < next.cost) {
         this.floatText(pos.x, pos.y, 'Not enough Ki', '#ff6b6b', 22);
         return;
@@ -698,11 +728,11 @@ export default class GameScene extends Phaser.Scene {
       f.upgrade();
       this.refreshHud();
       this.selectFighter(f);
-    }, { color: transform ? 0xc99a00 : 0x2f8a4a, fontSize: 24 });
-    up.setEnabled(!!next && this.ki >= next.cost);
+    }, { color: transform ? 0xc99a00 : 0x2f8a4a, fontSize: ready ? 24 : 18 });
+    up.setEnabled(ready && this.ki >= next.cost);
 
     const refund = Math.floor(f.spent * 0.7);
-    const sell = makeButton(this, 0, 90, 300, 36, `Sell  +${refund} Ki`, () => {
+    const sell = makeButton(this, 0, 114, 300, 36, `Sell  +${refund} Ki`, () => {
       this.ki += refund;
       f.destroy();
       f.spot.fighter = null;
@@ -894,14 +924,14 @@ export default class GameScene extends Phaser.Scene {
     }
     this.damageNumber(p.tx, p.ty - 24, p.damage);
     for (const e of [...this.enemies]) {
-      if (e.alive && Math.hypot(e.x - p.tx, e.y - p.ty) <= p.splash) e.takeDamage(p.damage);
+      if (e.alive && Math.hypot(e.x - p.tx, e.y - p.ty) <= p.splash) e.takeDamage(p.damage, true, p.by);
     }
     if (p.burn) {
       const r = p.splash * 0.8;
       const g = this.add.graphics().setDepth(3);
       g.fillStyle(0xff5a2a, 0.35).fillCircle(p.tx, p.ty, r);
       g.fillStyle(0xffb347, 0.35).fillCircle(p.tx, p.ty, r * 0.6);
-      this.hazards.push({ x: p.tx, y: p.ty, r, dps: p.burn.dps, time: p.burn.time, total: p.burn.time, tick: 0, g });
+      this.hazards.push({ x: p.tx, y: p.ty, r, dps: p.burn.dps, time: p.burn.time, total: p.burn.time, tick: 0, g, by: p.by });
     }
   }
 
@@ -912,7 +942,7 @@ export default class GameScene extends Phaser.Scene {
       if (h.tick >= 0.25) {
         h.tick -= 0.25;
         for (const e of [...this.enemies]) {
-          if (e.alive && Math.hypot(e.x - h.x, e.y - h.y) <= h.r) e.takeDamage(h.dps * 0.25, false);
+          if (e.alive && Math.hypot(e.x - h.x, e.y - h.y) <= h.r) e.takeDamage(h.dps * 0.25, false, h.by);
         }
       }
       h.g.setAlpha(Math.max(0, h.time / h.total));
@@ -996,7 +1026,8 @@ export default class GameScene extends Phaser.Scene {
     this.floatText(x, y - 80, 'STOMP!', '#ffe9c4', 30);
   }
 
-  onEnemyKilled(e) {
+  onEnemyKilled(e, by) {
+    this.fighterExp(e, by);
     if (e.def.boss) {
       Audio.sfx('explode');
       Audio.music(this.areaMusic);
@@ -1011,6 +1042,20 @@ export default class GameScene extends Phaser.Scene {
     this.floatText(e.x, e.y - 34, `+${e.def.reward}`, '#ffd93b', 20);
     this.poof(e.x, e.y);
     this.refreshHud();
+  }
+
+  // The fighter that defeated the enemy gets its EXP. Helpers get half: Lumi-type fighters when the
+  // enemy fell inside their range, and support fighters when the winner stood in their aura.
+  fighterExp(e, by) {
+    const xp = e.def.xp ?? 2;
+    const winner = this.fighters.includes(by) ? by : null;
+    winner?.gainExp(xp);
+    for (const f of this.fighters) {
+      if (f === winner) continue;
+      const near = (o) => Math.hypot(o.x - f.x, o.y - f.y) <= f.stats.range;
+      const helped = f.def.attack === 'flash' ? near(e) : f.def.attack === 'support' && winner && near(winner);
+      if (helped) f.gainExp(xp / 2);
+    }
   }
 
   // The hero landed the final blow: that enemy's XP counts twice

@@ -15,6 +15,12 @@ export function shade(color, f) {
 export function drawFighterArt(g, look) {
   g.fillStyle(0x000000, 0.25).fillEllipse(32, 61, 36, 8);
   g.lineStyle(2.5, O);
+  // Super Form 3: very long spiky hair down the back, behind the body
+  if (look.longHair) {
+    const back = pts([[20, 16], [6, 28], [11, 31], [3, 42], [10, 42], [5, 55], [14, 49], [32, 52], [50, 49], [59, 55], [54, 42], [61, 42], [53, 31], [58, 28], [44, 16]]);
+    g.fillStyle(look.hair).fillPoints(back, true);
+    g.strokePoints(back, true);
+  }
   // Legs (gi pants) and boots
   g.fillStyle(look.gi);
   g.fillRect(23, 47, 8, 10).strokeRect(23, 47, 8, 10);
@@ -54,6 +60,13 @@ export function drawFighterArt(g, look) {
   g.fillStyle(look.hair).fillPoints(hair, true);
   g.strokePoints(hair, true);
   g.fillStyle(shade(look.hair, 1.6), 0.55).fillPoints(pts([[27, 12], [32, 3], [34, 11], [30, 14]]), true);
+  // Super Form 2 and 3: little lightning sparks around the fighter
+  if (look.sparks) {
+    g.lineStyle(2, 0x9fe8ff, 0.95);
+    for (const z of [[[8, 22], [12, 27], [7, 31], [11, 36]], [[56, 18], [52, 24], [57, 28], [53, 33]], [[50, 44], [55, 48], [51, 52]]]) {
+      g.strokePoints(pts(z), false);
+    }
+  }
 }
 
 // A big, crisp fighter portrait centered on (x, y).

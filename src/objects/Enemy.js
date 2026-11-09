@@ -202,7 +202,8 @@ export default class Enemy {
     this.stunTime = Math.max(this.stunTime, time);
   }
 
-  takeDamage(amount, flash = true) {
+  // `by` is the fighter that hit it (it gets the EXP if this hit defeats the enemy)
+  takeDamage(amount, flash = true, by = null) {
     if (!this.alive) return;
     if (this.def.armor) amount = Math.max(amount * 0.3, amount - this.def.armor);
     if (this.shield > 0) {
@@ -215,7 +216,7 @@ export default class Enemy {
     this.applyTint();
     this.drawHpBar();
     if (this.hp <= 0) {
-      this.scene.onEnemyKilled(this);
+      this.scene.onEnemyKilled(this, by);
       this.destroy();
       const split = this.def.splitInto;
       if (split && !this.reachedEnd) {

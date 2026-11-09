@@ -24,9 +24,10 @@ export default class BootScene extends Phaser.Scene {
   }
 
   create() {
-    // One texture per form: kaito_0 (base), kaito_1 (gold hair), kaito_2 (blue hair)
+    // One texture per form: kaito_0 (base), kaito_1 (gold hair) ... kaito_5 (blue hair)
     for (const def of Object.values(FIGHTERS)) {
-      FORMS.forEach((form, i) => this.makeFighter(`${def.texture}_${i}`, { ...def.look, hair: form.hair ?? def.look.hair }));
+      FORMS.forEach((form, i) => this.makeFighter(`${def.texture}_${i}`,
+        { ...def.look, hair: form.hair ?? def.look.hair, longHair: form.longHair, sparks: form.sparks }));
     }
     // Each hero: normal, and gold-haired while Power Up is active (hero_zenko_0, hero_zenko_1)
     for (const [id, h] of Object.entries(HEROES)) {

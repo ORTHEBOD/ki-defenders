@@ -1,4 +1,4 @@
-import { FIGHTERS, FORMS } from '../data/fighters.js';
+import { FIGHTERS, FORMS, EXP_TOTAL } from '../data/fighters.js';
 import { distToSegment } from '../systems/Path.js';
 import { textStyle } from '../ui/theme.js';
 import { Audio } from '../systems/Audio.js';
@@ -17,6 +17,7 @@ export default class Fighter {
     this.hits = 0;
     this.kiTimer = 0;
     this.stunTime = 0;
+    this.exp = 0;
 
     this.aura = scene.add.ellipse(this.x, this.y - 14, 60, 82, 0xffffff, 0).setDepth(19);
     this.sprite = scene.add.image(this.x, this.y - 14, this.textureKey()).setDepth(20 + this.y / 1000);
@@ -24,6 +25,11 @@ export default class Fighter {
     this.sprite.on('pointerdown', () => scene.state === 'playing' && !scene.aiming && scene.selectFighter(this));
     this.stars = scene.add.text(this.x, this.y + 30, '', textStyle(16)).setOrigin(0.5).setDepth(21);
     this.refreshStars();
+    // EXP bar under the fighter, and an arrow over its head when the next upgrade is open
+    this.expBar = scene.add.graphics().setDepth(21);
+    this.readyIcon = scene.add.text(this.x, this.y - 60, '▲', textStyle(22, '#5be35b')).setOrigin(0.5).setDepth(22).setVisible(false);
+    scene.tweens.add({ targets: this.readyIcon, y: this.y - 66, duration: 400, yoyo: true, repeat: -1 });
+    this.drawExp();
 
     this.sprite.setScale(0);
     scene.tweens.add({ targets: this.sprite, scale: 1, duration: 250, ease: 'Back.Out' });
@@ -46,11 +52,51 @@ export default class Fighter {
     return FORMS[this.form];
   }
 
+  // Total EXP needed for the next step (undefined at max power)
+  get expNeed() {
+    return this.next ? EXP_TOTAL[this.tier + 1] : undefined;
+  }
+
+  // The next upgrade is open once the fighter has enough EXP
+  get expReady() {
+    return !!this.next && this.exp >= this.expNeed;
+  }
+
+  gainExp(n) {
+    if (!this.next) return;
+    const was = this.expReady;
+    this.exp += n;
+    this.drawExp();
+    if (!was && this.expReady) {
+      this.scene.floatText(this.x, this.y - 74, 'LEVEL UP!', '#5be35b', 22);
+      if (this.scene.menuFighter === this && this.scene.menu) this.scene.selectFighter(this);
+    }
+  }
+
+  drawExp() {
+    const g = this.expBar;
+    const from = EXP_TOTAL[this.tier];
+    const frac = this.next ? Math.min(1, (this.exp - from) / (this.expNeed - from)) : 1;
+    g.clear();
+    g.fillStyle(0x000000, 0.7).fillRect(this.x - 20, this.y + 40, 40, 5);
+    g.fillStyle(this.expReady ? 0x5be35b : this.next ? 0x7fd8ff : 0xffd93b).fillRect(this.x - 20, this.y + 40, 40 * frac, 5);
+  }
+
+  // Green arrow: the upgrade is open and there is enough Ki. White: open, but more Ki is needed.
+  refreshReady() {
+    const show = this.expReady;
+    if (this.readyIcon.visible !== show) this.readyIcon.setVisible(show);
+    if (show) {
+      const color = this.scene.ki >= this.next.cost ? '#5be35b' : '#ffffff';
+      if (this.readyIcon.style.color !== color) this.readyIcon.setColor(color);
+    }
+  }
+
   get nextIsTransform() {
     return !!this.next && this.next.form !== this.form;
   }
 
-  // Stars inside the current form (1 or 2)
+  // Stars inside the current form (1 to 3)
   get formStars() {
     return this.def.tiers.slice(0, this.tier + 1).filter((t) => t.form === this.form).length;
   }
@@ -70,11 +116,13 @@ export default class Fighter {
     this.tier++;
     this.spent += next.cost;
     this.refreshStars();
+    this.drawExp();
+    this.refreshReady();
     if (transform) {
       this.scene.tweens.killTweensOf(this.sprite);
       this.sprite.setTexture(this.textureKey()).setScale(1).setPosition(this.x, this.y - 14);
       this.scene.tweens.add({ targets: this.sprite, scaleY: 1.04, duration: 700, yoyo: true, repeat: -1, delay: 330 });
-      this.aura.setFillStyle(this.formInfo.aura, 0.22 + this.form * 0.08);
+      this.aura.setFillStyle(this.formInfo.aura, 0.22 + this.form * 0.05);
       if (!this.auraTween) {
         this.auraTween = this.scene.tweens.add({ targets: this.aura, scaleX: 1.15, scaleY: 1.1, duration: 450, yoyo: true, repeat: -1 });
       }
@@ -104,6 +152,7 @@ export default class Fighter {
   }
 
   update(dt) {
+    this.refreshReady();
     if (this.stunTime > 0) {
       this.stunTime -= dt;
       if (this.stunTime <= 0) this.sprite.clearTint();
@@ -146,7 +195,7 @@ export default class Fighter {
       target.stun(this.stats.stun);
       this.scene.floatText(target.x, target.y - 40, 'STUN!', '#ffd93b', 20);
     }
-    target.takeDamage(damage);
+    target.takeDamage(damage, true, this);
   }
 
   beam(target, damage) {
@@ -162,7 +211,7 @@ export default class Fighter {
       if (e.alive && distToSegment(e.x, e.y, sx, sy, ex, ey) < s.width) {
         const dmg = e.def.flying && s.flyingBonus ? damage * s.flyingBonus : damage;
         this.scene.damageNumber(e.x, e.y - 20, dmg);
-        e.takeDamage(dmg);
+        e.takeDamage(dmg, true, this);
       }
     }
   }
@@ -171,7 +220,7 @@ export default class Fighter {
     const s = this.stats;
     this.scene.tweens.add({ targets: this.sprite, y: this.y - 20, duration: 70, yoyo: true });
     this.scene.fireBlast(this.x, this.y - 22, target, {
-      damage, splash: s.splash, burn: s.burn, color: this.form > 0 ? this.formInfo.aura : this.def.color,
+      damage, splash: s.splash, burn: s.burn, color: this.form > 0 ? this.formInfo.aura : this.def.color, by: this,
     });
   }
 
@@ -182,7 +231,7 @@ export default class Fighter {
       if (!e.alive || (e.flying && !this.def.hitsAir) || Math.hypot(e.x - this.x, e.y - this.y) > s.range) continue;
       e.slow(s.slow, s.slowTime);
       if (s.freeze) e.stun(s.freeze);
-      e.takeDamage(damage);
+      e.takeDamage(damage, true, this);
     }
   }
 
@@ -200,5 +249,8 @@ export default class Fighter {
     this.sprite.destroy();
     this.aura.destroy();
     this.stars.destroy();
+    this.expBar.destroy();
+    this.scene.tweens.killTweensOf(this.readyIcon);
+    this.readyIcon.destroy();
   }
 }

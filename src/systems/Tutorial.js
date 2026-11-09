@@ -15,8 +15,11 @@ export default class Tutorial {
       { text: 'Ready? Press Start wave!', target: () => ({ x: 120, y: 625 }), done: () => s.waveIndex >= 0 },
       { text: 'Enemies walk to your base. Every enemy defeated gives Ki to spend', done: () => s.waveIndex >= 0 && !s.waveActive },
       {
-        text: 'Tap a fighter to upgrade it. Upgrade twice and it TRANSFORMS!',
-        target: () => (s.fighters[0] ? { x: s.fighters[0].x, y: s.fighters[0].y - 70 } : null),
+        text: 'Fighters earn EXP by defeating enemies. When the green arrow shows, tap the fighter to upgrade it!',
+        target: () => {
+          const f = s.fighters.find((x) => x.expReady) ?? s.fighters[0];
+          return f ? { x: f.x, y: f.y - 70 } : null;
+        },
         done: () => s.fighters.some((f) => f.tier > 0),
       },
       heroName
