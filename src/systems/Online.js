@@ -50,6 +50,10 @@ export const Online = {
     return call('GET', 'leaderboard');
   },
 
+  rename(name, token, newName, data) {
+    return call('POST', 'rename', { name, token, newName, data });
+  },
+
   feedback(message) {
     return call('POST', 'feedback', message);
   },

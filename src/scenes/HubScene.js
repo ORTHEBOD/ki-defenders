@@ -3,7 +3,7 @@ import { FORMS } from '../data/fighters.js';
 import { fighterPortrait, formLook, gearLook } from '../art/fighterArt.js';
 import { drawMenuBackground, panel, xpBar } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
-import { Save, Sync, totalStars, activeHero } from '../systems/Save.js';
+import { Save, Sync, totalStars, activeHero, renameCost } from '../systems/Save.js';
 import { Audio } from '../systems/Audio.js';
 import { SHOP_STARS, ENDLESS_STARS, shopOpen, endlessOpen } from '../systems/Progress.js';
 import { textStyle } from '../ui/theme.js';
@@ -14,6 +14,11 @@ export default class HubScene extends Phaser.Scene {
   }
 
   create(data) {
+    // A new version of the game is ready (see main.js)
+    if (window.kdUpdateReady) {
+      location.reload();
+      return;
+    }
     const player = Save.current();
     if (!player) {
       this.scene.start('Login');
@@ -28,7 +33,8 @@ export default class HubScene extends Phaser.Scene {
     this.add.text(330, 32, `★ ${totalStars(player)}`, textStyle(30, '#ffd93b')).setOrigin(0, 0.5);
     this.add.image(450, 32, 'coin');
     this.add.text(470, 32, `${player.coins}`, textStyle(30, '#ffd93b')).setOrigin(0, 0.5);
-    this.add.text(960, 32, player.name, textStyle(30)).setOrigin(1, 0.5);
+    this.add.text(928, 32, player.name, textStyle(30)).setOrigin(1, 0.5);
+    makeButton(this, 954, 32, 36, 36, '✏️', () => this.renamePopup(player), { fontSize: 18, color: 0x3a4470 });
     makeButton(this, 1050, 32, 140, 44, 'Settings', () => this.scene.start('Settings', { back: 'Hub' }),
       { fontSize: 22, color: 0x3a4470 });
     makeButton(this, 1200, 32, 130, 44, 'Log out', () => {
@@ -73,6 +79,53 @@ export default class HubScene extends Phaser.Scene {
       const t = this.add.text(830, 660, data.welcome, textStyle(30, '#5be35b')).setOrigin(0.5);
       this.tweens.add({ targets: t, alpha: 0, delay: 2200, duration: 600 });
     }
+  }
+
+  // Change name: the first time is free, then it costs coins (see Save.rename)
+  renamePopup(player) {
+    const cost = renameCost(player);
+    const pop = this.add.container(0, 0).setDepth(300);
+    pop.add(this.add.rectangle(0, 0, 1280, 720, 0x000000, 0.6).setOrigin(0).setInteractive());
+    pop.add(panel(this, 640, 360, 560, 360, 0xffd93b));
+    pop.add(this.add.text(640, 225, 'Change your name', textStyle(44, '#ffd93b')).setOrigin(0.5));
+    pop.add(this.add.text(640, 272, cost ? `This costs ${cost} coins (you have ${player.coins})` : 'Your first name change is free!',
+      textStyle(22, cost ? '#ffe9c4' : '#5be35b')).setOrigin(0.5));
+    const form = this.add.dom(640, 340).createFromHTML(`
+      <form class="kd-login" autocomplete="off" style="width: 400px; gap: 8px">
+        <input class="kd-input" name="name" maxlength="12" placeholder="New name" />
+        <div class="kd-error"></div>
+      </form>`).setDepth(301);
+    const el = form.node.querySelector('form');
+    const input = el.querySelector('input');
+    const error = el.querySelector('.kd-error');
+    input.value = player.name;
+    input.addEventListener('input', () => { error.textContent = ''; });
+    const close = () => {
+      form.destroy();
+      pop.destroy(true);
+    };
+    let busy = false;
+    const go = async () => {
+      if (busy) return;
+      busy = true;
+      error.textContent = '';
+      const res = await Save.rename(input.value);
+      busy = false;
+      if (!res.ok) {
+        error.textContent = res.error;
+        return;
+      }
+      close();
+      this.scene.restart({ welcome: `You are now ${res.name}!` });
+    };
+    el.addEventListener('submit', (e) => {
+      e.preventDefault();
+      go();
+    });
+    pop.add(makeButton(this, 540, 470, 180, 56, 'Cancel', close, { color: 0x3a4470, fontSize: 26, depth: 301 }));
+    pop.add(makeButton(this, 740, 470, 180, 56, 'Change', go, { color: 0x2f8a4a, fontSize: 26, depth: 301 }));
+    input.focus();
+    input.select();
   }
 
   // Daily reward: coins for the first visit each day, more for days in a row (up to 7)
@@ -123,8 +176,9 @@ export default class HubScene extends Phaser.Scene {
     makeButton(this, 830, 190, 420, 100, 'Play', () => this.scene.start('LevelSelect'), { color: 0xe0661a, fontSize: 56 });
     makeButton(this, 722, 300, 204, 76, 'Heroes', () => this.scene.start('Hero'), { color: 0xb8303a, fontSize: 34 });
     makeButton(this, 938, 300, 204, 76, 'Fighters', () => this.scene.start('Fighters'), { color: 0x2f6ab8, fontSize: 34 });
-    const shop = makeButton(this, 830, 392, 420, 76, shopOpen(player) ? 'Shop' : `Shop  (needs ★ ${SHOP_STARS})`,
+    const shop = makeButton(this, 722, 392, 204, 76, shopOpen(player) ? 'Shop' : `Shop  ★ ${SHOP_STARS}`,
       () => this.scene.start('Shop'), { color: 0x2f8a4a, fontSize: shopOpen(player) ? 36 : 28 });
+    makeButton(this, 938, 392, 204, 76, 'Base', () => this.scene.start('Base'), { color: 0x8a6a2a, fontSize: 34 });
     shop.setEnabled(shopOpen(player));
     const endless = makeButton(this, 830, 484, 420, 76,
       endlessOpen(player) ? `Endless Battle  (best: wave ${player.endlessBest})` : `Endless Battle  (needs ★ ${ENDLESS_STARS})`,

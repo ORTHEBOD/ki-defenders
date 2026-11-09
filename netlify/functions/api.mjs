@@ -8,12 +8,15 @@
 //   POST /api/google       { idToken, name?, pin? } -> { ok, token, created, data, name } or { ok:false, error:'need_name' }
 //        Signs in with a Google account. The first time, the player picks a new name, or links
 //        an existing player by giving its name and PIN.
+//   POST /api/rename       { name, token, newName, data } -> { ok, name }
+//        Moves a player to a new name (PIN, Google link and leaderboard place come along).
 //   POST /api/feedback     { name, kind, text, platform } -> { ok }
 //        A tip or a bug report from a player (kind: 'tip' or 'bug'). Saved as feedback/<time>.
 //   GET  /api/feedback?key=FEEDBACK_KEY            -> { ok, rows }  (newest first)
 //        For the game's maker. Works only when the FEEDBACK_KEY setting is set on Netlify.
 //
-// PINs are stored only as salted hashes. After 5 wrong PINs a name is locked for 15 minutes.
+// PINs are stored only as salted hashes. The hash uses the key of the player's first name
+// (`pinKey`), so a renamed player keeps the same PIN. After 5 wrong PINs a name is locked for 15 minutes.
 
 import { getStore } from '@netlify/blobs';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -111,7 +114,7 @@ async function login(body) {
   if (user.lockUntil > Date.now()) {
     return reply({ ok: false, error: 'locked', minutes: Math.ceil((user.lockUntil - Date.now()) / 60000) }, 429);
   }
-  if (!sameHash(hashPin(user.salt, key, pin), user.pinHash)) {
+  if (!sameHash(hashPin(user.salt, user.pinKey ?? key, pin), user.pinHash)) {
     user.fails = (user.fails ?? 0) + 1;
     if (user.fails >= MAX_FAILS) {
       user.fails = 0;
@@ -181,7 +184,7 @@ async function google(body) {
   if (user.lockUntil > Date.now()) {
     return reply({ ok: false, error: 'locked', minutes: Math.ceil((user.lockUntil - Date.now()) / 60000) }, 429);
   }
-  if (!sameHash(hashPin(user.salt, key, pin), user.pinHash)) {
+  if (!sameHash(hashPin(user.salt, user.pinKey ?? key, pin), user.pinHash)) {
     user.fails = (user.fails ?? 0) + 1;
     if (user.fails >= MAX_FAILS) {
       user.fails = 0;
@@ -210,6 +213,32 @@ async function save(body) {
   await s.setJSON(key, user);
   await updateLeaderboard(s, user.name, body.data);
   return reply({ ok: true, updatedAt: user.updatedAt });
+}
+
+async function rename(body) {
+  const name = cleanName(body.name);
+  const newName = cleanName(body.newName);
+  if (!name || !newName) return reply({ ok: false, error: 'bad_input' }, 400);
+  if (newName.toLowerCase() === TESTER) return reply({ ok: false, error: 'taken' }, 409);
+  const s = store();
+  const key = userKey(name);
+  const user = await s.get(key, { type: 'json' });
+  if (!user || !(user.tokens ?? []).includes(body.token)) return reply({ ok: false, error: 'bad_token' }, 401);
+  const newKey = userKey(newName);
+  if (newKey !== key && (await s.get(newKey, { type: 'json' }))) return reply({ ok: false, error: 'taken' }, 409);
+  user.pinKey ??= key;
+  user.name = newName;
+  if (validData(body.data)) {
+    user.data = body.data;
+    user.updatedAt = body.data.updatedAt ?? Date.now();
+  }
+  await s.setJSON(newKey, user);
+  if (newKey !== key) await s.delete(key);
+  if (user.google) await s.setJSON(`google/${user.google}`, { name: newName });
+  const rows = ((await s.get('leaderboard', { type: 'json' })) ?? []).filter((r) => r.name.toLowerCase() !== name.toLowerCase());
+  await s.setJSON('leaderboard', rows);
+  if (user.data) await updateLeaderboard(s, newName, user.data);
+  return reply({ ok: true, name: newName });
 }
 
 // Each player's device can send up to 10 messages an hour
@@ -262,6 +291,7 @@ export default async (req) => {
       if (route === 'save') return await save(body);
       if (route === 'google') return await google(body);
       if (route === 'feedback') return await feedback(body, req);
+      if (route === 'rename') return await rename(body);
     }
     return reply({ ok: false, error: 'not_found' }, 404);
   } catch (e) {

@@ -11,6 +11,7 @@ import LeaderboardScene from './scenes/LeaderboardScene.js';
 import StoryScene from './scenes/StoryScene.js';
 import FightersScene from './scenes/FightersScene.js';
 import FeedbackScene from './scenes/FeedbackScene.js';
+import BaseScene from './scenes/BaseScene.js';
 import { Audio } from './systems/Audio.js';
 import { Sync } from './systems/Save.js';
 import { Analytics } from './systems/Analytics.js';
@@ -29,7 +30,7 @@ const config = {
   },
   scene: [
     BootScene, TitleScene, LoginScene, HubScene, HeroScene, LevelSelectScene, GameScene,
-    ShopScene, SettingsScene, LeaderboardScene, StoryScene, FightersScene, FeedbackScene,
+    ShopScene, SettingsScene, LeaderboardScene, StoryScene, FightersScene, FeedbackScene, BaseScene,
   ],
 };
 
@@ -60,4 +61,12 @@ window.addEventListener('pointerdown', () => Audio.unlock());
 // (The Android and PC apps already carry every file, so they skip this.)
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.Capacitor) {
   navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Offline mode not available:', e));
+  // A new version of the game was downloaded: reload to start it right away, or, in the middle of
+  // a battle, when the player is back on the main page (see HubScene)
+  const hadVersion = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadVersion) return;
+    window.kdUpdateReady = true;
+    if (!window.game?.scene.isActive('Game')) location.reload();
+  });
 }

@@ -19,6 +19,8 @@ import Enemy from '../objects/Enemy.js';
 import Fighter from '../objects/Fighter.js';
 import { makeButton } from '../ui/Button.js';
 import { COLORS, textStyle } from '../ui/theme.js';
+import { baseLevels, baseLives, baseKi, cannonStats } from '../data/base.js';
+import { drawBase } from '../art/baseArt.js';
 
 const W = 1280;
 const H = 720;
@@ -76,8 +78,11 @@ export default class GameScene extends Phaser.Scene {
     this.aimText = null;
     this.walls = [];
     this.heroSelected = false;
-    this.ki = Math.round(this.level.startKi * (this.diff.ki ?? 1));
-    this.lives = this.level.lives;
+    // Base upgrades (bought on the Base page): more lives, more starting Ki, and a cannon
+    this.baseLv = baseLevels(Save.current());
+    this.ki = Math.round(this.level.startKi * (this.diff.ki ?? 1)) + baseKi(this.baseLv);
+    this.lives = this.level.lives + baseLives(this.baseLv);
+    this.cannon = null;
     this.waveIndex = -1;
     this.waveActive = false;
     this.waveTime = 0;
@@ -384,19 +389,33 @@ export default class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: outer, angle: 8, duration: 1200, yoyo: true, repeat: -1 });
   }
 
+  // The base, drawn with its upgrades (see art/baseArt.js)
   drawBase(x, y) {
-    const g = this.add.graphics().setDepth(9);
-    g.fillStyle(0x000000, 0.2).fillEllipse(x, y + 4, 110, 22);
-    g.lineStyle(3, COLORS.outline);
-    g.fillStyle(0xf2f4f8);
-    g.beginPath();
-    g.arc(x, y, 46, Math.PI, 0, false);
-    g.closePath();
-    g.fillPath();
-    g.strokePath();
-    g.fillStyle(0x2f55c4).fillRect(x - 46, y - 16, 92, 8).strokeRect(x - 46, y - 16, 92, 8);
-    g.fillStyle(0x3b3f4a).fillRoundedRect(x - 12, y - 26, 24, 26, { tl: 10, tr: 10, bl: 0, br: 0 });
-    this.add.text(x, y - 62, 'BASE', textStyle(20)).setOrigin(0.5).setDepth(9);
+    const { cannon } = drawBase(this, x, y, this.baseLv);
+    if (cannon) this.cannon = { sprite: cannon, x: cannon.x, y: cannon.y, timer: 1, stats: cannonStats(this.baseLv.cannon) };
+    this.add.text(x, y - (this.baseLv.walls >= 5 ? 82 : 62), 'BASE', textStyle(20)).setOrigin(0.5).setDepth(9);
+  }
+
+  // Base Cannon: turns toward the closest enemy in range and shoots it
+  updateCannon(dt) {
+    const c = this.cannon;
+    if (!c) return;
+    c.timer -= dt;
+    let target = null;
+    let best = c.stats.range;
+    for (const e of this.enemies) {
+      const d = e.alive ? Math.hypot(e.x - c.x, e.y - c.y) : Infinity;
+      if (d <= best) {
+        best = d;
+        target = e;
+      }
+    }
+    if (!target) return;
+    c.sprite.rotation = Math.atan2(target.y - c.y, target.x - c.x);
+    if (c.timer > 0) return;
+    c.timer = c.stats.every;
+    const r = c.sprite.rotation;
+    this.fireBlast(c.x + Math.cos(r) * 22, c.y + Math.sin(r) * 22, target, { damage: c.stats.damage, splash: 26, color: 0xff8a3d, size: 6 });
   }
 
   createSpots() {
@@ -833,6 +852,7 @@ export default class GameScene extends Phaser.Scene {
     this.tutorial?.update(dt);
     this.updateProjectiles(dt);
     this.updateHazards(dt);
+    this.updateCannon(dt);
     this.updateBossBar();
 
     for (const e of this.enemies) if (e.reachedEnd) this.loseLives(e.def.lives);

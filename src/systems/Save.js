@@ -7,7 +7,8 @@ import { GEAR } from '../data/shop.js';
 // and then copied to the online server whenever there is internet (see Sync below).
 // If storage is blocked (private mode), it falls back to memory for this session.
 //
-// A saved record: { pin (hash), data, token (online key), dirty (not uploaded yet), online ('ok' | 'taken') }
+// A saved record: { pin (hash), pinKey (the first name, after a rename), data, token (online key),
+//                  dirty (not uploaded yet), online ('ok' | 'taken') }
 
 const KEY = 'kd_profiles_v1';
 const CURRENT = 'kd_current_v1';
@@ -97,6 +98,7 @@ function migrate(p) {
   // Players who already won a level don't need the Level 1 tutorial
   p.tutorialDone ??= Object.keys(p.stars ?? {}).length > 0;
   p.daily ??= { last: null, streak: 0 };
+  p.base ??= {};
   p.updatedAt ??= 0;
   return p;
 }
@@ -112,8 +114,9 @@ export const Save = {
     const clean = name.trim();
     const key = clean.toLowerCase();
     const all = readAll();
-    const hash = await hashPin(key, pin);
     const local = all[key];
+    const pinKey = local?.pinKey ?? key;
+    const hash = await hashPin(pinKey, pin);
     if (local && !local.pin && local.google) return { ok: false, error: 'This player signs in with Google.' };
     if (local && local.pin !== hash) return { ok: false, error: 'Wrong PIN for this player.' };
 
@@ -136,7 +139,7 @@ export const Save = {
         data = local.data;
         dirty = true;
       }
-      all[key] = { pin: hash, data, token: res.token, dirty, online: 'ok' };
+      all[key] = { pin: hash, pinKey: local?.pinKey, data, token: res.token, dirty, online: 'ok' };
       writeAll(all);
       setCurrentKey(key);
       if (dirty) Sync.soon(200);
@@ -193,11 +196,40 @@ export const Save = {
       data = local.data;
       dirty = true;
     }
-    all[key] = { pin: local?.pin ?? null, google: true, data, token: res.token, dirty, online: 'ok' };
+    all[key] = { pin: local?.pin ?? null, pinKey: local?.pinKey, google: true, data, token: res.token, dirty, online: 'ok' };
     writeAll(all);
     setCurrentKey(key);
     if (dirty) Sync.soon(200);
     return { ok: true, created: res.created, name: res.name };
+  },
+
+  // Changes the player's name (online, so the name stays theirs). The first change is free.
+  async rename(newName) {
+    const clean = newName.trim();
+    const newKey = clean.toLowerCase();
+    const key = getCurrentKey();
+    const all = readAll();
+    const rec = all[key];
+    if (!rec) return { ok: false, error: 'Log in first.' };
+    if (rec.online === 'local') return { ok: false, error: "The tester account can't change its name." };
+    if (!/^[\p{L}\p{N} _-]{2,12}$/u.test(clean)) return { ok: false, error: 'Use 2-12 letters or numbers.' };
+    const data = migrate(rec.data);
+    if (clean === data.name) return { ok: false, error: 'That is already your name.' };
+    if (newKey === SUPER_NAME || (newKey !== key && all[newKey])) return { ok: false, error: 'This name is taken. Try another one.' };
+    const cost = renameCost(data);
+    if (data.coins < cost) return { ok: false, error: `You need ${cost} coins.` };
+    if (!rec.token) return { ok: false, error: 'Log out and back in with internet to change your name.' };
+    const next = { ...data, name: clean, coins: data.coins - cost, renames: (data.renames ?? 0) + 1, updatedAt: Date.now() };
+    const res = await Online.rename(data.name, rec.token, clean, next);
+    if (!res) return { ok: false, error: 'No internet - changing your name needs a connection.' };
+    if (!res.ok) {
+      return { ok: false, error: res.error === 'taken' ? 'This name is taken. Try another one.' : 'Log out and back in, then try again.' };
+    }
+    delete all[key];
+    all[newKey] = { ...rec, pinKey: rec.pinKey ?? key, data: next, dirty: false };
+    writeAll(all);
+    setCurrentKey(newKey);
+    return { ok: true, name: clean, cost };
   },
 
   current() {
@@ -282,6 +314,12 @@ export const Sync = {
 
 // Upload anything waiting as soon as the internet comes back
 if (typeof window !== 'undefined') window.addEventListener('online', () => Sync.now());
+
+// Changing your name: the first time is free, then 1000 coins
+export const RENAME_COST = 1000;
+export function renameCost(player) {
+  return (player.renames ?? 0) > 0 ? RENAME_COST : 0;
+}
 
 export function totalStars(player) {
   return Object.values(player.stars).reduce((a, b) => a + b, 0);
