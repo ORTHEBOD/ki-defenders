@@ -28,7 +28,8 @@ export default class LeaderboardScene extends Phaser.Scene {
         this.show(res.rows.map((r) => ({ ...r, hero: HEROES[r.hero]?.name ?? 'Zenko' })));
         this.note.setText('☁ Online - every player, on every device');
       } else {
-        this.show(Save.allPlayers().map((p) => ({
+        // The tester account never shows: it has everything, so it would not be fair
+        this.show(Save.allPlayers().filter((p) => !p.super).map((p) => ({
           name: p.name, wave: p.endlessBest, stars: totalStars(p), hero: HEROES[p.activeHero]?.name ?? 'Zenko',
         })));
         this.note.setText('No internet - showing players on this device only');

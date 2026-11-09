@@ -9,6 +9,7 @@ import ShopScene from './scenes/ShopScene.js';
 import SettingsScene from './scenes/SettingsScene.js';
 import LeaderboardScene from './scenes/LeaderboardScene.js';
 import StoryScene from './scenes/StoryScene.js';
+import FightersScene from './scenes/FightersScene.js';
 import { Audio } from './systems/Audio.js';
 import { Sync } from './systems/Save.js';
 import { Analytics } from './systems/Analytics.js';
@@ -26,7 +27,7 @@ const config = {
   },
   scene: [
     BootScene, TitleScene, LoginScene, HubScene, HeroScene, LevelSelectScene, GameScene,
-    ShopScene, SettingsScene, LeaderboardScene, StoryScene,
+    ShopScene, SettingsScene, LeaderboardScene, StoryScene, FightersScene,
   ],
 };
 

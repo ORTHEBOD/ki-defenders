@@ -1,4 +1,5 @@
-import { HEROES, ABILITIES, FREE_ABILITY, heroPower, heroMaxHp, learnedSkills } from '../data/hero.js';
+import { HEROES, ABILITIES, FREE_ABILITY, heroPower, heroMaxHp, learnedSkills, heroForm, formDamage, formHp } from '../data/hero.js';
+import { FORMS } from '../data/fighters.js';
 import { gearBonus } from '../data/shop.js';
 import { Audio } from '../systems/Audio.js';
 import { distToSegment } from '../systems/Path.js';
@@ -17,6 +18,7 @@ export default class Hero {
     this.gear = gearBonus(saved.gear);
     this.level = saved.level;
     this.skills = new Set(learnedSkills(saved));
+    this.form = heroForm(saved);
     this.x = x;
     this.y = y;
     this.spawn = { x, y };
@@ -32,15 +34,22 @@ export default class Hero {
 
     this.ring = scene.add.ellipse(x, y + 16, 48, 16).setStrokeStyle(3, this.def.look.gi).setDepth(18);
     this.aura = scene.add.ellipse(x, y - 14, 62, 86, 0xffd93b, 0).setDepth(21);
-    this.sprite = scene.add.image(x, y - 14, this.tex(0)).setDepth(22);
+    this.sprite = scene.add.image(x, y - 14, this.tex(this.form)).setDepth(22);
     this.hpBar = scene.add.graphics().setDepth(23);
     this.label = scene.add.text(x, y - 62, `Lv ${this.level}`, textStyle(15, '#ffd93b')).setOrigin(0.5).setDepth(23);
     this.marker = scene.add.circle(0, 0, 10).setStrokeStyle(3, 0xffffff).setDepth(5).setVisible(false);
+    this.restLook();
     this.draw();
   }
 
   tex(form) {
     return `hero_${this.id}_${form}`;
+  }
+
+  // The hero's own form (Forms skills), with its aura. Power Up shows one form higher for a while.
+  restLook() {
+    this.sprite.setTexture(this.tex(this.form));
+    this.aura.setFillStyle(this.form > 0 ? FORMS[this.form].aura : 0xffd93b, this.form > 0 ? 0.2 : 0);
   }
 
   mod(key, stat) {
@@ -52,11 +61,11 @@ export default class Hero {
   }
 
   get maxHp() {
-    return Math.round(heroMaxHp(this.level, this.B.hp) * (1 + this.gear.hp));
+    return Math.round(heroMaxHp(this.level, this.B.hp) * (1 + this.gear.hp) * formHp(this.form));
   }
 
   get damage() {
-    let d = this.B.damage * heroPower(this.level) * (1 + this.gear.damage);
+    let d = this.B.damage * heroPower(this.level) * (1 + this.gear.damage) * formDamage(this.form);
     if (this.has('heavyFists')) d *= 1.2;
     if (this.powerTime > 0) d *= 1.6;
     if (this.has('rage') && this.hp < this.maxHp / 2) d *= 1.4;
@@ -87,7 +96,7 @@ export default class Hero {
 
   // Ability damage grows with the hero level, gear, the hero's own strengths (and Power Up / Oru's aura)
   abilityDamage(base, key) {
-    return Math.round(base * heroPower(this.level) * (1 + this.gear.damage) * this.mod(key, 'damage')
+    return Math.round(base * heroPower(this.level) * (1 + this.gear.damage) * formDamage(this.form) * this.mod(key, 'damage')
       * (this.powerTime > 0 ? 1.6 : 1) * this.scene.boostAt(this));
   }
 
@@ -126,10 +135,7 @@ export default class Hero {
 
     if (this.powerTime > 0) {
       this.powerTime -= dt;
-      if (this.powerTime <= 0) {
-        this.sprite.setTexture(this.tex(0));
-        this.aura.setFillStyle(0xffd93b, 0);
-      }
+      if (this.powerTime <= 0) this.restLook();
     }
 
     this.sinceHit += dt;
@@ -189,14 +195,12 @@ export default class Hero {
     }
   }
 
-  // Damage an enemy. Boss Slayer hits bosses harder; a final blow gives Ki Harvest and bonus XP
+  // Damage an enemy. Boss Slayer hits bosses harder; a final blow gives Ki Harvest.
+  // The hero's XP comes only from enemies it hits (see GameScene.heroXpFor).
   hitEnemy(e, dmg) {
     if (e.def.boss && this.has('bossSlayer')) dmg *= 1.4;
-    e.takeDamage(dmg);
-    if (!e.alive) {
-      this.scene.onHeroKill?.(e);
-      if (this.has('kiHarvest')) this.scene.addKi(2, e.x, e.y - 54);
-    }
+    e.takeDamage(dmg, true, this);
+    if (!e.alive && this.has('kiHarvest')) this.scene.addKi(2, e.x, e.y - 54);
   }
 
   takeDamage(n) {
@@ -230,8 +234,7 @@ export default class Hero {
     this.x = this.spawn.x;
     this.y = this.spawn.y;
     this.hp = this.maxHp;
-    this.sprite.setTexture(this.tex(0));
-    this.aura.setFillStyle(0xffd93b, 0);
+    this.restLook();
     [this.sprite, this.aura, this.ring, this.label, this.hpBar].forEach((o) => o.setVisible(true));
     this.respawnText.destroy();
     this.respawnText = null;
@@ -325,8 +328,9 @@ export default class Hero {
     const a = this.A.powerUp;
     this.cd.powerUp = this.abilityCooldown('powerUp');
     this.powerTime = a.duration * this.mod('powerUp', 'duration');
-    this.sprite.setTexture(this.tex(1));
-    this.aura.setFillStyle(0xffd93b, 0.35);
+    const up = Math.min(FORMS.length - 1, this.form + 1);
+    this.sprite.setTexture(this.tex(up));
+    this.aura.setFillStyle(FORMS[up].aura, 0.35);
     this.scene.flashFx(this.x, this.y - 14, 90, 0xffd93b);
     this.scene.floatText(this.x, this.y - 80, 'POWER UP!', '#ffd93b', 28);
   }
@@ -356,6 +360,7 @@ export default class Hero {
       size: 28,
       speed: 650,
       big: true,
+      by: this,
     });
   }
 }

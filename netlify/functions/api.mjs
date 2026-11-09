@@ -65,8 +65,12 @@ function newToken(user) {
   return token;
 }
 
+// The game's tester account has every level and hero, so it is never on the leaderboard
+const TESTER = 'supertester';
+
 // Keeps the top 100 Endless results. Numbers are clamped so a broken save can't spoil the board.
 async function updateLeaderboard(s, name, data) {
+  if (name.toLowerCase() === TESTER || data.super) return;
   const stars = Object.values(data.stars ?? {}).reduce((a, b) => a + (Number(b) || 0), 0);
   const row = {
     name,
@@ -206,7 +210,7 @@ async function save(body) {
 
 async function leaderboard() {
   // Only players who have played Endless Battle are listed
-  const rows = ((await store().get('leaderboard', { type: 'json' })) ?? []).filter((r) => r.wave > 0);
+  const rows = ((await store().get('leaderboard', { type: 'json' })) ?? []).filter((r) => r.wave > 0 && r.name.toLowerCase() !== TESTER);
   return reply({ ok: true, rows: rows.slice(0, 50) });
 }
 

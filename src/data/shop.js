@@ -3,7 +3,7 @@
 // Equipment: each hero can wear one item per slot. Bought items can be worn by any hero.
 // stats: damage / hp / speed / attackSpeed / range / coins = +%, cooldown = -% ability recharge time,
 // regen = extra healing speed (2 = heals 3x faster).
-// tier: 1 = sold when the shop opens, 2 = after beating area 1, 3 = after beating area 2.
+// tier: 1 = Common (hero level 5), 2 = Rare (hero level 10), 3 = Epic (hero level 15). See Progress.js.
 export const GEAR_SLOTS = [
   { key: 'weapon', name: 'Weapon' },
   { key: 'armor', name: 'Armor' },

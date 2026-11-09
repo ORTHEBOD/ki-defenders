@@ -84,16 +84,21 @@ export default class Enemy {
     this.drawShield();
   }
 
-  // Medic: every few seconds, heals enemies around it (itself included)
+  // Medic: every few seconds, heals enemies around it (itself included).
+  // Many medics together don't stack: an enemy can only be healed once per heal time.
+  // Bosses get a smaller heal.
   healTick(dt) {
     const h = this.def.heal;
     this.healTimer -= dt;
     if (this.healTimer > 0 || this.stunTime > 0) return;
     this.healTimer = h.every;
+    const now = this.scene.time.now;
     let healed = false;
     for (const e of this.scene.enemies) {
       if (!e.alive || e.hp >= e.maxHp || Math.hypot(e.x - this.x, e.y - this.y) > h.radius) continue;
-      e.hp = Math.min(e.maxHp, e.hp + e.maxHp * h.amount);
+      if (now - (e.healedAt ?? -1e9) < h.every * 1000) continue;
+      e.healedAt = now;
+      e.hp = Math.min(e.maxHp, e.hp + e.maxHp * h.amount * (e.def.boss ? 0.25 : 1));
       e.drawHpBar();
       healed = true;
     }
@@ -205,6 +210,7 @@ export default class Enemy {
   // `by` is the fighter that hit it (it gets the EXP if this hit defeats the enemy)
   takeDamage(amount, flash = true, by = null) {
     if (!this.alive) return;
+    if (by && by === this.scene.hero) this.heroHit = true;
     if (this.def.armor) amount = Math.max(amount * 0.3, amount - this.def.armor);
     if (this.shield > 0) {
       const soaked = Math.min(this.shield, amount);

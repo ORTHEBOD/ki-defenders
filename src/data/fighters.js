@@ -14,6 +14,10 @@ export const FORMS = [
   { name: 'Ascended Form', hair: 0x5ad8ff, aura: 0x5ad8ff, color: '#5ad8ff' },
 ];
 
+// Forms open as the story goes on: a fighter can reach form i (and its +1, +2) once level
+// FORM_LEVELS[i] has been beaten. Base is always open.
+export const FORM_LEVELS = [0, 3, 8, 13, 18, 25];
+
 // The form bonus (stun, burn, freeze...) switches on at this form
 export const BONUS_FORM = 4;
 

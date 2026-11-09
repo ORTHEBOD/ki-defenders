@@ -285,7 +285,9 @@ export function endlessWave(w) {
   const groups = [{ type: 'grunt', count: 8 + Math.min(20, w), interval: Math.max(0.3, 1 - w * 0.03), hpScale: hp }];
   if (w > 0) {
     const type = pool[Math.floor(rand() * pool.length)];
-    groups.push({ type, count: 3 + Math.min(14, Math.floor(w / 2)), interval: 0.7, delay: 4, hpScale: hp });
+    // Medics heal the others, so a wave has only a few of them
+    const count = 3 + Math.min(14, Math.floor(w / 2));
+    groups.push({ type, count: type === 'medic' ? Math.min(4, count) : count, interval: 0.7, delay: 4, hpScale: hp });
   }
   if ((w + 1) % 10 === 0) {
     const bosses = ['ogre', 'scorpion', 'mech', 'krag', 'sandKing', 'vorn'];

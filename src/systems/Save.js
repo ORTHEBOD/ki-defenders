@@ -84,6 +84,11 @@ function migrate(p) {
     delete p.hero;
   }
   for (const h of Object.values(p.heroes)) h.gear ??= {};
+  // The tester keeps enough levels for every skill, also when new skills are added
+  if (p.super) {
+    const skills = SKILL_TREE.reduce((n, b) => n + b.skills.length, 0);
+    for (const h of Object.values(p.heroes)) h.level = Math.max(h.level, skills + 1);
+  }
   if (!p.heroes[p.activeHero]) p.activeHero = Object.keys(p.heroes)[0] ?? null;
   p.coins ??= 0;
   p.items ??= [];

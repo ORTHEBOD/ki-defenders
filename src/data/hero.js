@@ -49,7 +49,19 @@ export const FREE_ABILITY = 'kaiWave';
 
 // Each skill costs 1 skill point. Skills in a branch are learned from top to bottom.
 // `needs` = another skill that must be learned first (from any branch).
+// `level` = the hero level needed to learn it (the Forms branch: a new form every 5 levels).
 export const SKILL_TREE = [
+  {
+    branch: 'Forms',
+    color: 0xffd93b,
+    skills: [
+      { id: 'superForm', name: 'Super Form', desc: 'Gold hair: +12% damage and +10% HP for good. Power Up goes one form higher', level: 5, form: 1 },
+      { id: 'superForm2', name: 'Super Form 2', desc: 'Gold hair with lightning: another +12% damage and +10% HP', level: 10, form: 2 },
+      { id: 'superForm3', name: 'Super Form 3', desc: 'Long gold hair: another +12% damage and +10% HP', level: 15, form: 3 },
+      { id: 'divineForm', name: 'Divine Form', desc: 'Red hair: another +12% damage and +10% HP', level: 20, form: 4 },
+      { id: 'ascendedForm', name: 'Ascended Form', desc: 'Blue hair, the top form: another +12% damage and +10% HP', level: 25, form: 5 },
+    ],
+  },
   {
     branch: 'Techniques',
     color: 0xc38be0,
@@ -132,6 +144,16 @@ export function learnedSkills(hero) {
 export function skillPoints(hero) {
   return hero.level - 1 - learnedSkills(hero).length;
 }
+
+// The hero's form: how many skills of the Forms branch are learned (0 = Base ... 5 = Ascended)
+export function heroForm(hero) {
+  const forms = SKILL_TREE[0].skills;
+  return forms.filter((s) => learnedSkills(hero).includes(s.id)).length;
+}
+
+// Each form makes the hero stronger
+export const formDamage = (form) => 1 + 0.12 * form;
+export const formHp = (form) => 1 + 0.1 * form;
 
 export function heroPower(level) {
   return 1 + 0.08 * (level - 1);

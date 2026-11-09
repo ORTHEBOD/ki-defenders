@@ -1,4 +1,5 @@
-import { HEROES, SKILL_TREE, xpToNext, skillPoints, learnedSkills, heroPower, heroMaxHp } from '../data/hero.js';
+import { HEROES, SKILL_TREE, xpToNext, skillPoints, learnedSkills, heroPower, heroMaxHp, heroForm, formDamage, formHp } from '../data/hero.js';
+import { FORMS } from '../data/fighters.js';
 import { GEAR, GEAR_SLOTS, gearBonus } from '../data/shop.js';
 import { fighterPortrait } from '../art/fighterArt.js';
 import { drawMenuBackground, panel, xpBar } from '../ui/menuBackground.js';
@@ -39,6 +40,7 @@ export default class HeroScene extends Phaser.Scene {
     }
     this.learned = new Set(learnedSkills(hero));
     this.points = skillPoints(hero);
+    this.heroLevel = hero.level;
     if (this.learned.size > 0) {
       makeButton(this, 1170, 40, 180, 50, 'Reset skills', () => {
         Save.update((p) => { activeHero(p).skills = []; });
@@ -77,14 +79,16 @@ export default class HeroScene extends Phaser.Scene {
   drawInfo(player, hero, def) {
     const bonus = gearBonus(hero.gear);
     panel(this, 230, 405, 400, 560, def.look.gi);
-    fighterPortrait(this, 230, 210, def.look, 2.4, `hero_${player.activeHero}_0`);
+    const form = FORMS[heroForm(hero)];
+    fighterPortrait(this, 230, 210, { ...def.look, hair: form.hair ?? def.look.hair, longHair: form.longHair, sparks: form.sparks }, 2.4,
+      `hero_${player.activeHero}_${heroForm(hero)}`);
     this.add.text(230, 300, `${def.name}  Lv ${hero.level}`, textStyle(36)).setOrigin(0.5);
     this.add.text(230, 334, def.title, textStyle(19, '#c9d3ff')).setOrigin(0.5);
     const need = xpToNext(hero.level);
     xpBar(this, 70, 352, 320, 16, hero.xp / need);
     this.add.text(230, 382, `XP ${hero.xp} / ${need}`, textStyle(17, '#c9d3ff')).setOrigin(0.5);
-    const hp = Math.round(heroMaxHp(hero.level, def.base.hp) * (1 + bonus.hp));
-    const dmg = Math.round(def.base.damage * heroPower(hero.level) * (1 + bonus.damage));
+    const hp = Math.round(heroMaxHp(hero.level, def.base.hp) * (1 + bonus.hp) * formHp(heroForm(hero)));
+    const dmg = Math.round(def.base.damage * heroPower(hero.level) * (1 + bonus.damage) * formDamage(heroForm(hero)));
     this.add.text(230, 410, `HP ${hp}   Damage ${dmg}   Range ${def.base.range}`, textStyle(19)).setOrigin(0.5);
     this.add.text(230, 438, `Skill points: ${this.points}`, textStyle(22, this.points > 0 ? '#5be35b' : '#c9d3ff')).setOrigin(0.5);
     if (def.perk) {
@@ -119,12 +123,12 @@ export default class HeroScene extends Phaser.Scene {
 
   }
 
-  // Skill tree: 4 branches, learned top to bottom
+  // Skill tree: 5 branches, learned top to bottom
   drawTree(data) {
     panel(this, 845, 405, 790, 560);
     SKILL_TREE.forEach((branch, b) => {
-      const x = 545 + b * 200;
-      this.add.text(x, 152, branch.branch, textStyle(24, hex(branch.color))).setOrigin(0.5);
+      const x = 529 + b * 158;
+      this.add.text(x, 152, branch.branch, textStyle(22, hex(branch.color))).setOrigin(0.5);
       this.add.graphics().lineStyle(4, branch.color, 0.35).lineBetween(x, 190, x, 192 + (branch.skills.length - 1) * 66);
       branch.skills.forEach((skill, i) => {
         const y = 192 + i * 66;
@@ -135,6 +139,9 @@ export default class HeroScene extends Phaser.Scene {
         this.add.text(x, y, icon, state === 'locked' ? { fontSize: '16px' } : textStyle(22, state === 'learned' ? '#10131c' : '#5be35b'))
           .setOrigin(0.5).setAlpha(state === 'locked' ? 0.6 : 1);
         this.add.text(x, y + 31, skill.name, textStyle(15, state === 'locked' ? '#8a91ad' : '#ffffff')).setOrigin(0.5);
+        if (skill.level && state !== 'learned') {
+          this.add.text(x + 24, y - 18, `Lv${skill.level}`, textStyle(13, this.heroLevel >= skill.level ? '#5be35b' : '#ff9a9a')).setOrigin(0, 0.5);
+        }
         if (state === 'ready') this.tweens.add({ targets: node, scale: 1.12, duration: 600, yoyo: true, repeat: -1 });
         node.setInteractive({ useHandCursor: true });
         node.on('pointerdown', () => this.showSkill(branch, i));
@@ -158,13 +165,16 @@ export default class HeroScene extends Phaser.Scene {
     if (this.learned.has(skill.id)) return 'learned';
     const prevDone = i === 0 || this.learned.has(branch.skills[i - 1].id);
     if (!prevDone || (skill.needs && !this.learned.has(skill.needs))) return 'locked';
+    if (skill.level && this.heroLevel < skill.level) return 'locked';
     return this.points > 0 ? 'ready' : 'next';
   }
 
   lockReason(branch, i) {
-    if (i > 0 && !this.learned.has(branch.skills[i - 1].id)) return branch.skills[i - 1].name;
+    if (i > 0 && !this.learned.has(branch.skills[i - 1].id)) return `Learn ${branch.skills[i - 1].name} first`;
+    const skill = branch.skills[i];
+    if (skill.level && this.heroLevel < skill.level) return `Needs hero level ${skill.level}`;
     const need = branch.skills[i].needs;
-    return SKILL_TREE.flatMap((b) => b.skills).find((s) => s.id === need)?.name ?? need;
+    return `Learn ${SKILL_TREE.flatMap((b) => b.skills).find((s) => s.id === need)?.name ?? need} first`;
   }
 
   showSkill(branch, i) {
@@ -177,7 +187,7 @@ export default class HeroScene extends Phaser.Scene {
 
     let status = '';
     if (state === 'learned') status = 'Learned';
-    else if (state === 'locked') status = `Learn ${this.lockReason(branch, i)} first`;
+    else if (state === 'locked') status = this.lockReason(branch, i);
     else if (state === 'next') status = 'Needs 1 skill point';
     if (status) {
       this.info.add(this.add.text(1215, 642, status, textStyle(20, state === 'learned' ? '#5be35b' : '#9aa3c7')).setOrigin(1, 0.5));

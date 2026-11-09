@@ -29,10 +29,10 @@ export default class BootScene extends Phaser.Scene {
       FORMS.forEach((form, i) => this.makeFighter(`${def.texture}_${i}`,
         { ...def.look, hair: form.hair ?? def.look.hair, longHair: form.longHair, sparks: form.sparks }));
     }
-    // Each hero: normal, and gold-haired while Power Up is active (hero_zenko_0, hero_zenko_1)
+    // Each hero in every form (hero_zenko_0 ... hero_zenko_5): learned in the Forms branch, and Power Up
     for (const [id, h] of Object.entries(HEROES)) {
-      this.makeFighter(`hero_${id}_0`, h.look);
-      this.makeFighter(`hero_${id}_1`, { ...h.look, hair: FORMS[1].hair });
+      FORMS.forEach((form, i) => this.makeFighter(`hero_${id}_${i}`,
+        { ...h.look, hair: form.hair ?? h.look.hair, longHair: form.longHair, sparks: form.sparks }));
     }
     this.makeGrunt();
     this.makeRunner();

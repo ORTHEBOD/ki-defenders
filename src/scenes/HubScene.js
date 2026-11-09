@@ -1,4 +1,5 @@
-import { HEROES, xpToNext, skillPoints } from '../data/hero.js';
+import { HEROES, xpToNext, skillPoints, heroForm } from '../data/hero.js';
+import { FORMS } from '../data/fighters.js';
 import { fighterPortrait } from '../art/fighterArt.js';
 import { drawMenuBackground, panel, xpBar } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
@@ -103,7 +104,9 @@ export default class HubScene extends Phaser.Scene {
   heroCard(player, hero) {
     const def = HEROES[player.activeHero];
     panel(this, 330, 400, 500, 520, def.look.gi);
-    const art = fighterPortrait(this, 330, 290, def.look, 3.6, `hero_${player.activeHero}_0`);
+    const form = FORMS[heroForm(hero)];
+    const art = fighterPortrait(this, 330, 290, { ...def.look, hair: form.hair ?? def.look.hair, longHair: form.longHair, sparks: form.sparks },
+      3.6, `hero_${player.activeHero}_${heroForm(hero)}`);
     this.tweens.add({ targets: art, y: art.y - 8, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     this.add.text(330, 440, def.name, textStyle(48)).setOrigin(0.5);
     this.add.text(330, 482, def.title, textStyle(22, '#c9d3ff')).setOrigin(0.5);
@@ -119,7 +122,8 @@ export default class HubScene extends Phaser.Scene {
 
     // Main buttons
     makeButton(this, 830, 190, 420, 100, 'Play', () => this.scene.start('LevelSelect'), { color: 0xe0661a, fontSize: 56 });
-    makeButton(this, 830, 300, 420, 76, 'Heroes', () => this.scene.start('Hero'), { color: 0xb8303a, fontSize: 36 });
+    makeButton(this, 722, 300, 204, 76, 'Heroes', () => this.scene.start('Hero'), { color: 0xb8303a, fontSize: 34 });
+    makeButton(this, 938, 300, 204, 76, 'Fighters', () => this.scene.start('Fighters'), { color: 0x2f6ab8, fontSize: 34 });
     const shop = makeButton(this, 830, 392, 420, 76, shopOpen(player) ? 'Shop' : `Shop  (needs ★ ${SHOP_STARS})`,
       () => this.scene.start('Shop'), { color: 0x2f8a4a, fontSize: shopOpen(player) ? 36 : 28 });
     shop.setEnabled(shopOpen(player));
@@ -129,8 +133,8 @@ export default class HubScene extends Phaser.Scene {
     endless.setEnabled(endlessOpen(player));
     makeButton(this, 830, 576, 420, 76, 'Leaderboard', () => this.scene.start('Leaderboard'), { fontSize: 32 });
     if (hero && skillPoints(hero) > 0) {
-      const dot = this.add.circle(1015, 278, 14, 0x5be35b).setStrokeStyle(3, 0x10131c).setDepth(120);
-      this.add.text(1015, 278, '!', textStyle(20)).setOrigin(0.5).setDepth(121);
+      const dot = this.add.circle(808, 278, 14, 0x5be35b).setStrokeStyle(3, 0x10131c).setDepth(120);
+      this.add.text(808, 278, '!', textStyle(20)).setOrigin(0.5).setDepth(121);
       this.tweens.add({ targets: dot, scale: 1.2, duration: 500, yoyo: true, repeat: -1 });
     }
   }

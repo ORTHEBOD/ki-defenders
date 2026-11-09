@@ -40,8 +40,16 @@ export default class Fighter {
     return this.def.tiers[this.tier];
   }
 
+  // The next step, if the story has opened its form (see FORM_LEVELS)
   get next() {
-    return this.def.tiers[this.tier + 1];
+    const n = this.def.tiers[this.tier + 1];
+    return n && n.form <= this.scene.maxForm ? n : undefined;
+  }
+
+  // The next form is still closed by the story: returns its number
+  get closedForm() {
+    const n = this.def.tiers[this.tier + 1];
+    return n && n.form > this.scene.maxForm ? n.form : null;
   }
 
   get form() {

@@ -4,14 +4,14 @@ import { battleCoins } from '../data/shop.js';
 import { Ads } from '../systems/Ads.js';
 import { Settings } from '../systems/Settings.js';
 import { Audio } from '../systems/Audio.js';
-import { FIGHTERS, FORMS, BONUS_FORM, EXP_TOTAL, WALL, fightersFor } from '../data/fighters.js';
+import { FIGHTERS, FORMS, BONUS_FORM, EXP_TOTAL, FORM_LEVELS, WALL, fightersFor } from '../data/fighters.js';
 import { DIFFICULTY } from '../data/difficulty.js';
 import { Analytics } from '../systems/Analytics.js';
 import { ENEMIES } from '../data/enemies.js';
 import { addXp } from '../data/hero.js';
 import Hero from '../objects/Hero.js';
 import { Save, activeHero } from '../systems/Save.js';
-import { levelOpen } from '../systems/Progress.js';
+import { levelOpen, maxForm } from '../systems/Progress.js';
 import Tutorial from '../systems/Tutorial.js';
 import Path from '../systems/Path.js';
 import Grid from '../systems/Grid.js';
@@ -23,6 +23,26 @@ import { COLORS, textStyle } from '../ui/theme.js';
 const W = 1280;
 const H = 720;
 
+// The enemies of a wave in the order they come out. Bosses keep their own time; everyone else is
+// mixed together (a few grunts, a brute, a flyer...) instead of coming kind by kind.
+function mixWave(groups) {
+  const queue = [];
+  const mixed = [];
+  let length = 0;
+  for (const gr of groups) {
+    length = Math.max(length, (gr.delay ?? 0) + (gr.count - 1) * gr.interval);
+    for (let i = 0; i < gr.count; i++) {
+      const e = { type: gr.type, hpScale: gr.hpScale ?? 1 };
+      if (ENEMIES[gr.type].boss) queue.push({ ...e, time: (gr.delay ?? 0) + i * gr.interval });
+      else mixed.push({ ...e, at: (i + 0.2 + Math.random() * 0.6) / gr.count });
+    }
+  }
+  mixed.sort((a, b) => a.at - b.at);
+  const gap = mixed.length > 1 ? length / (mixed.length - 1) : 0;
+  mixed.forEach((e, i) => queue.push({ type: e.type, hpScale: e.hpScale, time: i * gap }));
+  return queue.sort((a, b) => a.time - b.time);
+}
+
 export default class GameScene extends Phaser.Scene {
   constructor() {
     super('Game');
@@ -33,11 +53,11 @@ export default class GameScene extends Phaser.Scene {
     this.level = levelById(data.levelId) ?? LEVELS[0];
     this.endless = !!this.level.endless;
     this.theme = MAPS[this.level.map ?? 0].theme;
-    this.xpEarned = 0;
-    this.heroKillXp = 0;
+    this.heroXp = 0;
     this.diffKey = data.difficulty ?? 'normal';
     this.diff = DIFFICULTY[this.diffKey];
     this.kills = 0;
+    this.maxForm = maxForm(Save.current());
     Analytics.event('level_start', this.statsInfo());
     // Fixed levels follow a drawn road; maze levels use an open grid the player builds on
     this.maze = !!this.level.maze;
@@ -716,6 +736,7 @@ export default class GameScene extends Phaser.Scene {
 
     const transform = f.nextIsTransform;
     let upLabel = 'Max power';
+    if (f.closedForm) upLabel = `🔒 ${FORMS[f.closedForm].name}: beat level ${FORM_LEVELS[f.closedForm]}`;
     if (next) upLabel = !ready ? '🔒 Defeat enemies for EXP' : transform ? `TRANSFORM!  ${next.cost} Ki` : `Upgrade  ${next.cost} Ki`;
     const up = makeButton(this, 0, 62, 300, 48, upLabel, () => {
       if (!next || !f.expReady) return;
@@ -766,13 +787,7 @@ export default class GameScene extends Phaser.Scene {
     const wave = this.endless ? endlessWave(this.waveIndex) : this.level.waves[this.waveIndex];
     this.waveActive = true;
     this.waveTime = 0;
-    this.spawnQueue = [];
-    for (const gr of wave.groups) {
-      for (let i = 0; i < gr.count; i++) {
-        this.spawnQueue.push({ time: (gr.delay ?? 0) + i * gr.interval, type: gr.type, hpScale: gr.hpScale ?? 1 });
-      }
-    }
-    this.spawnQueue.sort((a, b) => a.time - b.time);
+    this.spawnQueue = mixWave(wave.groups);
     this.showNewEnemyTips(wave.groups.map((gr) => gr.type));
     const last = !this.endless && this.waveIndex === this.level.waves.length - 1;
     Audio.sfx('wave');
@@ -1036,7 +1051,7 @@ export default class GameScene extends Phaser.Scene {
       this.banner(`${e.def.name} defeated!`);
     }
     this.kills++;
-    this.xpEarned += e.def.xp ?? 2;
+    this.heroXpFor(e, by);
     this.ki += e.def.reward;
     Audio.sfx('pop', 0.04);
     this.floatText(e.x, e.y - 34, `+${e.def.reward}`, '#ffd93b', 20);
@@ -1058,9 +1073,12 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  // The hero landed the final blow: that enemy's XP counts twice
-  onHeroKill(e) {
-    this.heroKillXp += e.def.xp ?? 2;
+  // The hero earns XP only for its own work: double for a final blow, normal when it helped
+  // (hit the enemy before someone else finished it). A hero that only watches earns nothing.
+  heroXpFor(e, by) {
+    const xp = e.def.xp ?? 2;
+    if (by && by === this.hero) this.heroXp += xp * 2;
+    else if (e.heroHit) this.heroXp += xp;
   }
 
   loseLives(n) {
@@ -1123,7 +1141,8 @@ export default class GameScene extends Phaser.Scene {
   saveRewards(win) {
     const wavesDone = this.waveIndex + (this.waveActive ? 0 : 1);
     const bonus = this.endless ? wavesDone * 10 : win ? 40 * this.diff.stars : 10;
-    const xp = this.xpEarned + this.heroKillXp + bonus;
+    // The win bonus only goes to a hero that fought
+    const xp = this.heroXp > 0 ? Math.round(this.heroXp) + bonus : 0;
     const stars = win ? this.diff.stars : 0;
     const coins = battleCoins({
       win, stars, levelNumber: this.level.id, kills: this.kills, bounty: !!this.hero?.has('bounty'), extra: this.hero?.gear.coins ?? 0,
