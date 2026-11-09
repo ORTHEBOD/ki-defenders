@@ -1,6 +1,6 @@
-import { GEAR, GEAR_SLOTS, SPIN, gearText } from '../data/shop.js';
-import { HEROES, newHeroSave } from '../data/hero.js';
-import { fighterPortrait } from '../art/fighterArt.js';
+import { GEAR, GEAR_SLOTS, SPIN, gearText, gearBonus } from '../data/shop.js';
+import { HEROES, newHeroSave, heroForm } from '../data/hero.js';
+import { fighterPortrait, formLook, gearLook } from '../art/fighterArt.js';
 import { drawMenuBackground, panel } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
 import { Save, activeHero } from '../systems/Save.js';
@@ -64,62 +64,112 @@ export default class ShopScene extends Phaser.Scene {
 
   // ---------- Equipment ----------
 
+  // Equipment: the hero on the left wearing its gear, a tab for each gear slot,
+  // and the 3 items of the chosen slot (Common, Rare, Epic). Pointing at a card tries it on.
   showGear() {
     const L = this.layer;
     const hero = activeHero(this.player);
     const worn = hero?.gear ?? {};
-    const note = hero
-      ? `Bought gear can be worn by any hero. Buying puts it on ${HEROES[this.player.activeHero].name}.`
-      : 'Bought gear can be worn by any hero - win your first hero in the Lucky Spin!';
-    L.add(this.add.text(640, 160, note, textStyle(20, '#c9d3ff')).setOrigin(0.5));
-    GEAR_SLOTS.forEach((slot, col) => {
-      const x = 115 + col * 210;
-      L.add(this.add.text(x, 200, slot.name, textStyle(26, '#ffd93b')).setOrigin(0.5));
-      Object.entries(GEAR).filter(([, g]) => g.slot === slot.key).forEach(([id, item], row) => {
-        const y = 300 + row * 140;
-        if (item.tier > gearTier(this.player)) {
-          // Not sold yet: a locked card that says what opens it
-          L.add(panel(this, x, y, 200, 124, 0x3a3f52));
-          L.add(this.add.text(x, y - 18, '🔒', { fontSize: '30px' }).setOrigin(0.5).setAlpha(0.8));
-          L.add(this.add.text(x, y + 26, tierNeed(item.tier), textStyle(18, '#9aa3c7')).setOrigin(0.5));
-          return;
-        }
-        const owned = this.player.items.includes(id);
-        const wearing = worn[slot.key] === id;
-        const rarity = RARITY[item.tier - 1];
-        L.add(panel(this, x, y, 200, 124, rarity.color));
-        const badge = this.add.graphics();
-        badge.fillStyle(rarity.color, 0.25).fillCircle(x - 74, y - 12, 22);
-        badge.lineStyle(2, rarity.color, 0.9).strokeCircle(x - 74, y - 12, 22);
-        L.add(badge);
-        const icon = this.gearIcon(0, 0, slot.key, item.color);
-        icon.setPosition(x - 74, y - 12).setScale(1.1);
-        L.add(icon);
-        L.add(this.add.text(x - 74, y + 30, rarity.name, textStyle(13, rarity.text)).setOrigin(0.5));
-        L.add(this.add.text(x - 48, y - 38, item.name, textStyle(17)).setOrigin(0, 0.5));
-        L.add(this.add.text(x - 48, y - 4, gearText(item), { ...textStyle(13, '#9bff7a'), wordWrap: { width: 140 } }).setOrigin(0, 0.5));
-        let label;
-        let action;
-        let color = 0x2f8a4a;
-        if (wearing) {
-          label = 'Wearing';
-          color = 0x3a4470;
-        } else if (owned && !hero) {
-          label = 'Owned';
-          color = 0x3a4470;
-        } else if (owned) {
-          label = 'Wear';
-          action = () => this.wear(id);
-        } else {
-          label = `Buy  ${item.cost}`;
-          color = 0xc99a00;
-          action = () => this.buy(id);
-        }
-        const b = makeButton(this, x + 22, y + 36, 140, 38, label, () => action?.(), { fontSize: 18, color });
-        if (!action || (!owned && this.player.coins < item.cost)) b.setEnabled(false);
-        L.add(b);
+    this.slot ??= 'weapon';
+
+    // The hero
+    const def = hero ? HEROES[this.player.activeHero] : null;
+    L.add(panel(this, 215, 425, 350, 490, def ? def.look.gi : 0x3a3f52));
+    if (hero) {
+      this.heroArt = null;
+      this.dressHero(hero, def, worn);
+      L.add(this.add.text(215, 412, def.name, textStyle(34)).setOrigin(0.5));
+      L.add(this.add.text(215, 444, 'Gear can be worn by any hero', textStyle(16, '#9aa3c7')).setOrigin(0.5));
+      const bonus = Object.fromEntries(Object.entries(gearBonus(worn)).filter(([, v]) => v));
+      const text = Object.keys(bonus).length ? gearText({ stats: bonus }).split(', ').join('\n') : 'No gear yet';
+      L.add(this.add.text(215, 472, 'Worn gear gives:', textStyle(19, '#ffd93b')).setOrigin(0.5, 0));
+      L.add(this.add.text(215, 500, text, { ...textStyle(17, '#9bff7a'), align: 'center', lineSpacing: 2 }).setOrigin(0.5, 0));
+    } else {
+      L.add(this.add.text(215, 425, 'Win a hero in the\nLucky Spin to\nwear gear!', { ...textStyle(28), align: 'center' }).setOrigin(0.5));
+    }
+
+    // Slot tabs
+    GEAR_SLOTS.forEach((slot, i) => {
+      const x = 494 + i * 136;
+      const on = slot.key === this.slot;
+      const item = GEAR[worn[slot.key]];
+      const tab = this.add.rectangle(x, 222, 128, 88, on ? 0x2a3350 : 0x161a28)
+        .setStrokeStyle(3, on ? 0xffd93b : 0x3a4470).setInteractive({ useHandCursor: true });
+      tab.on('pointerdown', () => {
+        this.slot = slot.key;
+        this.show('gear');
       });
+      L.add(tab);
+      L.add(this.gearIcon(0, 0, slot.key, item ? item.color : 0x5a6378).setPosition(x, 208).setScale(on ? 1.2 : 1));
+      L.add(this.add.text(x, 250, slot.name, textStyle(18, on ? '#ffd93b' : '#9aa3c7')).setOrigin(0.5));
+      if (item) L.add(this.add.circle(x + 50, 190, 6, 0x5be35b).setStrokeStyle(2, 0x10131c));
     });
+
+    // The 3 items of this slot
+    Object.entries(GEAR).filter(([, g]) => g.slot === this.slot).forEach(([id, item], i) => {
+      this.gearCard(id, item, 560 + i * 275, 480, hero, def, worn);
+    });
+  }
+
+  gearCard(id, item, x, y, hero, def, worn) {
+    const L = this.layer;
+    const rarity = RARITY[item.tier - 1];
+    if (item.tier > gearTier(this.player)) {
+      L.add(panel(this, x, y, 255, 360, 0x3a3f52));
+      L.add(this.add.text(x, y - 140, rarity.name, textStyle(22, '#8a91ad')).setOrigin(0.5));
+      L.add(this.add.text(x, y - 30, '🔒', { fontSize: '56px' }).setOrigin(0.5).setAlpha(0.8));
+      L.add(this.add.text(x, y + 50, `Opens at\n${tierNeed(item.tier)}`, { ...textStyle(22, '#9aa3c7'), align: 'center' }).setOrigin(0.5));
+      return;
+    }
+    const owned = this.player.items.includes(id);
+    const wearing = worn[item.slot] === id;
+    const card = panel(this, x, y, 255, 360, wearing ? 0x5be35b : rarity.color);
+    L.add(card);
+    L.add(this.add.text(x, y - 150, rarity.name.toUpperCase(), textStyle(20, rarity.text)).setOrigin(0.5));
+    const glow = this.add.graphics();
+    glow.fillStyle(rarity.color, 0.2).fillCircle(x, y - 80, 48);
+    glow.lineStyle(3, rarity.color, 0.9).strokeCircle(x, y - 80, 48);
+    L.add(glow);
+    L.add(this.gearIcon(0, 0, item.slot, item.color).setPosition(x, y - 80).setScale(2));
+    L.add(this.add.text(x, y - 10, item.name, textStyle(26)).setOrigin(0.5));
+    L.add(this.add.text(x, y + 40, gearText(item).split(', ').join('\n'),
+      { ...textStyle(18, '#9bff7a'), align: 'center', lineSpacing: 2 }).setOrigin(0.5));
+
+    let label;
+    let action;
+    let color = 0x2f8a4a;
+    if (wearing) {
+      label = '✓ Wearing';
+      color = 0x3a4470;
+    } else if (owned && !hero) {
+      label = 'Owned';
+      color = 0x3a4470;
+    } else if (owned) {
+      label = 'Wear';
+      action = () => this.wear(id);
+    } else {
+      label = `Buy  ${item.cost}`;
+      color = 0xc99a00;
+      action = () => this.buy(id);
+    }
+    const b = makeButton(this, x, y + 128, 210, 54, label, () => action?.(), { fontSize: 24, color });
+    if (!action || (!owned && this.player.coins < item.cost)) b.setEnabled(false);
+    L.add(b);
+
+    // Point at the card to try the item on the hero
+    if (hero) {
+      const hit = this.add.rectangle(x, y - 40, 255, 270, 0xffffff, 0).setInteractive();
+      hit.on('pointerover', () => this.dressHero(hero, def, { ...worn, [item.slot]: id }));
+      hit.on('pointerout', () => this.dressHero(hero, def, worn));
+      L.add(hit);
+    }
+  }
+
+  // Draws the hero (in its form) wearing `gear`
+  dressHero(hero, def, gear) {
+    this.heroArt?.destroy();
+    this.heroArt = fighterPortrait(this, 215, 290, { ...formLook(def.look, heroForm(hero)), ...gearLook(gear) }, 3);
+    this.layer.add(this.heroArt);
   }
 
   // A small shaded picture of a gear piece

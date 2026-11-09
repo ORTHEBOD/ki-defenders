@@ -22,6 +22,9 @@ import { COLORS, textStyle } from '../ui/theme.js';
 import { baseLevels, baseLives, baseKi, cannonStats } from '../data/base.js';
 import { drawBase } from '../art/baseArt.js';
 
+// Part of every fighter's EXP that is shared with the whole team (see shareExp)
+const TEAM_EXP = 0.3;
+
 const W = 1280;
 const H = 720;
 
@@ -1078,8 +1081,12 @@ export default class GameScene extends Phaser.Scene {
     this.refreshHud();
   }
 
-  // The enemy's EXP is shared by everyone who hurt it, by how much of the damage each one did:
-  // 10 EXP and three fighters that each did a third = about 3.3 EXP each.
+  // The enemy's EXP is shared by everyone who hurt it, by how much of the damage each one did.
+  // So weaker fighters keep growing too:
+  // - TEAM_EXP of each fighter's share goes to a team pot, split evenly between every fighter
+  //   that can still level up (10 EXP, one fighter did it all, 3 fighters: 8 / 1 / 1).
+  // - A fighter that can't level up now (max level, or the next form is closed by the story)
+  //   puts all of its share in the pot.
   // The hero's share counts double (hero levels need more XP). A hero that only watches gets nothing.
   // Support fighters (they don't attack) earn half of what the fighters in their aura earn.
   shareExp(e) {
@@ -1088,17 +1095,23 @@ export default class GameScene extends Phaser.Scene {
     let total = 0;
     for (const d of dealt.values()) total += d;
     if (!total) return;
+    let pot = 0;
     for (const [who, d] of dealt) {
       const share = (xp * d) / total;
       if (who === this.hero) {
         this.heroXp += share * 2;
       } else if (this.fighters.includes(who)) {
-        who.gainExp(share);
+        if (who.next) {
+          who.gainExp(share * (1 - TEAM_EXP));
+          pot += share * TEAM_EXP;
+        } else pot += share;
         for (const f of this.fighters) {
           if (f !== who && f.def.attack === 'support' && Math.hypot(who.x - f.x, who.y - f.y) <= f.stats.range) f.gainExp(share / 2);
         }
       }
     }
+    const growing = this.fighters.filter((f) => f.next);
+    for (const f of growing) f.gainExp(pot / growing.length);
   }
 
   loseLives(n) {
