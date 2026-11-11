@@ -185,6 +185,7 @@ export default class Fighter {
       if (!this.scene.findTarget(this.x, this.y, s.range, this.def.hitsAir)) return;
       this.cooldown = s.cooldown;
       Audio.sfx('flash', 0.1);
+      this.attackPose();
       this.flash(damage);
       return;
     }
@@ -194,14 +195,25 @@ export default class Fighter {
     this.sprite.setFlipX(target.x < this.x);
     this.cooldown = s.cooldown;
     Audio.sfx(this.def.attack, 0.07);
+    this.attackPose();
     if (this.def.attack === 'punch') this.punch(target, damage);
     else if (this.def.attack === 'beam') this.beam(target, damage);
     else if (this.def.attack === 'blast') this.blast(target, damage);
   }
 
+  // Shows the fighter's attack picture for a moment (art/kaito_0_attack.png and so on), if there is one
+  attackPose() {
+    const key = `${this.def.texture}_${this.form}_attack`;
+    if (!this.scene.textures.exists(key)) return;
+    this.sprite.setTexture(key);
+    this.poseTimer?.remove();
+    const ms = Math.min(220, this.stats.cooldown * 600);
+    this.poseTimer = this.scene.time.delayedCall(ms, () => this.sprite.setTexture(this.textureKey()));
+  }
+
   punch(target, damage) {
     const dir = Math.sign(target.x - this.x) || 1;
-    this.scene.tweens.add({ targets: this.sprite, x: this.x + dir * 8, duration: 60, yoyo: true });
+    this.scene.tweens.add({ targets: this.sprite, x: this.x + dir * 12, duration: 70, yoyo: true, ease: 'Quad.Out' });
     this.scene.hitSpark(target.x, target.y - 6, this.def.color);
     this.scene.damageNumber(target.x, target.y - 20, damage);
     this.hits++;
@@ -259,6 +271,7 @@ export default class Fighter {
   }
 
   destroy() {
+    this.poseTimer?.remove();
     this.scene.tweens.killTweensOf([this.sprite, this.aura]);
     this.sprite.destroy();
     this.aura.destroy();

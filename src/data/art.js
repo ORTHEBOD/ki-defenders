@@ -5,7 +5,7 @@
 // Anything not listed keeps the art drawn in code, so pictures can be added a few at a time.
 
 export const ART_FILES = [
-  // 'kaito_0', 'kaito_1', 'kaito_2', 'hero_zenko_0', 'grunt', ...
+  'kaito_0', 'kaito_0_attack',
 ];
 
 // How big each picture is shown in battle (pixels). Bigger PNGs are shrunk to fit;

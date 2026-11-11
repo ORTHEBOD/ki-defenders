@@ -70,13 +70,35 @@ export default class BootScene extends Phaser.Scene {
       if (!this.textures.exists(raw)) continue;
       const img = this.textures.get(raw).getSourceImage();
       const size = artSize(key);
-      const scale = Math.min(size / img.width, size / img.height);
+      let scale = Math.min(size / img.width, size / img.height);
+      // An attack picture (kaito_0_attack) is shrunk like its normal picture, so the character keeps
+      // its size; a stretched-out arm or leg may make it wider than the square
+      const plainKey = `art_${key.replace(/_attack$/, '')}`;
+      if (key.endsWith('_attack') && this.textures.exists(plainKey)) {
+        const plain = this.textures.get(plainKey).getSourceImage();
+        scale = Math.min(size / plain.width, size / plain.height);
+      }
       const w = img.width * scale;
       const h = img.height * scale;
+      const cw = Math.max(size, Math.ceil(w));
       if (this.textures.exists(key)) this.textures.remove(key);
-      const canvas = this.textures.createCanvas(key, size, size);
-      canvas.context.imageSmoothingQuality = 'high';
-      canvas.context.drawImage(img, (size - w) / 2, size - h, w, h);
+      const canvas = this.textures.createCanvas(key, cw, size);
+      const c = canvas.context;
+      c.imageSmoothingQuality = 'high';
+      const x = (cw - w) / 2;
+      const y = size - h;
+      // A dark outline around the picture, so it stands out on the map like the drawn art
+      const shape = document.createElement('canvas');
+      shape.width = cw;
+      shape.height = size;
+      const sc = shape.getContext('2d');
+      sc.imageSmoothingQuality = 'high';
+      sc.drawImage(img, x, y, w, h);
+      sc.globalCompositeOperation = 'source-in';
+      sc.fillStyle = '#0d0d12';
+      sc.fillRect(0, 0, cw, size);
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) c.drawImage(shape, dx, dy);
+      c.drawImage(img, x, y, w, h);
       canvas.refresh();
     }
   }
