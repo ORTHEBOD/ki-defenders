@@ -27,6 +27,12 @@ import { shade } from '../art/fighterArt.js';
 const TEAM_EXP = 0.3;
 // After a win, the next level starts by itself after this many seconds
 const NEXT_SECONDS = 5;
+// Floating text on the screen layer (not on the map)
+const SCREEN = 150;
+// How far the map can zoom in
+const MAX_ZOOM = 2.5;
+// The HUD (top bar, buttons, banners, end screen) never zooms; menus (120-129) open on the map
+const isHudDepth = (d) => d >= 100 && (d < 120 || d >= 130);
 
 const W = 1280;
 const H = 720;
@@ -135,12 +141,12 @@ export default class GameScene extends Phaser.Scene {
     if (this.maze) {
       this.heroSel = this.add.ellipse(0, 0, 66, 24).setStrokeStyle(4, 0xffffff).setDepth(17).setVisible(false);
       this.drawRoute();
-      this.floatText(W / 2, 560, 'Tap empty ground to build. Fighters and walls block the way!', '#ffe9c4', 28);
-      if (this.hero) this.time.delayedCall(1400, () => this.floatText(W / 2, 560, `Tap ${heroName}, then tap where to send them`, '#ffe9c4', 28));
+      this.floatText(W / 2, 560, 'Tap empty ground to build. Fighters and walls block the way!', '#ffe9c4', 28, SCREEN);
+      if (this.hero) this.time.delayedCall(1400, () => this.floatText(W / 2, 560, `Tap ${heroName}, then tap where to send them`, '#ffe9c4', 28, SCREEN));
     } else if (this.hero) {
-      this.floatText(W / 2, 600, `Tap the ground to move ${heroName}`, '#ffe9c4', 28);
+      this.floatText(W / 2, 600, `Tap the ground to move ${heroName}`, '#ffe9c4', 28, SCREEN);
     } else {
-      this.floatText(W / 2, 600, 'Tap a glowing spot to place a fighter', '#ffe9c4', 28);
+      this.floatText(W / 2, 600, 'Tap a glowing spot to place a fighter', '#ffe9c4', 28, SCREEN);
     }
 
     this.floats = 0;
@@ -154,22 +160,87 @@ export default class GameScene extends Phaser.Scene {
     this.game.events.on('hidden', onHidden);
     this.events.once('shutdown', () => this.game.events.off('hidden', onHidden));
 
+    // A tap on the map counts when the finger lifts, close to where it touched, and not during a pinch
     this.input.on('pointerdown', (pointer, over) => {
-      if (this.state !== 'playing') return;
-      if (this.uiClickFrame === this.game.loop.frame) return;
+      const ok = this.state === 'playing' && this.uiClickFrame !== this.game.loop.frame;
+      pointer.kdTap = ok ? { x: pointer.x, y: pointer.y, over: over.length > 0 } : null;
+      if (this.input.pointer1.isDown && this.input.pointer2.isDown) this.input.pointer1.kdTap = this.input.pointer2.kdTap = null;
+    });
+    this.input.on('pointerup', (pointer) => {
+      const tap = pointer.kdTap;
+      pointer.kdTap = null;
+      if (!tap || this.state !== 'playing' || Phaser.Math.Distance.Between(tap.x, tap.y, pointer.x, pointer.y) > 16) return;
+      const p = this.worldAt(pointer);
       if (this.aiming) {
         // Use the chosen ability at the tapped spot
         const key = this.aiming;
         this.cancelAim();
-        this.hero?.cast(key, pointer.worldX, pointer.worldY);
+        this.hero?.cast(key, p.x, p.y);
         return;
       }
-      if (over.length > 0) return;
+      if (tap.over) return;
       // Tapping empty ground: close a menu, or move Zenko there (maze: build there)
       if (this.menu) this.closeMenu();
-      else if (this.maze) this.mazeTap(pointer.worldX, pointer.worldY);
-      else if (pointer.worldY > 60) this.hero?.moveTo(pointer.worldX, pointer.worldY);
+      else if (this.maze) this.mazeTap(p.x, p.y);
+      else if (pointer.y > 60) this.hero?.moveTo(p.x, p.y);
     });
+    this.setupZoom();
+  }
+
+  // ---------- Zoom (two fingers, or the mouse wheel) ----------
+
+  // The map zooms on the main camera. The HUD lives on a second camera that never zooms:
+  // it draws the objects at HUD depths, and the main camera draws everything else.
+  setupZoom() {
+    const cam = this.cameras.main;
+    this.uiCam = this.cameras.add(0, 0, W, H);
+    this.input.addPointer(1);
+    const split = () => {
+      for (const o of this.children.list) o.cameraFilter = isHudDepth(o.depth) ? cam.id : this.uiCam.id;
+    };
+    this.events.on('postupdate', split);
+    this.events.once('shutdown', () => this.events.off('postupdate', split));
+    this.input.on('wheel', (p, over, dx, dy) => this.zoomAt(p.x, p.y, cam.zoom * (dy > 0 ? 0.88 : 1.14)));
+    this.pinch = null;
+    this.input.on('pointermove', () => {
+      const a = this.input.pointer1;
+      const b = this.input.pointer2;
+      if (!a.isDown || !b.isDown) {
+        this.pinch = null;
+        return;
+      }
+      const d = Math.max(20, Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y));
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      if (!this.pinch) {
+        this.pinch = { d, mx, my, zoom: cam.zoom };
+        return;
+      }
+      // Moving both fingers pans, spreading them zooms
+      cam.scrollX -= (mx - this.pinch.mx) / cam.zoom;
+      cam.scrollY -= (my - this.pinch.my) / cam.zoom;
+      this.pinch.mx = mx;
+      this.pinch.my = my;
+      this.zoomAt(mx, my, this.pinch.zoom * d / this.pinch.d);
+    });
+  }
+
+  // The map point under a screen point
+  worldAt(p) {
+    const cam = this.cameras.main;
+    return { x: cam.scrollX + W / 2 + (p.x - W / 2) / cam.zoom, y: cam.scrollY + H / 2 + (p.y - H / 2) / cam.zoom };
+  }
+
+  // Zooms keeping the map point under (sx, sy) in place, and never shows past the map's edges
+  zoomAt(sx, sy, zoom) {
+    const cam = this.cameras.main;
+    const z = Phaser.Math.Clamp(zoom, 1, MAX_ZOOM);
+    const at = this.worldAt({ x: sx, y: sy });
+    cam.setZoom(z);
+    const mx = W / 2 - W / (2 * z);
+    const my = H / 2 - H / (2 * z);
+    cam.scrollX = Phaser.Math.Clamp(at.x - W / 2 - (sx - W / 2) / z, -mx, mx);
+    cam.scrollY = Phaser.Math.Clamp(at.y - H / 2 - (sy - H / 2) / z, -my, my);
   }
 
   // ---------- Hero ability bar ----------
@@ -207,11 +278,11 @@ export default class GameScene extends Phaser.Scene {
     this.selectHero(false);
     const hero = this.hero;
     if (!hero.knows(key)) {
-      this.floatText(W / 2, 600, `Learn ${hero.A[key].name} in the Heroes skill tree`, '#ffd93b', 26);
+      this.floatText(W / 2, 600, `Learn ${hero.A[key].name} in the Heroes skill tree`, '#ffd93b', 26, SCREEN);
       return;
     }
     if (!hero.alive) {
-      this.floatText(W / 2, 600, `${hero.def.name} is down`, '#ff6b6b', 26);
+      this.floatText(W / 2, 600, `${hero.def.name} is down`, '#ff6b6b', 26, SCREEN);
       return;
     }
     if (!hero.canUse(key)) return;
@@ -735,6 +806,7 @@ export default class GameScene extends Phaser.Scene {
     this.rangeCircle.clear();
     this.cellMark.clear();
     this.menuFighter = null;
+    this.menuRefresh = null;
     if (!this.menu) return;
     const m = this.menu;
     this.menu = null;
@@ -770,6 +842,7 @@ export default class GameScene extends Phaser.Scene {
     const m = this.add.container(pos.x, pos.y).setDepth(120);
     m.add(this.add.rectangle(0, 0, w, h, COLORS.panel, 0.94).setStrokeStyle(2, COLORS.ki));
 
+    const cards = [];
     types.forEach((type, i) => {
       const def = type === 'wall' ? WALL : FIGHTERS[type];
       const range = def.tiers?.[0].range;
@@ -780,6 +853,7 @@ export default class GameScene extends Phaser.Scene {
       const card = this.add.rectangle(cx, 0, cardW, cardH, COLORS.card)
         .setStrokeStyle(2, afford && !locked ? 0xffffff : 0x555a6a)
         .setInteractive({ useHandCursor: true });
+      cards.push({ card, def, locked });
       if (locked) {
         card.on('pointerdown', () => this.floatText(pos.x + cx, pos.y, `Unlocks at level ${def.unlock}`, '#ffd93b', 22));
         m.add([
@@ -813,7 +887,7 @@ export default class GameScene extends Phaser.Scene {
         this.add.image(cx, -34, type === 'wall' ? 'wall' : `${def.texture}_0`),
         this.add.text(cx, 10, def.name, textStyle(22)).setOrigin(0.5),
         this.add.text(cx, 34, def.role, textStyle(16, '#c9d3ff')).setOrigin(0.5),
-        this.add.text(cx, 56, `${def.cost} Ki`, textStyle(22, afford ? '#ffd93b' : '#ff6b6b')).setOrigin(0.5),
+        cards[cards.length - 1].price = this.add.text(cx, 56, `${def.cost} Ki`, textStyle(22, afford ? '#ffd93b' : '#ff6b6b')).setOrigin(0.5),
       ]);
       // Which fighters can hit flying enemies
       if (def.hitsAir) m.add(this.add.text(cx + 54, -60, 'AIR', textStyle(14, '#7fd8ff')).setOrigin(1, 0));
@@ -821,6 +895,15 @@ export default class GameScene extends Phaser.Scene {
     });
     this.markCell(spot);
     this.menu = m;
+    // Ki keeps coming in while the menu is open
+    this.menuRefresh = () => {
+      for (const c of cards) {
+        if (c.locked) continue;
+        const afford = this.ki >= c.def.cost;
+        c.card.setStrokeStyle(2, afford ? 0xffffff : 0x555a6a);
+        c.price.setColor(afford ? '#ffd93b' : '#ff6b6b');
+      }
+    };
   }
 
   selectFighter(f) {
@@ -845,13 +928,20 @@ export default class GameScene extends Phaser.Scene {
     // EXP bar: the fighter earns EXP by hurting enemies; a full bar opens the next upgrade
     const next = f.next;
     const ready = f.expReady;
+    let paintExp = () => {};
     if (next) {
       const bar = this.add.graphics();
+      const expText = this.add.text(0, 16, '', textStyle(14)).setOrigin(0.5);
       const from = EXP_TOTAL[f.tier];
-      const frac = Math.min(1, (f.exp - from) / (f.expNeed - from));
-      bar.fillStyle(0x000000, 0.7).fillRoundedRect(-140, 8, 280, 16, 6);
-      bar.fillStyle(ready ? 0x5be35b : 0x7fd8ff).fillRoundedRect(-140, 8, Math.max(8, 280 * frac), 16, 6);
-      m.add([bar, this.add.text(0, 16, ready ? 'LEVEL UP!' : `EXP  ${Math.floor(f.exp - from)} / ${f.expNeed - from}`, textStyle(14)).setOrigin(0.5)]);
+      paintExp = () => {
+        const frac = Math.min(1, (f.exp - from) / (f.expNeed - from));
+        bar.clear();
+        bar.fillStyle(0x000000, 0.7).fillRoundedRect(-140, 8, 280, 16, 6);
+        bar.fillStyle(ready ? 0x5be35b : 0x7fd8ff).fillRoundedRect(-140, 8, Math.max(8, 280 * frac), 16, 6);
+        expText.setText(ready ? 'LEVEL UP!' : `EXP  ${Math.floor(f.exp - from)} / ${f.expNeed - from}`);
+      };
+      paintExp();
+      m.add([bar, expText]);
     }
 
     const transform = f.nextIsTransform;
@@ -885,6 +975,19 @@ export default class GameScene extends Phaser.Scene {
 
     m.add([up, sell]);
     this.menu = m;
+    let shownExp = f.exp;
+    this.menuRefresh = () => {
+      // The upgrade just opened (EXP bar full): build the menu again with its new button
+      if (f.expReady !== ready) {
+        this.selectFighter(f);
+        return;
+      }
+      if (f.exp !== shownExp) {
+        shownExp = f.exp;
+        paintExp();
+      }
+      if (next) up.setEnabled(ready && this.ki >= next.cost);
+    };
   }
 
   buildFighter(spot, type) {
@@ -923,7 +1026,7 @@ export default class GameScene extends Phaser.Scene {
     }
     const bonus = Math.min(150, 20 + this.waveIndex * 10);
     this.ki += bonus;
-    this.floatText(W / 2, H / 2 + 50, `Wave clear!  +${bonus} Ki`, '#ffd93b', 34);
+    this.floatText(W / 2, H / 2 + 50, `Wave clear!  +${bonus} Ki`, '#ffd93b', 34, SCREEN);
     this.refreshHud();
   }
 
@@ -950,6 +1053,7 @@ export default class GameScene extends Phaser.Scene {
       else this.selectHero(false);
     }
     if (this.hero) this.refreshAbilities();
+    this.menuRefresh?.();
     this.tutorial?.update(dt);
     this.updateProjectiles(dt);
     this.updateHazards(dt);
@@ -1500,10 +1604,11 @@ export default class GameScene extends Phaser.Scene {
     this.floatText(x + Phaser.Math.Between(-8, 8), y, `${n}`, '#ffffff', 16);
   }
 
-  floatText(x, y, str, color = '#ffffff', size = 20) {
+  // depth SCREEN: a message on the screen; otherwise the text belongs to the map (and zooms with it)
+  floatText(x, y, str, color = '#ffffff', size = 20, depth = 60) {
     if (size <= 20 && this.floats > 45) return;
     this.floats++;
-    const t = this.add.text(x, y, str, textStyle(size, color)).setOrigin(0.5).setDepth(150);
+    const t = this.add.text(x, y, str, textStyle(size, color)).setOrigin(0.5).setDepth(depth);
     this.tweens.add({
       targets: t, y: y - 36, alpha: 0, duration: 800, ease: 'Cubic.Out',
       onComplete: () => {

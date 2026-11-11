@@ -3,7 +3,7 @@
 // when online, so the next launch gets the newest version.
 // Bump CACHE when the file list changes.
 
-const CACHE = 'ki-defenders-v21';
+const CACHE = 'ki-defenders-v22';
 
 const FILES = [
   './',
@@ -64,6 +64,16 @@ const FILES = [
   'src/ui/menuBackground.js',
   'art/kaito_0.png',
   'art/kaito_0_attack.png',
+  'art/kaito_1.png',
+  'art/kaito_1_attack.png',
+  'art/kaito_2.png',
+  'art/kaito_2_attack.png',
+  'art/kaito_3.png',
+  'art/kaito_3_attack.png',
+  'art/kaito_4.png',
+  'art/kaito_4_attack.png',
+  'art/kaito_5.png',
+  'art/kaito_5_attack.png',
 ];
 
 self.addEventListener('install', (event) => {
