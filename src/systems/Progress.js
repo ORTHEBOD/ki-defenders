@@ -38,9 +38,10 @@ export function endlessOpen(player) {
   return player.super || totalStars(player) >= ENDLESS_STARS;
 }
 
-// Better gear is sold as your heroes grow: Common from hero level 5, Rare from 10, Epic from 15.
+// Better gear is sold as your heroes grow: Common from hero level 5, Rare from 10, Epic from 15,
+// Legendary from 20, Mythic from 25 and Divine from 30.
 // The highest level of any of the player's heroes counts.
-export const GEAR_LEVELS = [5, 10, 15];
+export const GEAR_LEVELS = [5, 10, 15, 20, 25, 30];
 
 export function gearTier(player) {
   if (player.super) return GEAR_LEVELS.length;

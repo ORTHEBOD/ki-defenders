@@ -1,4 +1,4 @@
-import { GEAR, GEAR_SLOTS, SPIN, gearText, gearBonus } from '../data/shop.js';
+import { GEAR, GEAR_SLOTS, RARITY, SPIN, gearText, gearBonus } from '../data/shop.js';
 import { HEROES, newHeroSave, heroForm } from '../data/hero.js';
 import { fighterPortrait, formLook, gearLook } from '../art/fighterArt.js';
 import { drawMenuBackground, panel } from '../ui/menuBackground.js';
@@ -8,13 +8,6 @@ import { Audio } from '../systems/Audio.js';
 import { Ads, AD_REWARD, ADS_PER_DAY } from '../systems/Ads.js';
 import { shopOpen, gearTier, tierNeed } from '../systems/Progress.js';
 import { textStyle } from '../ui/theme.js';
-
-// Gear tiers: card frame and label colour
-const RARITY = [
-  { name: 'Common', color: 0x8c96b0, text: '#c9d3ff' },
-  { name: 'Rare', color: 0x3fa8ff, text: '#7ac8ff' },
-  { name: 'Epic', color: 0xc86bff, text: '#e0a8ff' },
-];
 
 export default class ShopScene extends Phaser.Scene {
   constructor() {
@@ -51,6 +44,8 @@ export default class ShopScene extends Phaser.Scene {
     if (this.spinning) return;
     this.tab = tab;
     ['gear', 'spin', 'video'].forEach((t, i) => this.tabs[i].setAlpha(tab === t ? 1 : 0.6));
+    this.shines?.forEach((t) => t.remove());
+    this.shines = [];
     this.layer.removeAll(true);
     if (tab === 'gear') this.showGear();
     else if (tab === 'spin') this.showSpin();
@@ -65,7 +60,7 @@ export default class ShopScene extends Phaser.Scene {
   // ---------- Equipment ----------
 
   // Equipment: the hero on the left wearing its gear, a tab for each gear slot,
-  // and the 3 items of the chosen slot (Common, Rare, Epic). Pointing at a card tries it on.
+  // and the 6 items of the chosen slot (Common up to Divine) in 2 rows. Pointing at a card tries it on.
   showGear() {
     const L = this.layer;
     const hero = activeHero(this.player);
@@ -105,9 +100,9 @@ export default class ShopScene extends Phaser.Scene {
       if (item) L.add(this.add.circle(x + 50, 190, 6, 0x5be35b).setStrokeStyle(2, 0x10131c));
     });
 
-    // The 3 items of this slot
-    Object.entries(GEAR).filter(([, g]) => g.slot === this.slot).forEach(([id, item], i) => {
-      this.gearCard(id, item, 560 + i * 275, 480, hero, def, worn);
+    // The 6 items of this slot, weakest first
+    Object.entries(GEAR).filter(([, g]) => g.slot === this.slot).sort((a, b) => a[1].tier - b[1].tier).forEach(([id, item], i) => {
+      this.gearCard(id, item, 560 + (i % 3) * 275, 377 + Math.floor(i / 3) * 198, hero, def, worn);
     });
   }
 
@@ -115,25 +110,33 @@ export default class ShopScene extends Phaser.Scene {
     const L = this.layer;
     const rarity = RARITY[item.tier - 1];
     if (item.tier > gearTier(this.player)) {
-      L.add(panel(this, x, y, 255, 360, 0x3a3f52));
-      L.add(this.add.text(x, y - 140, rarity.name, textStyle(22, '#8a91ad')).setOrigin(0.5));
-      L.add(this.add.text(x, y - 30, '🔒', { fontSize: '56px' }).setOrigin(0.5).setAlpha(0.8));
-      L.add(this.add.text(x, y + 50, `Opens at\n${tierNeed(item.tier)}`, { ...textStyle(22, '#9aa3c7'), align: 'center' }).setOrigin(0.5));
+      L.add(panel(this, x, y, 262, 190, 0x3a3f52));
+      L.add(this.add.text(x, y - 62, rarity.name.toUpperCase(), textStyle(20, '#8a91ad')).setOrigin(0.5));
+      L.add(this.add.text(x, y - 14, '🔒', { fontSize: '40px' }).setOrigin(0.5).setAlpha(0.8));
+      L.add(this.add.text(x, y + 48, `Opens at ${tierNeed(item.tier)}`, textStyle(19, '#9aa3c7')).setOrigin(0.5));
       return;
     }
     const owned = this.player.items.includes(id);
     const wearing = worn[item.slot] === id;
-    const card = panel(this, x, y, 255, 360, wearing ? 0x5be35b : rarity.color);
-    L.add(card);
-    L.add(this.add.text(x, y - 150, rarity.name.toUpperCase(), textStyle(20, rarity.text)).setOrigin(0.5));
-    const glow = this.add.graphics();
-    glow.fillStyle(rarity.color, 0.2).fillCircle(x, y - 80, 48);
-    glow.lineStyle(3, rarity.color, 0.9).strokeCircle(x, y - 80, 48);
-    L.add(glow);
-    L.add(this.gearIcon(0, 0, item.slot, item.color).setPosition(x, y - 80).setScale(2));
-    L.add(this.add.text(x, y - 10, item.name, textStyle(26)).setOrigin(0.5));
-    L.add(this.add.text(x, y + 40, gearText(item).split(', ').join('\n'),
-      { ...textStyle(18, '#9bff7a'), align: 'center', lineSpacing: 2 }).setOrigin(0.5));
+    L.add(panel(this, x, y, 262, 190, wearing ? 0x5be35b : rarity.color));
+    // The picture, in a ring of the tier's color (Legendary and better shine)
+    const ix = x - 86;
+    const iy = y - 28;
+    if (item.tier >= 4) {
+      const shine = this.add.image(ix, iy, 'glow').setTint(rarity.color).setBlendMode('ADD').setScale(1.05).setAlpha(0.55);
+      this.shines.push(this.tweens.add({ targets: shine, alpha: 0.95, scale: 1.3, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' }));
+      L.add(shine);
+    }
+    const ring = this.add.graphics();
+    ring.fillStyle(0x10131c, 0.85).fillCircle(ix, iy, 34);
+    ring.fillStyle(rarity.color, 0.22).fillCircle(ix, iy, 34);
+    ring.lineStyle(3, rarity.color, 0.95).strokeCircle(ix, iy, 34);
+    L.add(ring);
+    L.add(this.gearIcon(0, 0, item.slot, item.color).setPosition(ix, iy).setScale(1.5));
+    L.add(this.add.text(x - 42, y - 86, `${rarity.name.toUpperCase()}${'★'.repeat(Math.max(0, item.tier - 3))}`, textStyle(16, rarity.text)));
+    const name = this.add.text(x - 42, y - 67, item.name, { ...textStyle(21), wordWrap: { width: 166 }, lineSpacing: -4 });
+    L.add(name);
+    L.add(this.add.text(x - 42, name.y + name.height, gearText(item).split(', ').join('\n'), { ...textStyle(15, '#9bff7a'), lineSpacing: -2 }));
 
     let label;
     let action;
@@ -152,13 +155,13 @@ export default class ShopScene extends Phaser.Scene {
       color = 0xc99a00;
       action = () => this.buy(id);
     }
-    const b = makeButton(this, x, y + 128, 210, 54, label, () => action?.(), { fontSize: 24, color });
+    const b = makeButton(this, x, y + 64, 236, 42, label, () => action?.(), { fontSize: 22, color });
     if (!action || (!owned && this.player.coins < item.cost)) b.setEnabled(false);
     L.add(b);
 
     // Point at the card to try the item on the hero
     if (hero) {
-      const hit = this.add.rectangle(x, y - 40, 255, 270, 0xffffff, 0).setInteractive();
+      const hit = this.add.rectangle(x, y - 26, 262, 134, 0xffffff, 0).setInteractive();
       hit.on('pointerover', () => this.dressHero(hero, def, { ...worn, [item.slot]: id }));
       hit.on('pointerout', () => this.dressHero(hero, def, worn));
       L.add(hit);

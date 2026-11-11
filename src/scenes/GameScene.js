@@ -21,9 +21,12 @@ import { makeButton } from '../ui/Button.js';
 import { COLORS, textStyle } from '../ui/theme.js';
 import { baseLevels, baseLives, baseKi, cannonStats } from '../data/base.js';
 import { drawBase } from '../art/baseArt.js';
+import { shade } from '../art/fighterArt.js';
 
 // Part of every fighter's EXP that is shared with the whole team (see shareExp)
 const TEAM_EXP = 0.3;
+// After a win, the next level starts by itself after this many seconds
+const NEXT_SECONDS = 5;
 
 const W = 1280;
 const H = 720;
@@ -248,28 +251,48 @@ export default class GameScene extends Phaser.Scene {
   // ---------- Map ----------
 
   drawMap() {
-    const g = this.add.graphics().setDepth(0);
+    const g = this.add.graphics();
     const rnd = new Phaser.Math.RandomDataGenerator([`map-${this.level.id}`]);
 
     const th = this.theme;
     this.drawGround(g, rnd);
 
+    // The road in layers: its shadow, a dark outline, the edge, the road and a lighter worn middle.
+    // Each layer is straight pieces with a circle on every corner, so the corners come out round.
     const pts = this.path.points;
-    g.lineStyle(70, 0x000000, 0.12).strokePoints(pts.map((p) => ({ x: p.x + 4, y: p.y + 6 })));
-    g.lineStyle(66, th.edge).strokePoints(pts);
-    pts.forEach((p) => g.fillStyle(th.edge).fillCircle(p.x, p.y, 33));
-    g.lineStyle(54, th.road).strokePoints(pts);
-    pts.forEach((p) => g.fillStyle(th.road).fillCircle(p.x, p.y, 27));
+    const layer = (width, color, dx = 0, dy = 0) => {
+      g.lineStyle(width, color).fillStyle(color);
+      pts.forEach((p, i) => {
+        if (i) g.lineBetween(pts[i - 1].x + dx, pts[i - 1].y + dy, p.x + dx, p.y + dy);
+        g.fillCircle(p.x + dx, p.y + dy, width / 2);
+      });
+    };
+    layer(72, shade(th.ground, 0.78), 4, 7);
+    layer(71, shade(th.edge, 0.6));
+    layer(66, th.edge);
+    layer(54, th.road);
+    layer(32, shade(th.road, th.metal ? 1.12 : 1.05));
     if (th.metal) {
       // Glowing guide lights along the metal walkway
       for (let d = 0; d < this.path.length; d += 36) {
         const p = this.path.pointAt(d);
-        g.fillStyle(th.pebble, 0.7).fillCircle(p.x, p.y, 3);
+        g.fillStyle(th.pebble, 0.16).fillCircle(p.x, p.y, 9);
+        g.fillStyle(th.pebble, 0.8).fillCircle(p.x, p.y, 3);
       }
     } else {
+      // Worn marks and pebbles
+      for (let i = 0; i < 40; i++) {
+        const p = this.path.pointAt(rnd.between(0, this.path.length));
+        g.fillStyle(shade(th.road, 0.88), 0.8).fillEllipse(p.x + rnd.between(-18, 18), p.y + rnd.between(-18, 18), rnd.between(6, 13), 3);
+      }
       for (let i = 0; i < 60; i++) {
         const p = this.path.pointAt(rnd.between(0, this.path.length));
-        g.fillStyle(th.pebble).fillCircle(p.x + rnd.between(-20, 20), p.y + rnd.between(-20, 20), rnd.between(2, 4));
+        const x = p.x + rnd.between(-20, 20);
+        const y = p.y + rnd.between(-20, 20);
+        const r = rnd.between(2, 4);
+        g.fillStyle(shade(th.pebble, 0.7)).fillCircle(x + 1, y + 1.5, r);
+        g.fillStyle(th.pebble).fillCircle(x, y, r);
+        g.fillStyle(shade(th.pebble, 1.25)).fillCircle(x - r * 0.3, y - r * 0.3, r * 0.4);
       }
     }
 
@@ -282,13 +305,15 @@ export default class GameScene extends Phaser.Scene {
       placed++;
       this.drawDeco(g, x, y, rnd);
     }
+    this.bakeMap(g);
     this.addAmbience();
 
     this.drawPortal(pts[0].x + 60, pts[0].y);
     this.drawBase(pts[pts.length - 1].x, pts[pts.length - 1].y);
   }
 
-  // Ground color with soft patches, plus a light-to-dark shading from top to bottom
+  // Ground color with soft patches and small details: grass and flowers, ripples in the sand,
+  // or metal plates with rivets
   drawGround(g, rnd) {
     const th = this.theme;
     g.fillStyle(th.ground).fillRect(0, 0, W, H);
@@ -299,13 +324,56 @@ export default class GameScene extends Phaser.Scene {
       for (let i = 0; i < 40; i++) {
         g.fillStyle(rnd.pick(th.blobs), 1).fillRect(rnd.between(0, 15) * 80 + 2, rnd.between(0, 9) * 80 + 2, 76, 76);
       }
-    } else {
-      for (let i = 0; i < 140; i++) {
-        g.fillStyle(rnd.pick(th.blobs), 1);
-        g.fillEllipse(rnd.between(0, W), rnd.between(0, H), rnd.between(30, 90), rnd.between(14, 40));
+      for (let x = 0; x < W; x += 80) {
+        for (let y = 0; y < H; y += 80) {
+          g.fillStyle(0xffffff, 0.05).fillRect(x + 2, y + 2, 76, 3);
+          g.fillStyle(0x8a94a8, 0.55).fillCircle(x + 9, y + 10, 2).fillCircle(x + 71, y + 10, 2).fillCircle(x + 9, y + 71, 2).fillCircle(x + 71, y + 71, 2);
+        }
+      }
+      return;
+    }
+    for (let i = 0; i < 140; i++) {
+      g.fillStyle(rnd.pick(th.blobs), 1);
+      g.fillEllipse(rnd.between(0, W), rnd.between(0, H), rnd.between(30, 90), rnd.between(14, 40));
+    }
+    const sandy = th.deco.includes('cactus');
+    for (let i = 0; i < 260; i++) {
+      const x = rnd.between(0, W);
+      const y = rnd.between(64, H);
+      if (sandy) {
+        g.lineStyle(2, shade(th.ground, rnd.pick([0.86, 1.1])), 0.75);
+        g.beginPath().arc(x, y, rnd.between(8, 20), Math.PI * 1.2, Math.PI * 1.8).strokePath();
+      } else {
+        g.lineStyle(2, shade(th.ground, rnd.pick([0.7, 0.8, 1.22])), 0.9);
+        g.lineBetween(x, y, x - 3, y - 6).lineBetween(x, y, x, y - 8).lineBetween(x, y, x + 3, y - 6);
       }
     }
-    g.fillGradientStyle(0xffffff, 0xffffff, 0x000000, 0x000000, 0.06, 0.06, 0.12, 0.12).fillRect(0, 0, W, H);
+    for (let i = 0; i < (sandy ? 30 : 44); i++) {
+      const x = rnd.between(0, W);
+      const y = rnd.between(64, H);
+      if (sandy) {
+        // Little stones
+        g.fillStyle(shade(th.ground, 0.7)).fillEllipse(x + 1, y + 1.5, 7, 5);
+        g.fillStyle(shade(th.ground, 0.84)).fillEllipse(x, y, 7, 5);
+      } else {
+        // Flowers
+        g.fillStyle(rnd.pick([0xffffff, 0xffe14d, 0xff9ab0, 0xc9a8ff]));
+        g.fillCircle(x - 2, y, 1.8).fillCircle(x + 2, y, 1.8).fillCircle(x, y - 2, 1.8).fillCircle(x, y + 2, 1.8);
+        g.fillStyle(0xffb300).fillCircle(x, y, 1.3);
+      }
+    }
+  }
+
+  // Turns the finished map drawing into one picture (much lighter than drawing every shape again
+  // each frame), then lays soft light from the top left and darker corners over it
+  bakeMap(g) {
+    if (this.textures.exists('battleMap')) this.textures.remove('battleMap');
+    g.generateTexture('battleMap', W, H);
+    g.destroy();
+    this.add.image(0, 0, 'battleMap').setOrigin(0).setDepth(0);
+    const metal = this.theme.metal;
+    this.add.image(250, 130, 'glow').setTint(metal ? 0x3fd0f5 : 0xfff2c0).setBlendMode('ADD').setScale(9).setAlpha(metal ? 0.1 : 0.2).setDepth(1);
+    this.add.image(0, 0, 'vignette').setOrigin(0).setDisplaySize(W, H).setDepth(1);
   }
 
   // A decoration that fits the map: trees and bushes, cacti and bones, or crates and lights
@@ -314,9 +382,11 @@ export default class GameScene extends Phaser.Scene {
     if (kind === 'tree') this.drawTree(g, x, y, rnd);
     else if (kind === 'rock') this.drawRock(g, x, y, rnd);
     else if (kind === 'bush') {
-      g.lineStyle(2, COLORS.outline).fillStyle(0x3b9447);
-      [[-8, 0, 9], [8, 0, 9], [0, -6, 10]].forEach(([dx, dy, r]) => g.fillCircle(x + dx, y + dy, r).strokeCircle(x + dx, y + dy, r));
-      g.fillStyle(0xff6b8a).fillCircle(x - 4, y - 8, 2.5).fillCircle(x + 6, y - 2, 2.5);
+      g.fillStyle(0x000000, 0.16).fillEllipse(x + 1, y + 9, 36, 8);
+      g.lineStyle(2, COLORS.outline);
+      [[-8, 0, 9], [8, 0, 9], [0, -6, 10]].forEach(([dx, dy, r]) => this.leafClump(g, x + dx, y + dy, r, 0x3b9447));
+      g.fillStyle(0xff6b8a).fillCircle(x - 4, y - 8, 2.6).fillCircle(x + 6, y - 2, 2.6);
+      g.fillStyle(0xffd0da).fillCircle(x - 4.7, y - 8.7, 1).fillCircle(x + 5.3, y - 2.7, 1);
     } else if (kind === 'cactus') {
       const s = rnd.realInRange(0.8, 1.2);
       g.fillStyle(0x000000, 0.18).fillEllipse(x + 4, y + 18 * s, 30 * s, 8 * s);
@@ -325,21 +395,28 @@ export default class GameScene extends Phaser.Scene {
       g.fillRoundedRect(x - 17 * s, y - 10 * s, 8 * s, 16 * s, 4 * s).strokeRoundedRect(x - 17 * s, y - 10 * s, 8 * s, 16 * s, 4 * s);
       g.fillRoundedRect(x + 9 * s, y - 16 * s, 8 * s, 16 * s, 4 * s).strokeRoundedRect(x + 9 * s, y - 16 * s, 8 * s, 16 * s, 4 * s);
       g.fillStyle(0x6aba6a).fillRect(x - 3 * s, y - 18 * s, 2 * s, 30 * s);
+      g.fillStyle(0x35763a).fillRect(x + 2.5 * s, y - 17 * s, 2 * s, 32 * s).fillRect(x + 14 * s, y - 13 * s, 1.6 * s, 11 * s);
+      g.fillStyle(0xff8ab0).fillCircle(x, y - 22 * s, 2.6 * s);
     } else if (kind === 'sandrock') {
       const s = rnd.realInRange(0.8, 1.4);
+      g.fillStyle(0x000000, 0.16).fillEllipse(x + 3 * s, y + 12 * s, 40 * s, 9 * s);
       g.lineStyle(2, COLORS.outline).fillStyle(0xb8865a);
       g.fillRoundedRect(x - 18 * s, y - 12 * s, 36 * s, 24 * s, 8 * s).strokeRoundedRect(x - 18 * s, y - 12 * s, 36 * s, 24 * s, 8 * s);
-      g.fillStyle(0xd8a87a).fillRect(x - 14 * s, y - 8 * s, 28 * s, 5 * s);
+      g.fillStyle(0x96683f).fillRoundedRect(x - 16 * s, y + 3 * s, 32 * s, 7 * s, 3 * s);
+      g.fillStyle(0xd8a87a).fillRoundedRect(x - 14 * s, y - 9 * s, 28 * s, 5 * s, 2 * s);
     } else if (kind === 'bones') {
       g.lineStyle(4, 0xf2e6c4);
       g.lineBetween(x - 12, y - 4, x + 12, y + 4);
       g.lineBetween(x - 10, y + 6, x + 10, y - 6);
       g.fillStyle(0xf2e6c4).fillCircle(x - 18, y - 2, 6).fillCircle(x - 15, y + 5, 4);
     } else if (kind === 'crate') {
+      g.fillStyle(0x000000, 0.25).fillRect(x - 13, y - 11, 34, 32);
       g.lineStyle(2, COLORS.outline).fillStyle(0x5a6378).fillRect(x - 16, y - 16, 32, 32).strokeRect(x - 16, y - 16, 32, 32);
+      g.fillStyle(0x7a8498).fillRect(x - 14, y - 14, 28, 4);
       g.lineStyle(2, 0x2e3442).lineBetween(x - 16, y - 16, x + 16, y + 16).lineBetween(x + 16, y - 16, x - 16, y + 16);
       g.fillStyle(0xffd93b).fillRect(x - 16, y - 4, 32, 4);
     } else if (kind === 'light') {
+      g.fillStyle(0x3fd0f5, 0.1).fillCircle(x, y, 38);
       g.fillStyle(0x3fd0f5, 0.18).fillCircle(x, y, 26);
       g.lineStyle(2, COLORS.outline).fillStyle(0x2e3442).fillCircle(x, y, 10).strokeCircle(x, y, 10);
       g.fillStyle(0x9fe8ff).fillCircle(x, y, 5);
@@ -367,27 +444,45 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  // A round clump of leaves: a dark underside, the leaf color, and a sunny spot on top
+  leafClump(g, x, y, r, color) {
+    g.fillStyle(shade(color, 0.7)).fillCircle(x, y, r).strokeCircle(x, y, r);
+    g.fillStyle(color).fillCircle(x - r * 0.1, y - r * 0.14, r * 0.82);
+    g.fillStyle(shade(color, 1.28), 0.9).fillCircle(x - r * 0.3, y - r * 0.36, r * 0.38);
+  }
+
   drawTree(g, x, y, rnd) {
     const s = rnd.realInRange(0.8, 1.2);
-    g.fillStyle(0x000000, 0.18).fillEllipse(x, y + 14 * s, 40 * s, 10 * s);
-    g.fillStyle(0x7a4e2d).fillRect(x - 4 * s, y, 8 * s, 14 * s);
+    g.fillStyle(0x000000, 0.2).fillEllipse(x + 3 * s, y + 15 * s, 46 * s, 11 * s);
     g.lineStyle(2, COLORS.outline);
-    g.fillStyle(0x2f7a3a);
-    g.fillCircle(x - 10 * s, y - 4 * s, 13 * s).strokeCircle(x - 10 * s, y - 4 * s, 13 * s);
-    g.fillCircle(x + 10 * s, y - 4 * s, 13 * s).strokeCircle(x + 10 * s, y - 4 * s, 13 * s);
-    g.fillStyle(0x3b9447).fillCircle(x, y - 14 * s, 15 * s).strokeCircle(x, y - 14 * s, 15 * s);
+    g.fillStyle(0x7a4e2d).fillRect(x - 4 * s, y, 8 * s, 15 * s).strokeRect(x - 4 * s, y, 8 * s, 15 * s);
+    g.fillStyle(0x5c3a20).fillRect(x + s, y + 1, 2.4 * s, 13 * s);
+    this.leafClump(g, x - 10 * s, y - 4 * s, 13 * s, 0x2f7a3a);
+    this.leafClump(g, x + 10 * s, y - 4 * s, 13 * s, 0x2f7a3a);
+    this.leafClump(g, x, y - 14 * s, 15 * s, 0x3b9447);
   }
 
   drawRock(g, x, y, rnd) {
     const s = rnd.realInRange(0.7, 1.3);
+    g.fillStyle(0x000000, 0.18).fillEllipse(x + 2 * s, y + 9 * s, 38 * s, 10 * s);
     g.lineStyle(2, COLORS.outline);
-    g.fillStyle(0x8c8f99).fillEllipse(x, y, 34 * s, 22 * s).strokeEllipse(x, y, 34 * s, 22 * s);
-    g.fillStyle(0xb3b6c0).fillEllipse(x - 5 * s, y - 4 * s, 14 * s, 7 * s);
+    g.fillStyle(0x6c6f7a).fillEllipse(x, y, 34 * s, 22 * s).strokeEllipse(x, y, 34 * s, 22 * s);
+    g.fillStyle(0x8c8f99).fillEllipse(x - 1.5 * s, y - 2 * s, 28 * s, 15 * s);
+    g.fillStyle(0xbcbfc9).fillEllipse(x - 6 * s, y - 5 * s, 13 * s, 6 * s);
   }
 
+  // The enemy portal: a glowing, turning swirl
   drawPortal(x, y) {
-    const outer = this.add.ellipse(x, y, 70, 90, 0x6c2f86, 0.85).setDepth(9).setStrokeStyle(4, 0x2a0f3a);
-    const inner = this.add.ellipse(x, y, 44, 62, 0xc38be0, 0.9).setDepth(9);
+    const glow = this.add.image(x, y, 'glow').setTint(0xc86bff).setBlendMode('ADD').setDepth(8).setScale(1.9, 2.3).setAlpha(0.75);
+    this.tweens.add({ targets: glow, alpha: 0.4, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    const outer = this.add.ellipse(x, y, 70, 90, 0x6c2f86, 0.9).setDepth(9).setStrokeStyle(4, 0x2a0f3a);
+    this.add.ellipse(x, y, 56, 76, 0x9a4fc0, 0.9).setDepth(9);
+    const inner = this.add.ellipse(x, y, 40, 60, 0xe3b8f5, 0.95).setDepth(9);
+    const swirl = this.add.graphics().setDepth(9).setPosition(x, y);
+    for (let i = 0; i < 3; i++) {
+      swirl.lineStyle(3, 0xffffff, 0.75 - i * 0.15).beginPath().arc(0, 0, 6 + i * 6, i * 2.1, i * 2.1 + 2.4).strokePath();
+    }
+    this.tweens.add({ targets: swirl, angle: 360, duration: 2400, repeat: -1 });
     this.tweens.add({ targets: inner, scaleX: 0.7, scaleY: 0.8, duration: 800, yoyo: true, repeat: -1 });
     this.tweens.add({ targets: outer, angle: 8, duration: 1200, yoyo: true, repeat: -1 });
   }
@@ -438,7 +533,7 @@ export default class GameScene extends Phaser.Scene {
 
   drawMazeMap() {
     const grid = this.route;
-    const g = this.add.graphics().setDepth(0);
+    const g = this.add.graphics();
     const rnd = new Phaser.Math.RandomDataGenerator([`map-${this.level.id}`]);
     this.drawGround(g, rnd);
     // Checkered field so the cells are easy to see
@@ -456,6 +551,7 @@ export default class GameScene extends Phaser.Scene {
     const right = grid.ox + grid.cols * grid.size;
     g.fillStyle(this.theme.edge).fillRect(-10, inY - 33, grid.ox + 10, 66).fillRect(right, outY - 33, W - right + 10, 66);
     g.fillStyle(this.theme.road).fillRect(-10, inY - 27, grid.ox + 10, 54).fillRect(right, outY - 27, W - right + 10, 54);
+    g.fillStyle(shade(this.theme.road, 1.05)).fillRect(-10, inY - 16, grid.ox + 10, 32).fillRect(right, outY - 16, W - right + 10, 32);
     for (const [c, r] of grid.rocks) {
       const p = grid.center(c, r);
       this.drawBoulder(g, p.x, p.y, rnd);
@@ -463,6 +559,7 @@ export default class GameScene extends Phaser.Scene {
     for (const [x, y] of [[1220, 110], [1250, 200], [1215, 520], [1252, 600], [30, 130], [28, 590]]) {
       this.drawDeco(g, x, y, rnd);
     }
+    this.bakeMap(g);
     this.addAmbience();
     this.routeLine = this.add.graphics().setDepth(2);
     this.drawPortal(grid.start.x, grid.start.y);
@@ -473,6 +570,7 @@ export default class GameScene extends Phaser.Scene {
     g.fillStyle(0x000000, 0.2).fillEllipse(x + 2, y + 18, 58, 18);
     g.lineStyle(3, COLORS.outline);
     g.fillStyle(this.theme.boulder).fillEllipse(x, y + 2, 58, 46).strokeEllipse(x, y + 2, 58, 46);
+    g.fillStyle(shade(this.theme.boulder, 0.72)).fillEllipse(x + 4, y + 12, 44, 18);
     g.fillStyle(0xa3a6b0).fillEllipse(x - 6 + rnd.between(-3, 3), y - 8, 30, 16);
     g.fillStyle(0xc4c7d0).fillEllipse(x - 10, y - 11, 10, 5);
   }
@@ -928,8 +1026,14 @@ export default class GameScene extends Phaser.Scene {
   // ---------- Blaze's ki blasts and burning ground ----------
 
   fireBlast(x, y, target, opts) {
-    const ball = this.add.circle(x, y, opts.size ?? 9, opts.color).setStrokeStyle(3, 0xffffff).setDepth(31);
-    this.projectiles.push({ ball, target, tx: target.x, ty: target.y, speed: 520, ...opts });
+    const size = opts.size ?? 9;
+    // A glowing ball of ki with a bright middle
+    const ball = this.add.container(x, y, [
+      this.add.image(0, 0, 'glow').setTint(opts.color).setBlendMode('ADD').setScale(size / 11),
+      this.add.circle(0, 0, size, opts.color).setStrokeStyle(2.5, 0xffffff),
+      this.add.circle(-size * 0.2, -size * 0.2, size * 0.5, 0xffffff, 0.85),
+    ]).setDepth(31);
+    this.projectiles.push({ ball, target, tx: target.x, ty: target.y, speed: 520, trail: 0, ...opts });
   }
 
   updateProjectiles(dt) {
@@ -948,6 +1052,13 @@ export default class GameScene extends Phaser.Scene {
       } else {
         p.ball.x += (dx / d) * step;
         p.ball.y += (dy / d) * step;
+        // A fading trail behind the ball
+        p.trail -= dt;
+        if (p.trail <= 0) {
+          p.trail = 0.05;
+          const t = this.add.circle(p.ball.x, p.ball.y, (p.size ?? 9) * 0.75, p.color, 0.5).setDepth(30);
+          this.tweens.add({ targets: t, scale: 0.2, alpha: 0, duration: 220, onComplete: () => t.destroy() });
+        }
       }
     }
     this.projectiles = this.projectiles.filter((p) => !p.done);
@@ -1213,7 +1324,7 @@ export default class GameScene extends Phaser.Scene {
     Audio.sfx(win ? 'victory' : 'defeat');
     const heroName = this.hero?.def.name;
 
-    this.add.rectangle(0, 0, W, H, 0x000000, 0.65).setOrigin(0).setDepth(200).setInteractive();
+    const dim = this.add.rectangle(0, 0, W, H, 0x000000, 0.65).setOrigin(0).setDepth(200).setInteractive();
     this.add.text(W / 2, 150, this.endless ? 'Game Over' : win ? 'Victory!' : 'Defeat', textStyle(96, win ? '#ffd93b' : '#ff5a5a'))
       .setOrigin(0.5).setDepth(201);
     if (this.endless) {
@@ -1247,18 +1358,41 @@ export default class GameScene extends Phaser.Scene {
       if (after && !seen.includes(after)) this.scene.start('Story', { id: after, next: { scene: 'LevelSelect', data: { mapIndex: this.startData.mapIndex } } });
       else this.quitToMap();
     };
-    // Every way out of this screen goes through the between-battles ad first
-    const thenAd = (fn) => () => Ads.between(this, fn);
+    // Every way out of this screen goes through the between-battles ad first (see `leave`)
     const nextId = this.level.id + 1;
     const player = Save.current();
     const hasNext = win && !this.endless && !after && player && levelOpen(player, nextId);
+    // The next level starts by itself after NEXT_SECONDS. Any other button, or a tap on the dark
+    // screen, stops the countdown.
+    let countdown = null;
+    const leave = (fn) => () => {
+      countdown?.remove();
+      Ads.between(this, fn);
+    };
     if (hasNext) {
-      makeButton(this, W / 2 - 290, 540, 260, 64, 'Next level', thenAd(() => this.playNext(nextId)), { color: 0x2f8a4a, depth: 202 });
+      const goNext = leave(() => this.playNext(nextId));
+      const nextBtn = makeButton(this, W / 2 - 290, 540, 260, 64, `Next level (${NEXT_SECONDS})`, goNext, { color: 0x2f8a4a, depth: 202 });
+      let left = NEXT_SECONDS;
+      // `time` runs faster at 2x and 3x speed, so the delay is stretched to keep real seconds
+      countdown = this.time.addEvent({
+        delay: 1000 * this.speed,
+        repeat: NEXT_SECONDS - 1,
+        callback: () => {
+          left--;
+          nextBtn.setLabel(`Next level (${left})`);
+          if (left <= 0) goNext();
+        },
+      });
+      dim.on('pointerdown', () => {
+        if (this.uiClickFrame === this.game.loop.frame) return;
+        countdown.remove();
+        nextBtn.setLabel('Next level');
+      });
     }
     const x0 = hasNext ? 0 : -150;
-    makeButton(this, W / 2 + x0, 540, 260, 64, win ? (hasNext ? 'Back to map' : 'Continue') : this.endless ? 'Back' : 'Back to map', thenAd(cont),
+    makeButton(this, W / 2 + x0, 540, 260, 64, win ? (hasNext ? 'Back to map' : 'Continue') : this.endless ? 'Back' : 'Back to map', leave(cont),
       { color: 0xe0661a, depth: 202 });
-    makeButton(this, W / 2 + x0 + (hasNext ? 290 : 300), 540, 260, 64, win ? 'Play again' : 'Try again', thenAd(() => this.scene.restart(this.startData)),
+    makeButton(this, W / 2 + x0 + (hasNext ? 290 : 300), 540, 260, 64, win ? 'Play again' : 'Try again', leave(() => this.scene.restart(this.startData)),
       { depth: 202 });
   }
 
@@ -1273,6 +1407,12 @@ export default class GameScene extends Phaser.Scene {
 
   // ---------- Effects ----------
 
+  // A quick soft light that grows and fades
+  glowFx(x, y, color, from, to, duration = 220, depth = 29) {
+    const glow = this.add.image(x, y, 'glow').setTint(color).setBlendMode('ADD').setDepth(depth).setScale(from);
+    this.tweens.add({ targets: glow, scale: to, alpha: 0, duration, onComplete: () => glow.destroy() });
+  }
+
   hitSpark(x, y, color, scale = 1) {
     const g = this.add.graphics().setDepth(30).setPosition(x, y).setScale(scale);
     g.fillStyle(0xffffff).fillCircle(0, 0, 6);
@@ -1282,15 +1422,19 @@ export default class GameScene extends Phaser.Scene {
       g.lineBetween(Math.cos(a) * 7, Math.sin(a) * 7, Math.cos(a) * 15, Math.sin(a) * 15);
     }
     this.tweens.add({ targets: g, scale: scale * 1.6, alpha: 0, duration: 180, onComplete: () => g.destroy() });
+    this.glowFx(x, y, color, 0.45 * scale, 0.9 * scale, 200);
   }
 
   beamFx(x1, y1, x2, y2, color, width = 22) {
     const g = this.add.graphics().setDepth(30);
+    g.lineStyle(width * 1.3, color, 0.18).lineBetween(x1, y1, x2, y2);
     g.lineStyle(width * 0.75, color, 0.55).lineBetween(x1, y1, x2, y2);
     g.lineStyle(width * 0.28, 0xffffff, 1).lineBetween(x1, y1, x2, y2);
     g.fillStyle(0xffffff).fillCircle(x1, y1, width * 0.4);
     g.fillStyle(color, 0.6).fillCircle(x1, y1, width * 0.65);
     this.tweens.add({ targets: g, alpha: 0, duration: 260, onComplete: () => g.destroy() });
+    this.glowFx(x1, y1, color, width / 22, width / 14, 260, 30);
+    this.glowFx(x2, y2, color, width / 26, width / 12, 300, 30);
   }
 
   flashFx(x, y, range, color) {
@@ -1298,11 +1442,15 @@ export default class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: ring, scale: 1, alpha: 0, duration: 380, ease: 'Cubic.Out', onComplete: () => ring.destroy() });
     const core = this.add.circle(x, y, 22, 0xffffff, 0.95).setDepth(31);
     this.tweens.add({ targets: core, scale: 1.8, alpha: 0, duration: 220, onComplete: () => core.destroy() });
+    this.glowFx(x, y, color, range / 90, range / 36, 380);
   }
 
   explosionFx(x, y, radius, color) {
     const c = this.add.circle(x, y, radius, color, 0.55).setDepth(29).setScale(0.3);
     this.tweens.add({ targets: c, scale: 1, alpha: 0, duration: 300, ease: 'Cubic.Out', onComplete: () => c.destroy() });
+    const ring = this.add.circle(x, y, radius).setStrokeStyle(4, 0xffffff, 0.9).setDepth(30).setScale(0.3);
+    this.tweens.add({ targets: ring, scale: 1.1, alpha: 0, duration: 340, ease: 'Cubic.Out', onComplete: () => ring.destroy() });
+    this.glowFx(x, y, color, radius / 60, radius / 22, 340);
     this.hitSpark(x, y, 0xffffff, 1.6);
   }
 
@@ -1318,13 +1466,33 @@ export default class GameScene extends Phaser.Scene {
         onComplete: () => ring.destroy(),
       });
     }
+    // A pillar of light, with sparks flying up
+    const pillar = this.add.image(f.x, f.y - 60, 'glow').setTint(color).setBlendMode('ADD').setDepth(32).setScale(1.3, 5);
+    this.tweens.add({ targets: pillar, scaleX: 0.15, alpha: 0, duration: 560, ease: 'Cubic.In', onComplete: () => pillar.destroy() });
+    for (let i = 0; i < 10; i++) {
+      const x = f.x + Phaser.Math.Between(-30, 30);
+      const bit = this.add.circle(x, f.y + Phaser.Math.Between(-10, 20), Phaser.Math.Between(2, 4), i % 3 ? color : 0xffffff).setDepth(32);
+      this.tweens.add({
+        targets: bit, y: bit.y - Phaser.Math.Between(70, 130), alpha: 0, delay: i * 30, duration: 620, ease: 'Cubic.Out',
+        onComplete: () => bit.destroy(),
+      });
+    }
     this.tweens.add({ targets: f.sprite, scale: { from: 1.4, to: 1 }, duration: 320, ease: 'Back.Out' });
     this.floatText(f.x, f.y - 70, `${f.formInfo.name.toUpperCase()}!`, f.formInfo.color, 34);
   }
 
+  // A beaten enemy bursts into a puff with little bits flying out
   poof(x, y) {
     const c = this.add.circle(x, y, 10, 0xc38be0, 0.7).setDepth(29);
     this.tweens.add({ targets: c, scale: 2.4, alpha: 0, duration: 260, onComplete: () => c.destroy() });
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 + Math.random();
+      const bit = this.add.circle(x, y, Phaser.Math.Between(2, 4), i % 2 ? 0xffffff : 0xc38be0).setDepth(29);
+      this.tweens.add({
+        targets: bit, x: x + Math.cos(a) * 30, y: y + Math.sin(a) * 30 - 6, alpha: 0, scale: 0.3, duration: 340, ease: 'Cubic.Out',
+        onComplete: () => bit.destroy(),
+      });
+    }
   }
 
   damageNumber(x, y, n) {

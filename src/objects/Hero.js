@@ -35,7 +35,8 @@ export default class Hero {
     this.cd = { kaiWave: 0, flashStep: 0, powerUp: 0, spiritOrb: 0 };
 
     this.ring = scene.add.ellipse(x, y + 16, 48, 16).setStrokeStyle(3, this.def.look.gi).setDepth(18);
-    this.aura = scene.add.ellipse(x, y - 14, 62, 86, 0xffd93b, 0).setDepth(21);
+    this.aura = scene.add.image(x, y - 14, 'aura').setOrigin(0.5, 0.58).setDepth(21);
+    scene.tweens.add({ targets: this.aura, scaleX: 1.12, scaleY: 1.2, duration: 380, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     this.sprite = scene.add.image(x, y - 14, this.tex(this.form)).setDepth(22);
     this.hpBar = scene.add.graphics().setDepth(23);
     this.label = scene.add.text(x, y - 62, `Lv ${this.level}`, textStyle(15, '#ffd93b')).setOrigin(0.5).setDepth(23);
@@ -52,7 +53,7 @@ export default class Hero {
   // The hero's own form (Forms skills), with its aura. Power Up shows one form higher for a while.
   restLook() {
     this.sprite.setTexture(this.tex(this.form));
-    this.aura.setFillStyle(this.form > 0 ? FORMS[this.form].aura : 0xffd93b, this.form > 0 ? 0.2 : 0);
+    this.aura.setTint(this.form > 0 ? FORMS[this.form].aura : 0xffd93b).setAlpha(this.form > 0 ? 0.6 : 0);
   }
 
   mod(key, stat) {
@@ -333,7 +334,7 @@ export default class Hero {
     this.powerTime = a.duration * this.mod('powerUp', 'duration');
     const up = Math.min(FORMS.length - 1, this.form + 1);
     this.sprite.setTexture(this.tex(up));
-    this.aura.setFillStyle(FORMS[up].aura, 0.35);
+    this.aura.setTint(FORMS[up].aura).setAlpha(0.9);
     this.scene.flashFx(this.x, this.y - 14, 90, 0xffd93b);
     this.scene.floatText(this.x, this.y - 80, 'POWER UP!', '#ffd93b', 28);
   }

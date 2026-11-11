@@ -19,7 +19,8 @@ export default class Fighter {
     this.stunTime = 0;
     this.exp = 0;
 
-    this.aura = scene.add.ellipse(this.x, this.y - 14, 60, 82, 0xffffff, 0).setDepth(19);
+    // The flame-shaped power aura, shown from the first transformation
+    this.aura = scene.add.image(this.x, this.y - 14, 'aura').setOrigin(0.5, 0.58).setAlpha(0).setDepth(19);
     this.sprite = scene.add.image(this.x, this.y - 14, this.textureKey()).setDepth(20 + this.y / 1000);
     this.sprite.setInteractive({ useHandCursor: true });
     this.sprite.on('pointerdown', () => scene.state === 'playing' && !scene.aiming && scene.selectFighter(this));
@@ -133,9 +134,9 @@ export default class Fighter {
       this.scene.tweens.killTweensOf(this.sprite);
       this.sprite.setTexture(this.textureKey()).setScale(1).setPosition(this.x, this.y - 14);
       this.scene.tweens.add({ targets: this.sprite, scaleY: 1.04, duration: 700, yoyo: true, repeat: -1, delay: 330 });
-      this.aura.setFillStyle(this.formInfo.aura, 0.22 + this.form * 0.05);
+      this.aura.setTint(this.formInfo.aura).setAlpha(0.62 + this.form * 0.06);
       if (!this.auraTween) {
-        this.auraTween = this.scene.tweens.add({ targets: this.aura, scaleX: 1.15, scaleY: 1.1, duration: 450, yoyo: true, repeat: -1 });
+        this.auraTween = this.scene.tweens.add({ targets: this.aura, scaleX: 1.12, scaleY: 1.2, duration: 380, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
       }
       this.scene.transformFx(this);
     } else {

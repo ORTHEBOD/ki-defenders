@@ -58,6 +58,7 @@ export default class BootScene extends Phaser.Scene {
     this.makeSpot();
     this.makeWall();
     this.makeKi();
+    this.makeLights();
     this.useArt();
     this.scene.start('Title');
   }
@@ -98,20 +99,41 @@ export default class BootScene extends Phaser.Scene {
     const g = this.make.graphics({ add: false });
     g.fillStyle(0x000000, 0.25).fillEllipse(24, 45, 30, 7);
     g.lineStyle(2.5, O);
+    // Legs and feet
     g.fillStyle(0x5a2a78);
-    g.fillRect(15, 33, 7, 10).strokeRect(15, 33, 7, 10);
-    g.fillRect(26, 33, 7, 10).strokeRect(26, 33, 7, 10);
+    g.fillRoundedRect(15, 33, 7, 10, 2).strokeRoundedRect(15, 33, 7, 10, 2);
+    g.fillRoundedRect(26, 33, 7, 10, 2).strokeRoundedRect(26, 33, 7, 10, 2);
+    g.fillStyle(0x3d1b54).fillRect(15, 40, 7, 3).fillRect(26, 40, 7, 3);
+    // Arms
+    g.fillStyle(0x9b59c6);
+    g.fillCircle(9, 28, 4.5).strokeCircle(9, 28, 4.5);
+    g.fillCircle(39, 28, 4.5).strokeCircle(39, 28, 4.5);
+    // Body, with shade below and armor on the chest
     g.fillStyle(0x7b3fa0).fillRoundedRect(11, 19, 26, 17, 6).strokeRoundedRect(11, 19, 26, 17, 6);
-    g.fillStyle(0xd4d8e6).fillRect(14, 21, 20, 7).strokeRect(14, 21, 20, 7);
+    g.fillStyle(0x5a2a78).fillRoundedRect(13, 30, 22, 5, 3);
+    g.fillStyle(0xd4d8e6).fillRoundedRect(14, 21, 20, 8, 2).strokeRoundedRect(14, 21, 20, 8, 2);
+    g.fillStyle(0xffffff).fillRect(16, 22.5, 16, 2);
+    g.fillStyle(0x9aa0b4).fillRect(16, 26, 16, 1.6);
+    g.fillStyle(0xe02424).fillCircle(24, 25, 2.2);
+    // Horns
     const hornL = pts([[14, 10], [9, 0], [19, 7]]);
     const hornR = pts([[34, 10], [39, 0], [29, 7]]);
-    g.fillStyle(0x9b59c6);
+    g.fillStyle(0xe9e2c8);
     g.fillPoints(hornL, true).strokePoints(hornL, true);
     g.fillPoints(hornR, true).strokePoints(hornR, true);
-    g.fillEllipse(24, 13, 22, 16).strokeEllipse(24, 13, 22, 16);
-    g.lineStyle(3, 0xe02424);
-    g.lineBetween(17, 11, 22, 14);
-    g.lineBetween(31, 11, 26, 14);
+    // Head: shade under the chin, light on the forehead
+    g.fillStyle(0x7b3fa0).fillEllipse(24, 13, 22, 16).strokeEllipse(24, 13, 22, 16);
+    g.fillStyle(0x9b59c6).fillEllipse(24, 11.5, 19, 12);
+    g.fillStyle(0xc38be0, 0.8).fillEllipse(21, 8, 9, 3.5);
+    // Angry glowing eyes and a toothy mouth
+    g.fillStyle(0xff5a4a, 0.35).fillCircle(19, 13, 4).fillCircle(29, 13, 4);
+    g.fillStyle(0xffe14d).fillEllipse(19, 13.5, 5, 3.4).fillEllipse(29, 13.5, 5, 3.4);
+    g.fillStyle(0xe02424).fillCircle(19.5, 13.5, 1.4).fillCircle(28.5, 13.5, 1.4);
+    g.lineStyle(2.5, O);
+    g.lineBetween(15.5, 9.5, 22, 12.5);
+    g.lineBetween(32.5, 9.5, 26, 12.5);
+    g.lineStyle(1.6, O).lineBetween(20, 18, 28, 18);
+    g.fillStyle(0xffffff).fillTriangle(21, 18, 23, 18, 22, 20).fillTriangle(25, 18, 27, 18, 26, 20);
     g.generateTexture('grunt', 48, 48);
     g.destroy();
   }
@@ -122,14 +144,88 @@ export default class BootScene extends Phaser.Scene {
     g.lineStyle(2.5, O);
     const tail = pts([[12, 26], [1, 20], [12, 31]]);
     g.fillStyle(0x2e8a45).fillPoints(tail, true).strokePoints(tail, true);
-    g.fillRect(14, 30, 5, 10).strokeRect(14, 30, 5, 10);
-    g.fillRect(26, 30, 5, 10).strokeRect(26, 30, 5, 10);
-    g.fillStyle(0x3fae5a).fillEllipse(22, 27, 24, 15).strokeEllipse(22, 27, 24, 15);
-    g.fillCircle(34, 17, 9).strokeCircle(34, 17, 9);
-    g.fillStyle(0xffe14d).fillCircle(37, 15, 3);
-    g.fillStyle(O).fillCircle(38, 15, 1.4);
+    g.fillRoundedRect(14, 30, 5, 10, 2).strokeRoundedRect(14, 30, 5, 10, 2);
+    g.fillRoundedRect(26, 30, 5, 10, 2).strokeRoundedRect(26, 30, 5, 10, 2);
+    // Spikes along the back
+    g.fillStyle(0xffa53b);
+    [[13, 21], [19, 19], [25, 19]].forEach(([x, y]) => {
+      const spike = pts([[x - 3, y + 3], [x - 1, y - 4], [x + 3, y + 2]]);
+      g.fillPoints(spike, true).strokePoints(spike, true);
+    });
+    // Body with a darker underside and a pale belly
+    g.fillStyle(0x2e8a45).fillEllipse(22, 27, 24, 15).strokeEllipse(22, 27, 24, 15);
+    g.fillStyle(0x3fae5a).fillEllipse(21.5, 25.5, 21, 11);
+    g.fillStyle(0xbfe8a0).fillEllipse(23, 31, 13, 4.5);
+    g.fillStyle(0x7ad98a, 0.9).fillEllipse(18, 22.5, 9, 3);
+    // Head
+    g.fillStyle(0x2e8a45).fillCircle(34, 17, 9).strokeCircle(34, 17, 9);
+    g.fillStyle(0x3fae5a).fillCircle(33.4, 16, 7.4);
+    g.fillStyle(0x7ad98a, 0.9).fillEllipse(31, 11.5, 6, 2.6);
+    g.fillStyle(0xffe14d).fillCircle(37, 15, 3.2);
+    g.lineStyle(1.5, O).strokeCircle(37, 15, 3.2);
+    g.fillStyle(O).fillEllipse(38, 15, 1.8, 4);
+    g.fillStyle(0xffffff).fillCircle(36.2, 13.8, 0.9);
+    g.lineStyle(2, O).lineBetween(33.5, 10.8, 39.5, 12.2);
+    g.lineStyle(1.6, O).lineBetween(36, 21.5, 41.5, 20);
+    g.fillStyle(0xffffff).fillTriangle(38, 21, 40, 20.4, 39.2, 23);
     g.generateTexture('runner', 48, 48);
     g.destroy();
+  }
+
+  // Soft lights drawn on a canvas, where real gradients are possible: a round glow, the flame-shaped
+  // power aura (both white, colored in the game with a tint) and the map's soft shadow
+  makeLights() {
+    const glow = this.textures.createCanvas('glow', 96, 96);
+    let c = glow.context;
+    let grad = c.createRadialGradient(48, 48, 0, 48, 48, 48);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.3, 'rgba(255,255,255,0.6)');
+    grad.addColorStop(0.65, 'rgba(255,255,255,0.18)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = grad;
+    c.fillRect(0, 0, 96, 96);
+    glow.refresh();
+
+    const aura = this.textures.createCanvas('aura', 80, 108);
+    c = aura.context;
+    const flame = [[14, 96], [3, 70], [12, 46], [7, 26], [21, 38], [25, 12], [33, 30], [40, 2], [47, 30], [55, 12], [59, 38],
+      [73, 26], [68, 46], [77, 70], [66, 96]];
+    const drawFlame = (scale, alpha) => {
+      c.save();
+      c.translate(40, 100);
+      c.scale(scale, scale);
+      c.translate(-40, -100);
+      c.beginPath();
+      flame.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+      c.quadraticCurveTo(40, 110, 14, 96);
+      c.closePath();
+      c.fillStyle = `rgba(255,255,255,${alpha})`;
+      c.fill();
+      c.restore();
+    };
+    c.shadowColor = 'rgba(255,255,255,0.9)';
+    c.shadowBlur = 8;
+    c.lineJoin = 'round';
+    drawFlame(0.94, 0.4);
+    c.shadowBlur = 4;
+    drawFlame(0.7, 0.45);
+    aura.refresh();
+
+    // Darker corners and a slightly darker bottom, stretched over the whole map
+    const vig = this.textures.createCanvas('vignette', 320, 180);
+    c = vig.context;
+    grad = c.createRadialGradient(160, 84, 70, 160, 90, 196);
+    grad.addColorStop(0, 'rgba(0,0,10,0)');
+    grad.addColorStop(1, 'rgba(0,0,10,0.36)');
+    c.fillStyle = grad;
+    c.fillRect(0, 0, 320, 180);
+    grad = c.createLinearGradient(0, 0, 0, 180);
+    grad.addColorStop(0, 'rgba(255,255,255,0.05)');
+    grad.addColorStop(0.5, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.14)');
+    c.fillStyle = grad;
+    c.fillRect(0, 0, 320, 180);
+    vig.refresh();
   }
 
   makeSpot() {
