@@ -3,6 +3,7 @@
   "private": true,
   "description": "Builds the Android app (Capacitor). Run by .github/workflows/apps.yml",
   "dependencies": {
+    "@capacitor-community/admob": "6.2.0",
     "@capacitor/android": "^6.2.0",
     "@capacitor/cli": "^6.2.0",
     "@capacitor/core": "^6.2.0",

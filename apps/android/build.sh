@@ -24,6 +24,12 @@ sed -i 's/minSdkVersion = [0-9]*/minSdkVersion = 24/; s/compileSdkVersion = [0-9
 grep -q 'minSdkVersion = 24' android/variables.gradle && grep -q 'targetSdkVersion = 36' android/variables.gradle
 echo 'android.suppressUnsupportedCompileSdk=36' >> android/gradle.properties
 
+# AdMob: the app's AdMob ID (see src/data/ads.js for the ad units)
+ADMOB_APP_ID='ca-app-pub-8681646204349261~7348930331'
+sed -i "s#</application>#    <meta-data android:name=\"com.google.android.gms.ads.APPLICATION_ID\" android:value=\"@string/admob_app_id\"/>\n    </application>#" android/app/src/main/AndroidManifest.xml
+sed -i "s#</resources>#    <string name=\"admob_app_id\">${ADMOB_APP_ID}</string>\n</resources>#" android/app/src/main/res/values/strings.xml
+grep -q 'gms.ads.APPLICATION_ID' android/app/src/main/AndroidManifest.xml && grep -q admob_app_id android/app/src/main/res/values/strings.xml
+
 # Google sign-in: the main screen passes Google's "allow access" answer back to the sign-in plugin
 cat > android/app/src/main/java/com/orthebod/kidefenders/MainActivity.java <<'JAVA'
 package com.orthebod.kidefenders;

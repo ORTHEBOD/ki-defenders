@@ -1,9 +1,10 @@
 // Ads. Two kinds:
 // - Reward videos in the shop: watch one, get coins. A few per day.
 // - A short ad between battles that every player sees (no reward).
-// For now stand-in screens play. When the game is on Google Play, show() and between() will call
-// the AdMob plugin (e.g. @capacitor-community/admob): a rewarded ad and an interstitial ad.
+// The Android app shows real AdMob ads (@capacitor-community/admob, ad units in src/data/ads.js).
+// The website and the PC app show the game's own stand-in screens instead.
 import { Save } from './Save.js';
+import { AD_UNITS, TEST_ADS } from '../data/ads.js';
 
 export const AD_REWARD = 100;
 export const ADS_PER_DAY = 3;
@@ -11,6 +12,78 @@ export const ADS_PER_DAY = 3;
 const BREAK_GAP = 5 * 60 * 1000;
 const FREE_LEVELS = 5;
 let lastBreak = 0;
+
+// ---------- AdMob (Android app) ----------
+
+const admob = () => (window.Capacitor?.isNativePlatform?.() ? window.Capacitor?.Plugins?.AdMob : null);
+
+// Starts AdMob once, and asks for ad consent where the law requires it (EU and UK)
+let started = null;
+function startAdMob() {
+  const A = admob();
+  if (!A) return Promise.resolve(false);
+  started ??= (async () => {
+    try {
+      await A.initialize({ initializeForTesting: TEST_ADS });
+      const consent = await A.requestConsentInfo();
+      if (consent.isConsentFormAvailable && consent.status === 'REQUIRED') await A.showConsentForm();
+      return true;
+    } catch (e) {
+      console.warn('AdMob could not start', e);
+      started = null;
+      return false;
+    }
+  })();
+  return started;
+}
+
+// Waits for the first of these plugin events (or the time limit); resolves with the event's name
+async function firstEvent(names, ms) {
+  const A = admob();
+  const handles = [];
+  let timer;
+  const result = await new Promise((resolve) => {
+    timer = setTimeout(() => resolve('timeout'), ms);
+    names.forEach((name) => A.addListener(name, () => resolve(name)).then((h) => handles.push(h)));
+  });
+  clearTimeout(timer);
+  handles.forEach((h) => h.remove());
+  return result;
+}
+
+// A full-screen ad between battles. Resolves when it is closed, failed or took too long to load.
+async function nativeInterstitial() {
+  if (!(await startAdMob())) return;
+  const A = admob();
+  try {
+    await Promise.race([A.prepareInterstitial({ adId: AD_UNITS.interstitial, isTesting: TEST_ADS }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('slow')), 6000))]);
+    const closed = firstEvent(['interstitialAdDismissed', 'interstitialAdFailedToShow'], 120000);
+    await A.showInterstitial();
+    await closed;
+  } catch (e) {
+    console.warn('No ad between battles', e);
+  }
+}
+
+// A reward video. Resolves true only when the player watched it to the end.
+async function nativeRewarded() {
+  if (!(await startAdMob())) return null;
+  const A = admob();
+  try {
+    await A.prepareRewardVideoAd({ adId: AD_UNITS.rewarded, isTesting: TEST_ADS });
+    let rewarded = false;
+    const reward = A.addListener('onRewardedVideoAdReward', () => { rewarded = true; });
+    const closed = firstEvent(['onRewardedVideoAdDismissed', 'onRewardedVideoAdFailedToShow'], 180000);
+    A.showRewardVideoAd().then(() => { rewarded = true; }).catch(() => {});
+    await closed;
+    (await reward).remove();
+    return rewarded;
+  } catch (e) {
+    console.warn('No reward video', e);
+    return null;
+  }
+}
 
 const today = () => {
   const d = new Date();
@@ -25,7 +98,16 @@ export const Ads = {
   },
 
   // Plays a video; resolves true when it was watched to the end
-  show(scene) {
+  async show(scene) {
+    if (admob()) {
+      const watched = await nativeRewarded();
+      if (watched === null) {
+        const t = scene.add.text(640, 600, 'No video right now - try again later', { fontFamily: 'Bangers, Arial Black', fontSize: '30px', color: '#ff6b6b' })
+          .setOrigin(0.5).setDepth(400);
+        scene.tweens.add({ targets: t, alpha: 0, delay: 1800, duration: 400, onComplete: () => t.destroy() });
+      }
+      return !!watched;
+    }
     return new Promise((resolve) => {
       const SECONDS = 5;
       const pop = scene.add.container(0, 0).setDepth(400);
@@ -61,6 +143,10 @@ export const Ads = {
       return;
     }
     lastBreak = Date.now();
+    if (admob()) {
+      nativeInterstitial().then(next);
+      return;
+    }
     const SKIP_AFTER = 5;
     const pop = scene.add.container(0, 0).setDepth(500);
     pop.add(scene.add.rectangle(0, 0, 1280, 720, 0x000000, 0.95).setOrigin(0).setInteractive());

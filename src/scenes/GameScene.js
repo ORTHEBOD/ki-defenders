@@ -31,8 +31,8 @@ const NEXT_SECONDS = 5;
 const SCREEN = 150;
 // How far the map can zoom in
 const MAX_ZOOM = 2.5;
-// The HUD (top bar, buttons, banners, end screen) never zooms; menus (120-129) open on the map
-const isHudDepth = (d) => d >= 100 && (d < 120 || d >= 130);
+// The HUD (top bar, buttons, menus, banners, end screen) never zooms
+const isHudDepth = (d) => d >= 100;
 
 const W = 1280;
 const H = 720;
@@ -225,6 +225,12 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  // Where a map point is on the screen
+  screenAt(p) {
+    const cam = this.cameras.main;
+    return { x: (p.x - cam.scrollX - W / 2) * cam.zoom + W / 2, y: (p.y - cam.scrollY - H / 2) * cam.zoom + H / 2 };
+  }
+
   // The map point under a screen point
   worldAt(p) {
     const cam = this.cameras.main;
@@ -234,6 +240,7 @@ export default class GameScene extends Phaser.Scene {
   // Zooms keeping the map point under (sx, sy) in place, and never shows past the map's edges
   zoomAt(sx, sy, zoom) {
     const cam = this.cameras.main;
+    if (this.menu) this.closeMenu();
     const z = Phaser.Math.Clamp(zoom, 1, MAX_ZOOM);
     const at = this.worldAt({ x: sx, y: sy });
     cam.setZoom(z);
@@ -815,10 +822,14 @@ export default class GameScene extends Phaser.Scene {
     this.time.delayedCall(1, () => m.destroy());
   }
 
+  // Menus live on the screen (they never zoom): placed next to where the spot is on screen right now
   menuPosition(spot, w, h) {
-    const x = Phaser.Math.Clamp(spot.x, w / 2 + 10, W - w / 2 - 10);
-    let y = spot.y - 50 - h / 2;
-    if (y - h / 2 < 64) y = spot.y + 50 + h / 2;
+    const p = this.screenAt(spot);
+    const gap = 50 * this.cameras.main.zoom;
+    const x = Phaser.Math.Clamp(p.x, w / 2 + 10, W - w / 2 - 10);
+    let y = p.y - gap - h / 2;
+    if (y - h / 2 < 64) y = p.y + gap + h / 2;
+    y = Phaser.Math.Clamp(y, 64 + h / 2, H - 10 - h / 2);
     return { x, y };
   }
 
@@ -855,7 +866,7 @@ export default class GameScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true });
       cards.push({ card, def, locked });
       if (locked) {
-        card.on('pointerdown', () => this.floatText(pos.x + cx, pos.y, `Unlocks at level ${def.unlock}`, '#ffd93b', 22));
+        card.on('pointerdown', () => this.floatText(pos.x + cx, pos.y, `Unlocks at level ${def.unlock}`, '#ffd93b', 22, SCREEN));
         m.add([
           card,
           this.add.image(cx, -34, `${def.texture}_0`).setTint(0x202430),
@@ -868,7 +879,7 @@ export default class GameScene extends Phaser.Scene {
       card.on('pointerover', () => (range ? this.showRange(spot.x, spot.y, range, def.color) : this.rangeCircle.clear()));
       card.on('pointerdown', () => {
         if (this.ki < def.cost) {
-          this.floatText(pos.x + cx, pos.y, 'Not enough Ki', '#ff6b6b', 22);
+          this.floatText(pos.x + cx, pos.y, 'Not enough Ki', '#ff6b6b', 22, SCREEN);
           return;
         }
         if (spot.maze) {
@@ -951,7 +962,7 @@ export default class GameScene extends Phaser.Scene {
     const up = makeButton(this, 0, 62, 300, 48, upLabel, () => {
       if (!next || !f.expReady) return;
       if (this.ki < next.cost) {
-        this.floatText(pos.x, pos.y, 'Not enough Ki', '#ff6b6b', 22);
+        this.floatText(pos.x, pos.y, 'Not enough Ki', '#ff6b6b', 22, SCREEN);
         return;
       }
       this.ki -= next.cost;
