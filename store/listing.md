@@ -19,7 +19,7 @@ FEATURES
 • 6 transformation forms, each with a new look and stronger powers
 • Heroes you control on the battlefield, with special abilities like Kai Wave, Flash Step, Power Up and Spirit Orb
 • A big hero skill tree with 5 branches, including hero forms
-• Gear for your heroes: weapons, armor, pants, boots, amulets and accessories – and you see them on your hero
+• Gear for your heroes in 6 tiers, from Common to Divine: weapons, armor, pants, boots, amulets and accessories – and you see them on your hero
 • Story levels across different worlds, with bosses that stomp, stun, shield and summon
 • Endless Battle – how many waves can you survive? Climb the online leaderboard!
 • Daily rewards and a Lucky Spin to win new heroes
@@ -30,8 +30,8 @@ Send us tips and bug reports right from the game – we read every message!
 
 ## Pictures (in this folder)
 - App icon: icon-512.png (512 x 512)
-- Feature graphic: feature-graphic.png (1024 x 500)
-- Phone screenshots: screenshot-1.png … screenshot-5.png (1280 x 720)
+- Feature graphic: feature-graphic-rgb.png (1024 x 500, no transparency – Play rejects it otherwise)
+- Phone screenshots: screenshot-1.png … screenshot-5.png (1920 x 1080, from the new graphics; 1080+ px is needed for featuring)
 
 ## Other answers
 - **App or game:** Game
@@ -53,7 +53,7 @@ Send us tips and bug reports right from the game – we read every message!
   - **User IDs** only when Google sign-in is used (Google's account number is stored to find the player; the email is not saved)
   - **Messages** – Tips & bugs messages the player sends
 - Data is sent over HTTPS (encrypted in transit).
-- Players can ask to delete their data by email (orthebod2@gmail.com).
+- Players can ask to delete their data by email (orthebod2@gmail.com); account deletion page: https://ki-defenders.netlify.app/privacy.html#delete
 
 ## Upload
 - File: ki-defenders.aab from the newest release at
