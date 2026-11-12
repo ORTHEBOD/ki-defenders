@@ -71,32 +71,35 @@ export default class BootScene extends Phaser.Scene {
       const img = this.textures.get(raw).getSourceImage();
       const size = artSize(key);
       let scale = Math.min(size / img.width, size / img.height);
-      // An attack picture (kaito_0_attack) is shrunk like its normal picture, so the character keeps
-      // its size; a stretched-out arm or leg may make it wider than the square
-      const plainKey = `art_${key.replace(/_attack$/, '')}`;
-      if (key.endsWith('_attack') && this.textures.exists(plainKey)) {
-        const plain = this.textures.get(plainKey).getSourceImage();
-        scale = Math.min(size / plain.width, size / plain.height);
+      // A fighter's other pictures (kaito_2, kaito_0_attack) are shrunk like its base picture (kaito_0),
+      // so the character keeps its size; a stretched-out arm or tall hair may stick out of the square
+      const baseKey = `art_${key.replace(/_\d+(_attack)?$/, '_0')}`;
+      if (baseKey !== raw && this.textures.exists(baseKey)) {
+        const base = this.textures.get(baseKey).getSourceImage();
+        scale = Math.min(size / base.width, size / base.height);
       }
       const w = img.width * scale;
       const h = img.height * scale;
       const cw = Math.max(size, Math.ceil(w));
+      // Taller than the square: room is added above and below alike, so the feet stay where they were
+      const over = Math.max(0, Math.ceil(h - size));
+      const ch = size + over * 2;
       if (this.textures.exists(key)) this.textures.remove(key);
-      const canvas = this.textures.createCanvas(key, cw, size);
+      const canvas = this.textures.createCanvas(key, cw, ch);
       const c = canvas.context;
       c.imageSmoothingQuality = 'high';
       const x = (cw - w) / 2;
-      const y = size - h;
+      const y = over + size - h;
       // A dark outline around the picture, so it stands out on the map like the drawn art
       const shape = document.createElement('canvas');
       shape.width = cw;
-      shape.height = size;
+      shape.height = ch;
       const sc = shape.getContext('2d');
       sc.imageSmoothingQuality = 'high';
       sc.drawImage(img, x, y, w, h);
       sc.globalCompositeOperation = 'source-in';
       sc.fillStyle = '#0d0d12';
-      sc.fillRect(0, 0, cw, size);
+      sc.fillRect(0, 0, cw, ch);
       for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) c.drawImage(shape, dx, dy);
       c.drawImage(img, x, y, w, h);
       canvas.refresh();

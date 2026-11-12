@@ -3,7 +3,7 @@
 // when online, so the next launch gets the newest version.
 // Bump CACHE when the file list changes.
 
-const CACHE = 'ki-defenders-v22';
+const CACHE = 'ki-defenders-v23';
 
 const FILES = [
   './',
