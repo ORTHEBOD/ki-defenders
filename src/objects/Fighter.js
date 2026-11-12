@@ -16,6 +16,7 @@ export default class Fighter {
     this.cooldown = 0;
     this.hits = 0;
     this.kiTimer = 0;
+    this.boltTimer = 0;
     this.stunTime = 0;
     this.exp = 0;
 
@@ -167,6 +168,7 @@ export default class Fighter {
 
   update(dt) {
     this.refreshReady();
+    this.crackle(dt);
     if (this.stunTime > 0) {
       this.stunTime -= dt;
       if (this.stunTime <= 0) this.sprite.clearTint();
@@ -199,6 +201,27 @@ export default class Fighter {
     if (this.def.attack === 'punch') this.punch(target, damage);
     else if (this.def.attack === 'beam') this.beam(target, damage);
     else if (this.def.attack === 'blast') this.blast(target, damage);
+  }
+
+  // Super Form 2 and 3: little lightning bolts keep flickering around the fighter (more in form 3)
+  crackle(dt) {
+    if (!this.formInfo.sparks) return;
+    this.boltTimer -= dt;
+    if (this.boltTimer > 0) return;
+    this.boltTimer = this.formInfo.longHair ? 0.11 : 0.17;
+    const side = Math.random() < 0.5 ? -1 : 1;
+    let x = this.x + side * Phaser.Math.Between(12, 24);
+    let y = this.y - 14 + Phaser.Math.Between(-30, 22);
+    const pts = [{ x, y }];
+    for (let k = 0; k < 4; k++) {
+      x += side * Phaser.Math.Between(1, 6);
+      y += Phaser.Math.Between(-9, 9);
+      pts.push({ x, y });
+    }
+    const g = this.scene.add.graphics().setDepth(this.sprite.depth + 0.01);
+    g.lineStyle(4, 0x5ad8ff, 0.45).strokePoints(pts);
+    g.lineStyle(1.6, 0xeafcff, 1).strokePoints(pts);
+    this.scene.tweens.add({ targets: g, alpha: 0, duration: 170, onComplete: () => g.destroy() });
   }
 
   // Shows the fighter's attack picture for a moment (art/kaito_0_attack.png and so on), if there is one

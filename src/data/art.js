@@ -7,8 +7,7 @@
 export const ART_FILES = [
   'kaito_0', 'kaito_0_attack',
   'kaito_1', 'kaito_1_attack',
-  'kaito_2', 'kaito_2_attack',
-  'kaito_3', 'kaito_3_attack',
+  'kaito_2', 'kaito_3', // no punch pictures yet: these forms only do the jump
   'kaito_4', 'kaito_4_attack',
   'kaito_5', 'kaito_5_attack',
 ];
