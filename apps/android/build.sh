@@ -18,6 +18,9 @@ npx cap add android
 sed -i 's/android:name=".MainActivity"/android:name=".MainActivity"\n            android:screenOrientation="sensorLandscape"/' android/app/src/main/AndroidManifest.xml
 sed -i '/<style name="AppTheme.NoActionBar"/a\        <item name="android:windowFullscreen">true</item>' android/app/src/main/res/values/styles.xml
 sed -i "s/versionCode 1$/versionCode ${VERSION_CODE}/; s/versionName \"1.0\"/versionName \"${VERSION_NAME}\"/" android/app/build.gradle
+# Android 7.0 or newer: Google Play's automatic app protection needs minSdk 24
+sed -i 's/minSdkVersion = [0-9]*/minSdkVersion = 24/' android/variables.gradle
+grep -q 'minSdkVersion = 24' android/variables.gradle
 
 # Google sign-in: the main screen passes Google's "allow access" answer back to the sign-in plugin
 cat > android/app/src/main/java/com/orthebod/kidefenders/MainActivity.java <<'JAVA'
