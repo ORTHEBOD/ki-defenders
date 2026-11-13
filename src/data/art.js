@@ -5,11 +5,9 @@
 // Anything not listed keeps the art drawn in code, so pictures can be added a few at a time.
 
 export const ART_FILES = [
-  'kaito_0', 'kaito_0_attack',
-  'kaito_1', 'kaito_1_attack',
-  'kaito_2', 'kaito_3', // no punch pictures yet: these forms only do the jump
-  'kaito_4', 'kaito_4_attack',
-  'kaito_5', 'kaito_5_attack',
+  // Kaito, all 6 forms, standing and punching
+  'kaito_0', 'kaito_1', 'kaito_2', 'kaito_3', 'kaito_4', 'kaito_5',
+  'kaito_0_attack', 'kaito_1_attack', 'kaito_2_attack', 'kaito_3_attack', 'kaito_4_attack', 'kaito_5_attack',
 ];
 
 // How big each picture is shown in battle (pixels). Bigger PNGs are shrunk to fit;
