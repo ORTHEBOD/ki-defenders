@@ -3,9 +3,19 @@ import { pts } from '../art/fighterArt.js';
 const W = 1280;
 const H = 720;
 
-// Purple evening sky, an energy sun, mountains, and ki sparks floating up
+// Purple evening sky, an energy sun, mountains, and ki sparks floating up.
+// Uses the painted picture (art/menu_bg.jpg, made with ComfyUI) when it loaded, else draws it.
 export function drawMenuBackground(scene) {
   const g = scene.add.graphics();
+  if (scene.textures.exists('menu_bg')) {
+    scene.add.image(W / 2, H / 2, 'menu_bg').setDisplaySize(W, H).setDepth(-2);
+    // Darker at the top and bottom, so the titles and buttons stay easy to read
+    g.fillGradientStyle(0x0d0a24, 0x0d0a24, 0x0d0a24, 0x0d0a24, 0.55, 0.55, 0.1, 0.1).fillRect(0, 0, W, H * 0.45);
+    g.fillGradientStyle(0x0d0a24, 0x0d0a24, 0x0d0a24, 0x0d0a24, 0.1, 0.1, 0.6, 0.6).fillRect(0, H * 0.45, W, H * 0.55);
+    g.setDepth(-1);
+    sparks(scene);
+    return g;
+  }
   g.fillGradientStyle(0x1b1442, 0x1b1442, 0x5a2a5e, 0x5a2a5e, 1).fillRect(0, 0, W, H);
   // Twinkling stars high in the sky
   for (let i = 0; i < 50; i++) {
@@ -23,6 +33,12 @@ export function drawMenuBackground(scene) {
     [1280, 525], [1280, 720], [0, 720],
   ]), true);
 
+  sparks(scene);
+  return g;
+}
+
+// Ki sparks floating up
+function sparks(scene) {
   for (let i = 0; i < 26; i++) {
     const c = scene.add.circle(
       Phaser.Math.Between(0, W), Phaser.Math.Between(320, H),
@@ -37,7 +53,6 @@ export function drawMenuBackground(scene) {
       repeat: -1,
     });
   }
-  return g;
 }
 
 // A dark rounded panel

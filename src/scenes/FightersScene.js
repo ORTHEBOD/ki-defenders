@@ -37,7 +37,8 @@ export default class FightersScene extends Phaser.Scene {
       panel(this, x, 270, 220, 300, joined ? def.color : 0x3a3f52);
       // The top upgrade of that form: headband and cape
       const look = { ...formLook(def.look, top), rank: 3, trim: top > 0 ? form.aura : def.color };
-      const art = fighterPortrait(this, x, 220, joined ? look : { ...def.look, gi: 0x202430, skin: 0x202430, hair: 0x202430, belt: 0x202430, boots: 0x202430 }, 2.6);
+      const art = fighterPortrait(this, x, 220, joined ? look : { ...def.look, gi: 0x202430, skin: 0x202430, hair: 0x202430, belt: 0x202430, boots: 0x202430 }, 2.6,
+        joined ? `${def.texture}_${top}` : null);
       if (!joined) this.add.text(x, 220, '🔒', { fontSize: '44px' }).setOrigin(0.5);
       else this.tweens.add({ targets: art, y: art.y - 6, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: i * 150 });
       this.add.text(x, 330, def.name, textStyle(30, joined ? '#ffffff' : '#8a91ad')).setOrigin(0.5);

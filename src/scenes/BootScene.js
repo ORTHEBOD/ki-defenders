@@ -21,6 +21,7 @@ export default class BootScene extends Phaser.Scene {
   preload() {
     this.load.on('loaderror', (file) => console.warn('Art not found:', file.src));
     for (const key of ART_FILES) this.load.image(`art_${key}`, `art/${key}.png`);
+    this.load.image('menu_bg', 'art/menu_bg.jpg');
   }
 
   create() {

@@ -195,7 +195,9 @@ export function drawFighterArt(g, look) {
 // `key` (a texture key like 'hero_zenko_0') uses the AI picture when one has been added.
 export function fighterPortrait(scene, x, y, look, scale = 3, key = null) {
   if (key && scene.textures.exists(`art_${key}`)) {
-    return scene.add.image(x, y, `art_${key}`).setDisplaySize(64 * scale, 64 * scale);
+    // Fits the picture in the square without stretching it (the pictures are not all square)
+    const img = scene.add.image(x, y, `art_${key}`);
+    return img.setScale((64 * scale) / Math.max(img.width, img.height));
   }
   const g = scene.add.graphics();
   drawFighterArt(g, look);
