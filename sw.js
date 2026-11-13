@@ -3,7 +3,7 @@
 // when online, so the next launch gets the newest version.
 // Bump CACHE when the file list changes.
 
-const CACHE = 'ki-defenders-v27';
+const CACHE = 'ki-defenders-v28';
 
 const FILES = [
   './',
@@ -63,6 +63,18 @@ const FILES = [
   'src/ui/theme.js',
   'src/ui/menuBackground.js',
   'art/menu_bg.jpg',
+  'art/ronin_0.png',
+  'art/ronin_1.png',
+  'art/ronin_2.png',
+  'art/ronin_3.png',
+  'art/ronin_4.png',
+  'art/ronin_5.png',
+  'art/ronin_0_attack.png',
+  'art/ronin_1_attack.png',
+  'art/ronin_2_attack.png',
+  'art/ronin_3_attack.png',
+  'art/ronin_4_attack.png',
+  'art/ronin_5_attack.png',
   'art/kaito_0.png',
   'art/kaito_1.png',
   'art/kaito_2.png',

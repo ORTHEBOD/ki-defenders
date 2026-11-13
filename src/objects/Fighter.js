@@ -249,8 +249,10 @@ export default class Fighter {
 
   beam(target, damage) {
     const s = this.stats;
-    const sx = this.x;
-    const sy = this.y - 18;
+    // With Ronin's pictures the beam comes out of the energy ball in his hands
+    const art = this.scene.textures.exists(`${this.def.texture}_${this.form}_attack`);
+    const sx = art ? this.x + (target.x < this.x ? -12 : 12) : this.x;
+    const sy = art ? this.y - 14 : this.y - 18;
     const angle = Math.atan2(target.y - sy, target.x - sx);
     const ex = sx + Math.cos(angle) * s.range;
     const ey = sy + Math.sin(angle) * s.range;
