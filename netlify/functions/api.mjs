@@ -3,7 +3,10 @@
 //
 //   POST /api/login        { name, pin, data? }   -> { ok, token, created, data }
 //   POST /api/save         { name, token, data }  -> { ok, updatedAt }
-//   GET  /api/leaderboard                          -> { ok, rows }
+//   GET  /api/leaderboard                          -> { ok, rows, week, ends }
+//        This week's Endless board (see src/data/weekly.js): more waves first, then the faster time.
+//        Every Monday 10:00 a new week starts, and the top 20 of the week before win diamonds.
+//        Login, google and save replies carry `rewards` ([{ week, place, diamonds }]) once.
 //   GET  /api/ping                                 -> { ok }
 //   POST /api/google       { idToken, name?, pin? } -> { ok, token, created, data, name } or { ok:false, error:'need_name' }
 //        Signs in with a Google account. The first time, the player picks a new name, or links
@@ -21,6 +24,7 @@
 import { getStore } from '@netlify/blobs';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { GOOGLE_CLIENT_ID } from '../../src/data/google.js';
+import { weekOf, lastWeek, compareScores, WEEK_PRIZES } from '../../src/data/weekly.js';
 
 const MAX_FAILS = 5;
 const LOCK_MS = 15 * 60 * 1000;
@@ -75,20 +79,52 @@ function newToken(user) {
 // The game's tester account has every level and hero, so it is never on the leaderboard
 const TESTER = 'supertester';
 
-// Keeps the top 100 Endless results. Numbers are clamped so a broken save can't spoil the board.
+const boardKey = (week) => `leaderboard/${week}`;
+
+// Keeps this week's top 100 Endless results. Numbers are clamped so a broken save can't spoil the board.
+// The save's `week` ({ id, wave, time }) is this week's best run; one from an older week counts as nothing.
 async function updateLeaderboard(s, name, data) {
   if (name.toLowerCase() === TESTER || data.super) return;
+  const week = weekOf().id;
+  const best = data.week?.id === week ? data.week : null;
+  if (!best || !(Number(best.wave) > 0)) return;
   const stars = Object.values(data.stars ?? {}).reduce((a, b) => a + (Number(b) || 0), 0);
   const row = {
     name,
-    wave: Math.max(0, Math.min(10000, Math.floor(Number(data.endlessBest) || 0))),
+    wave: Math.max(0, Math.min(10000, Math.floor(Number(best.wave) || 0))),
+    time: Math.max(1, Math.min(10 ** 7, Math.round(Number(best.time) || 0))),
     stars: Math.max(0, Math.min(90, stars)),
     hero: HEROES.includes(data.activeHero) ? data.activeHero : 'zenko',
   };
-  const rows = ((await s.get('leaderboard', { type: 'json' })) ?? []).filter((r) => r.name.toLowerCase() !== name.toLowerCase());
+  const rows = ((await s.get(boardKey(week), { type: 'json' })) ?? []).filter((r) => r.name.toLowerCase() !== name.toLowerCase());
   rows.push(row);
-  rows.sort((a, b) => b.wave - a.wave || b.stars - a.stars);
-  await s.setJSON('leaderboard', rows.slice(0, 100));
+  rows.sort(compareScores);
+  await s.setJSON(boardKey(week), rows.slice(0, 100));
+}
+
+// The first request after a week ends hands out that week's diamonds (once): each winner gets a
+// reward waiting in their record, which the next login or save gives to the game.
+async function payLastWeek(s) {
+  const week = lastWeek().id;
+  const paidKey = `weekly-paid/${week}`;
+  if (await s.get(paidKey, { type: 'json' })) return;
+  await s.setJSON(paidKey, { at: Date.now() });
+  const rows = ((await s.get(boardKey(week), { type: 'json' })) ?? []).filter((r) => r.name.toLowerCase() !== TESTER);
+  rows.sort(compareScores);
+  for (const [i, row] of rows.slice(0, WEEK_PRIZES.length).entries()) {
+    const key = userKey(row.name);
+    const user = await s.get(key, { type: 'json' });
+    if (!user) continue;
+    user.rewards = [...(user.rewards ?? []), { week, place: i + 1, diamonds: WEEK_PRIZES[i] }];
+    await s.setJSON(key, user);
+  }
+}
+
+// Takes the waiting rewards out of a user record (the caller saves the record)
+function takeRewards(user) {
+  const rewards = user.rewards ?? [];
+  delete user.rewards;
+  return rewards;
 }
 
 async function login(body) {
@@ -96,6 +132,7 @@ async function login(body) {
   const pin = String(body.pin ?? '');
   if (!name || !/^\d{4}$/.test(pin)) return reply({ ok: false, error: 'bad_input' }, 400);
   const s = store();
+  await payLastWeek(s);
   const key = userKey(name);
   const user = await s.get(key, { type: 'json' });
 
@@ -126,8 +163,9 @@ async function login(body) {
   user.fails = 0;
   user.lockUntil = 0;
   const token = newToken(user);
+  const rewards = takeRewards(user);
   await s.setJSON(key, user);
-  return reply({ ok: true, created: false, token, data: user.data, name: user.name });
+  return reply({ ok: true, created: false, token, data: user.data, name: user.name, rewards });
 }
 
 // Asks Google whether the sign-in token is real and made for this game. Returns the account id.
@@ -146,6 +184,7 @@ async function google(body) {
   const sub = await googleAccount(body.idToken);
   if (!sub) return reply({ ok: false, error: 'bad_google' }, 401);
   const s = store();
+  await payLastWeek(s);
   const linkKey = `google/${sub}`;
   const link = await s.get(linkKey, { type: 'json' });
 
@@ -155,8 +194,9 @@ async function google(body) {
     const user = await s.get(key, { type: 'json' });
     if (user) {
       const token = newToken(user);
+      const rewards = takeRewards(user);
       await s.setJSON(key, user);
-      return reply({ ok: true, created: false, token, data: user.data, name: user.name });
+      return reply({ ok: true, created: false, token, data: user.data, name: user.name, rewards });
     }
   }
 
@@ -196,23 +236,26 @@ async function google(body) {
   user.fails = 0;
   user.google = sub;
   const token = newToken(user);
+  const rewards = takeRewards(user);
   await s.setJSON(key, user);
   await s.setJSON(linkKey, { name: user.name });
-  return reply({ ok: true, created: false, token, data: user.data, name: user.name });
+  return reply({ ok: true, created: false, token, data: user.data, name: user.name, rewards });
 }
 
 async function save(body) {
   const name = cleanName(body.name);
   if (!name || typeof body.token !== 'string' || !validData(body.data)) return reply({ ok: false, error: 'bad_input' }, 400);
   const s = store();
+  await payLastWeek(s);
   const key = userKey(name);
   const user = await s.get(key, { type: 'json' });
   if (!user || !(user.tokens ?? []).includes(body.token)) return reply({ ok: false, error: 'bad_token' }, 401);
   user.data = body.data;
   user.updatedAt = body.data.updatedAt ?? Date.now();
+  const rewards = takeRewards(user);
   await s.setJSON(key, user);
   await updateLeaderboard(s, user.name, body.data);
-  return reply({ ok: true, updatedAt: user.updatedAt });
+  return reply({ ok: true, updatedAt: user.updatedAt, rewards });
 }
 
 async function rename(body) {
@@ -235,8 +278,9 @@ async function rename(body) {
   await s.setJSON(newKey, user);
   if (newKey !== key) await s.delete(key);
   if (user.google) await s.setJSON(`google/${user.google}`, { name: newName });
-  const rows = ((await s.get('leaderboard', { type: 'json' })) ?? []).filter((r) => r.name.toLowerCase() !== name.toLowerCase());
-  await s.setJSON('leaderboard', rows);
+  const board = boardKey(weekOf().id);
+  const rows = ((await s.get(board, { type: 'json' })) ?? []).filter((r) => r.name.toLowerCase() !== name.toLowerCase());
+  await s.setJSON(board, rows);
   if (user.data) await updateLeaderboard(s, newName, user.data);
   return reply({ ok: true, name: newName });
 }
@@ -273,9 +317,12 @@ async function readFeedback(req) {
 }
 
 async function leaderboard() {
-  // Only players who have played Endless Battle are listed
-  const rows = ((await store().get('leaderboard', { type: 'json' })) ?? []).filter((r) => r.wave > 0 && r.name.toLowerCase() !== TESTER);
-  return reply({ ok: true, rows: rows.slice(0, 50) });
+  const s = store();
+  await payLastWeek(s);
+  const week = weekOf();
+  // Only players who have played Endless Battle this week are listed
+  const rows = ((await s.get(boardKey(week.id), { type: 'json' })) ?? []).filter((r) => r.wave > 0 && r.name.toLowerCase() !== TESTER);
+  return reply({ ok: true, rows: rows.slice(0, 50), week: week.id, ends: week.end });
 }
 
 export default async (req) => {

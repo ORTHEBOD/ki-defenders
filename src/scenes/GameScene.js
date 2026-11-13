@@ -11,6 +11,7 @@ import { ENEMIES } from '../data/enemies.js';
 import { addXp } from '../data/hero.js';
 import Hero from '../objects/Hero.js';
 import { Save, activeHero } from '../systems/Save.js';
+import { weekOf, compareScores, formatTime } from '../data/weekly.js';
 import { levelOpen, maxForm } from '../systems/Progress.js';
 import Tutorial from '../systems/Tutorial.js';
 import Path from '../systems/Path.js';
@@ -27,6 +28,8 @@ import { shade } from '../art/fighterArt.js';
 const TEAM_EXP = 0.3;
 // After a win, the next level starts by itself after this many seconds
 const NEXT_SECONDS = 5;
+// From this level on, the next wave can be called before the current one is beaten
+const EARLY_WAVES_LEVEL = 8;
 // Floating text on the screen layer (not on the map)
 const SCREEN = 150;
 // How far the map can zoom in
@@ -97,6 +100,16 @@ export default class GameScene extends Phaser.Scene {
     this.cannon = null;
     this.waveIndex = -1;
     this.waveActive = false;
+    // Waves fully beaten (with early waves, several can be fighting at once), and when the last one
+    // was beaten: seconds of play, not counting pauses. Endless ranks the week by these two.
+    this.wavesCleared = 0;
+    this.clearTime = 0;
+    this.playTime = 0;
+    // From level 8 (and in Endless) the next wave can be called before this one is beaten
+    this.earlyWaves = this.endless || this.level.id >= EARLY_WAVES_LEVEL;
+    // Fighters the player owns (the tester has them all)
+    const owner = Save.current();
+    this.owned = owner?.super ? Object.keys(FIGHTERS) : owner?.fighters ?? [];
     this.waveTime = 0;
     this.spawnQueue = [];
     this.enemies = [];
@@ -152,8 +165,9 @@ export default class GameScene extends Phaser.Scene {
     this.floats = 0;
     this.tutorial = this.level.id === 1 && !player?.tutorialDone ? new Tutorial(this) : null;
     // A fighter that joins the team on this level
-    const joined = this.endless ? [] : Object.values(FIGHTERS).filter((d) => d.unlock > 1 && d.unlock === this.level.id);
-    joined.forEach((d, i) => this.time.delayedCall(800 + i * 2500, () => this.banner(`New fighter: ${d.name}!`)));
+    const joined = this.endless ? [] : Object.values(FIGHTERS)
+      .filter((d) => d.unlock > 1 && d.unlock === this.level.id && !this.owned.includes(d.texture));
+    joined.forEach((d, i) => this.time.delayedCall(800 + i * 2500, () => this.banner(`New fighter: ${d.name}! Free on this level`)));
 
     // Switching apps or locking the phone pauses the battle
     const onHidden = () => this.state === 'playing' && this.pause();
@@ -790,8 +804,15 @@ export default class GameScene extends Phaser.Scene {
     this.kiText.setText(`${this.ki}`);
     this.livesText.setText(`${this.lives}`);
     const total = this.endless ? '' : `/${this.level.waves.length}`;
-    this.waveText.setText(`Wave ${Math.max(0, this.waveIndex + 1)}${total}`);
-    if (this.waveActive) {
+    // Endless shows the clock too: the weekly leaderboard ranks the same wave by time
+    const clock = this.endless ? `   ${formatTime(this.playTime)}` : '';
+    this.waveText.setText(`Wave ${Math.max(0, this.waveIndex + 1)}${total}${clock}`);
+    const more = this.endless || this.waveIndex + 1 < this.level.waves.length;
+    if (this.waveActive && this.earlyWaves) {
+      // Calling the next wave early: more enemies at once, and a faster finish
+      this.startBtn.setLabel(more ? `Call wave ${this.waveIndex + 2}` : 'Final wave');
+      this.startBtn.setEnabled(this.state === 'playing' && more);
+    } else if (this.waveActive) {
       this.startBtn.setLabel('Fighting...');
       this.startBtn.setEnabled(false);
     } else {
@@ -842,7 +863,7 @@ export default class GameScene extends Phaser.Scene {
   openBuildMenu(spot) {
     this.closeMenu();
     const types = Object.keys(FIGHTERS);
-    const open = fightersFor(this.level.id, this.endless);
+    const open = fightersFor(this.level.id, this.endless, this.owned);
     if (spot.maze) types.push('wall');
     const cardW = 124;
     const cardH = 140;
@@ -866,13 +887,16 @@ export default class GameScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true });
       cards.push({ card, def, locked });
       if (locked) {
-        card.on('pointerdown', () => this.floatText(pos.x + cx, pos.y, `Unlocks at level ${def.unlock}`, '#ffd93b', 22, SCREEN));
+        const player = Save.current();
+        const beaten = player && (player.stars[def.unlock] ?? 0) > 0;
+        const why = beaten ? `Buy ${def.name} on the Fighters page` : `Unlocks at level ${def.unlock}`;
+        card.on('pointerdown', () => this.floatText(pos.x + cx, pos.y, why, '#ffd93b', 22, SCREEN));
         m.add([
           card,
           this.add.image(cx, -34, `${def.texture}_0`).setTint(0x202430),
           this.add.text(cx, -34, '🔒', { fontSize: '30px' }).setOrigin(0.5),
           this.add.text(cx, 10, def.name, textStyle(22, '#8a91ad')).setOrigin(0.5),
-          this.add.text(cx, 40, `Level ${def.unlock}`, textStyle(20, '#ffd93b')).setOrigin(0.5),
+          this.add.text(cx, 40, beaten ? `${def.price} coins` : `Level ${def.unlock}`, textStyle(20, '#ffd93b')).setOrigin(0.5),
         ]);
         return;
       }
@@ -1015,13 +1039,19 @@ export default class GameScene extends Phaser.Scene {
   // ---------- Waves ----------
 
   startWave() {
-    if (this.waveActive || this.state !== 'playing') return;
+    if ((this.waveActive && !this.earlyWaves) || this.state !== 'playing') return;
     if (!this.endless && this.waveIndex + 1 >= this.level.waves.length) return;
     this.waveIndex++;
     const wave = this.endless ? endlessWave(this.waveIndex) : this.level.waves[this.waveIndex];
-    this.waveActive = true;
-    this.waveTime = 0;
-    this.spawnQueue = mixWave(wave.groups);
+    if (this.waveActive) {
+      // An early wave: its enemies join the ones still coming, starting now
+      const extra = mixWave(wave.groups).map((e) => ({ ...e, time: e.time + this.waveTime }));
+      this.spawnQueue = [...this.spawnQueue, ...extra].sort((a, b) => a.time - b.time);
+    } else {
+      this.waveActive = true;
+      this.waveTime = 0;
+      this.spawnQueue = mixWave(wave.groups);
+    }
     this.showNewEnemyTips(wave.groups.map((gr) => gr.type));
     const last = !this.endless && this.waveIndex === this.level.waves.length - 1;
     Audio.sfx('wave');
@@ -1031,6 +1061,8 @@ export default class GameScene extends Phaser.Scene {
 
   endWave() {
     this.waveActive = false;
+    this.wavesCleared = this.waveIndex + 1;
+    this.clearTime = this.playTime;
     if (!this.endless && this.waveIndex === this.level.waves.length - 1) {
       this.endGame(true);
       return;
@@ -1044,6 +1076,11 @@ export default class GameScene extends Phaser.Scene {
   update(time, delta) {
     if (this.state !== 'playing') return;
     const dt = Math.min(delta / 1000, 0.05) * this.speed;
+    this.playTime += delta / 1000;
+    if (this.endless && Math.floor(this.playTime) !== this.shownSecond) {
+      this.shownSecond = Math.floor(this.playTime);
+      this.refreshHud();
+    }
 
     if (this.waveActive) {
       this.waveTime += dt;
@@ -1398,7 +1435,7 @@ export default class GameScene extends Phaser.Scene {
 
   // Saves stars and hero XP, and returns what was earned
   saveRewards(win) {
-    const wavesDone = this.waveIndex + (this.waveActive ? 0 : 1);
+    const wavesDone = this.wavesCleared;
     const bonus = this.endless ? wavesDone * 10 : win ? 40 * this.diff.stars : 10;
     // The win bonus only goes to a hero that fought
     const xp = this.heroXp > 0 ? Math.round(this.heroXp) + bonus : 0;
@@ -1407,11 +1444,19 @@ export default class GameScene extends Phaser.Scene {
       win, stars, levelNumber: this.level.id, kills: this.kills, bounty: !!this.hero?.has('bounty'), extra: this.hero?.gear.coins ?? 0,
       endlessWaves: this.endless ? wavesDone : undefined,
     });
+    let weekBest = false;
     const result = Save.update((p) => {
       let newBest = false;
       if (this.endless) {
         newBest = wavesDone > p.endlessBest;
         if (newBest) p.endlessBest = wavesDone;
+        // This week's best run, for the weekly leaderboard: more waves, or the same waves faster
+        const run = { id: weekOf().id, wave: wavesDone, time: Math.max(1, Math.round(this.clearTime)) };
+        const old = p.week?.id === run.id ? p.week : null;
+        if (wavesDone > 0 && (!old || compareScores(run, old) < 0)) {
+          p.week = run;
+          weekBest = true;
+        }
       } else {
         newBest = stars > (p.stars[this.level.id] || 0);
         if (newBest) p.stars[this.level.id] = stars;
@@ -1420,7 +1465,7 @@ export default class GameScene extends Phaser.Scene {
       p.coins += coins;
       const hero = activeHero(p);
       const gained = hero ? addXp(hero, xp) : 0;
-      return { newBest, gained, heroLevel: hero?.level, best: p.endlessBest };
+      return { newBest, weekBest, gained, heroLevel: hero?.level, best: p.endlessBest, week: p.week };
     });
     return { xp, stars, coins, wavesDone, ...(result || { newBest: false, gained: 0 }) };
   }
@@ -1444,7 +1489,9 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5).setDepth(201);
     if (this.endless) {
       this.add.text(W / 2, 250, `You held out for ${r.wavesDone} waves!`, textStyle(48, '#ffd93b')).setOrigin(0.5).setDepth(201);
-      this.add.text(W / 2, 305, r.newBest ? 'New personal best!' : `Your best: ${r.best} waves`, textStyle(28))
+      const week = r.week?.wave ? `This week: wave ${r.week.wave} in ${formatTime(r.week.time)}` : '';
+      const line = r.weekBest ? `New best this week! Wave ${r.week.wave} in ${formatTime(r.week.time)}` : week;
+      this.add.text(W / 2, 305, `${r.newBest ? 'New personal best!' : `Your best: ${r.best} waves`}   ${line}`, textStyle(26))
         .setOrigin(0.5).setDepth(201);
     } else if (win) {
       this.add.text(W / 2, 245, '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars), textStyle(64, '#ffd93b'))

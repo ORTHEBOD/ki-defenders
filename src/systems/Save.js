@@ -1,6 +1,7 @@
 import { Online } from './Online.js';
 import { HEROES, SKILL_TREE, newHeroSave } from '../data/hero.js';
 import { GEAR } from '../data/shop.js';
+import { FIGHTERS } from '../data/fighters.js';
 
 // Player profiles. Each player has a name and a 4-digit PIN.
 // Progress is always saved on this device first (localStorage), so the game works offline,
@@ -92,6 +93,12 @@ function migrate(p) {
   }
   if (!p.heroes[p.activeHero]) p.activeHero = Object.keys(p.heroes)[0] ?? null;
   p.coins ??= 0;
+  p.diamonds ??= 0;
+  // Fighters bought on the Fighters page. Players from before fighters cost coins keep the ones
+  // whose level they already beat.
+  p.fighters ??= Object.keys(FIGHTERS).filter((t) => FIGHTERS[t].unlock === 1 || (p.stars?.[FIGHTERS[t].unlock] ?? 0) > 0);
+  // Weekly leaderboard prizes not shown yet: [{ week, place, diamonds }]
+  p.prizes ??= [];
   p.items ??= [];
   p.endlessBest ??= 0;
   p.seenStory ??= [];
@@ -101,6 +108,17 @@ function migrate(p) {
   p.base ??= {};
   p.updatedAt ??= 0;
   return p;
+}
+
+// Diamonds the server says were won on the weekly leaderboard: added now, shown in the Hub later
+function addRewards(data, rewards) {
+  if (!Array.isArray(rewards) || !rewards.length) return false;
+  for (const r of rewards) {
+    data.diamonds += Math.max(0, Math.floor(Number(r.diamonds) || 0));
+    data.prizes.push(r);
+  }
+  data.updatedAt = Date.now();
+  return true;
 }
 
 export const Save = {
@@ -139,6 +157,7 @@ export const Save = {
         data = local.data;
         dirty = true;
       }
+      if (addRewards(migrate(data), res.rewards)) dirty = true;
       all[key] = { pin: hash, pinKey: local?.pinKey, data, token: res.token, dirty, online: 'ok' };
       writeAll(all);
       setCurrentKey(key);
@@ -196,6 +215,7 @@ export const Save = {
       data = local.data;
       dirty = true;
     }
+    if (addRewards(migrate(data), res.rewards)) dirty = true;
     all[key] = { pin: local?.pin ?? null, pinKey: local?.pinKey, google: true, data, token: res.token, dirty, online: 'ok' };
     writeAll(all);
     setCurrentKey(key);
@@ -304,6 +324,10 @@ export const Sync = {
       // Only clear the flag if nothing changed while uploading
       if (now.data.updatedAt === sent) now.dirty = false;
       else this.soon();
+      if (addRewards(migrate(now.data), res.rewards)) {
+        now.dirty = true;
+        this.soon();
+      }
     } else if (res?.error === 'bad_token') {
       now.token = null;
     }

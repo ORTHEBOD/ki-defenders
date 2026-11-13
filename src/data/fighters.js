@@ -1,6 +1,9 @@
 // All fighter (tower) data lives here: names, looks and stats.
 // To rename a character or change its art later, only this file changes.
 //
+// Kaito and Ronin are on the team from the start. The others join at level `unlock`: they can be
+// tried there for free, and once that level is beaten they are bought for `price` coins.
+//
 // Every fighter has 18 steps: each of the 6 forms, then 2 normal upgrades (+1, +2) before the next form.
 // Moving into a new form is a TRANSFORMATION (new hair, aura and a bigger power jump).
 // Fighters earn EXP by hurting enemies (shared by damage); a step can only be bought (with Ki) once its EXP is reached.
@@ -80,6 +83,7 @@ export const FIGHTERS = {
   blaze: {
     name: 'Blaze',
     unlock: 5,
+    price: 1000,
     role: 'Barrage',
     texture: 'blaze',
     cost: 100,
@@ -96,6 +100,7 @@ export const FIGHTERS = {
   lumi: {
     name: 'Lumi',
     unlock: 3,
+    price: 500,
     role: 'Control',
     texture: 'lumi',
     cost: 80,
@@ -113,6 +118,7 @@ export const FIGHTERS = {
   oru: {
     name: 'Master Oru',
     unlock: 8,
+    price: 2000,
     role: 'Support',
     texture: 'oru',
     cost: 120,
@@ -128,9 +134,10 @@ export const FIGHTERS = {
   },
 };
 
-// Fighters the player can build on a level (all of them in Endless)
-export function fightersFor(levelId, endless) {
-  return Object.keys(FIGHTERS).filter((type) => endless || levelId >= FIGHTERS[type].unlock);
+// Fighters the player can build: the ones bought on the Fighters page (`owned`). A new fighter can
+// also be tried for free on the level it joins at; after beating that level it is bought with coins.
+export function fightersFor(levelId, endless, owned = []) {
+  return Object.keys(FIGHTERS).filter((type) => owned.includes(type) || (!endless && levelId === FIGHTERS[type].unlock));
 }
 
 // Maze levels only: a cheap block that does not attack. It just makes enemies walk around it.

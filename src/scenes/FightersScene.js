@@ -3,13 +3,15 @@ import { fighterPortrait, formLook } from '../art/fighterArt.js';
 import { drawMenuBackground, panel } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
 import { Save } from '../systems/Save.js';
-import { levelOpen, maxForm } from '../systems/Progress.js';
+import { maxForm } from '../systems/Progress.js';
+import { Audio } from '../systems/Audio.js';
 import { textStyle } from '../ui/theme.js';
 
 const hex = (c) => `#${c.toString(16).padStart(6, '0')}`;
 
 // The fighters (towers): who has joined the team, and how far they can power up.
-// New fighters join at certain levels, and the story opens higher forms (see FORM_LEVELS).
+// New fighters can be tried on the level they join at; after beating it they are bought here with coins.
+// The story opens higher forms (see FORM_LEVELS).
 export default class FightersScene extends Phaser.Scene {
   constructor() {
     super('Fighters');
@@ -24,6 +26,8 @@ export default class FightersScene extends Phaser.Scene {
     drawMenuBackground(this);
     makeButton(this, 90, 40, 140, 50, '< Back', () => this.scene.start('Hub'), { fontSize: 26, color: 0x3a4470 });
     this.add.text(640, 40, 'Fighters', textStyle(44, '#ffd93b')).setOrigin(0.5);
+    this.add.image(1110, 40, 'coin');
+    this.add.text(1130, 40, `${player.coins}`, textStyle(30, '#ffd93b')).setOrigin(0, 0.5);
     this.add.text(640, 84, 'In battle, fighters share the EXP of each enemy by the damage they did. Spend Ki to upgrade them.',
       textStyle(20, '#c9d3ff')).setOrigin(0.5);
 
@@ -31,20 +35,28 @@ export default class FightersScene extends Phaser.Scene {
     const form = FORMS[top];
 
     // One card per fighter, shown in the highest form the story has opened
-    Object.values(FIGHTERS).forEach((def, i) => {
+    Object.entries(FIGHTERS).forEach(([type, def], i) => {
       const x = 160 + i * 240;
-      const joined = player.super || def.unlock === 1 || levelOpen(player, def.unlock);
+      const joined = player.super || player.fighters.includes(type);
+      // Its level is beaten, so it can be bought
+      const forSale = !joined && (player.stars[def.unlock] ?? 0) > 0;
       panel(this, x, 270, 220, 300, joined ? def.color : 0x3a3f52);
       // The top upgrade of that form: headband and cape
       const look = { ...formLook(def.look, top), rank: 3, trim: top > 0 ? form.aura : def.color };
-      const art = fighterPortrait(this, x, 220, joined ? look : { ...def.look, gi: 0x202430, skin: 0x202430, hair: 0x202430, belt: 0x202430, boots: 0x202430 }, 2.6,
-        joined ? `${def.texture}_${top}` : null);
-      if (!joined) this.add.text(x, 220, '🔒', { fontSize: '44px' }).setOrigin(0.5);
+      const lit = joined || forSale;
+      const art = fighterPortrait(this, x, 220, lit ? look : { ...def.look, gi: 0x202430, skin: 0x202430, hair: 0x202430, belt: 0x202430, boots: 0x202430 }, 2.6,
+        lit ? `${def.texture}_${top}` : null);
+      if (!lit) this.add.text(x, 220, '🔒', { fontSize: '44px' }).setOrigin(0.5);
       else this.tweens.add({ targets: art, y: art.y - 6, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: i * 150 });
-      this.add.text(x, 330, def.name, textStyle(30, joined ? '#ffffff' : '#8a91ad')).setOrigin(0.5);
+      this.add.text(x, 330, def.name, textStyle(30, lit ? '#ffffff' : '#8a91ad')).setOrigin(0.5);
       this.add.text(x, 362, def.role, textStyle(20, '#c9d3ff')).setOrigin(0.5);
-      this.add.text(x, 398, joined ? `Up to ${form.name}` : `Joins at level ${def.unlock}`,
-        textStyle(19, joined ? form.color : '#ffd93b')).setOrigin(0.5);
+      if (forSale) {
+        makeButton(this, x, 396, 190, 40, `Buy  ${def.price} coins`, () => this.buy(type, def, x),
+          { fontSize: 20, color: player.coins >= def.price ? 0x2f8a4a : 0x5a5f72 });
+      } else {
+        this.add.text(x, 398, joined ? `Up to ${form.name}` : `Joins at level ${def.unlock}`,
+          textStyle(19, joined ? form.color : '#ffd93b')).setOrigin(0.5);
+      }
     });
 
     // The forms, and the story level that opens each one
@@ -60,5 +72,21 @@ export default class FightersScene extends Phaser.Scene {
       this.add.text(x, 636, i === 0 ? 'From the start' : `Beat level ${FORM_LEVELS[i]}`, textStyle(17, '#9aa3c7')).setOrigin(0.5);
       if (i < FORMS.length - 1) this.add.text(x + 100, 560, '›', textStyle(34, '#5a6378')).setOrigin(0.5);
     });
+  }
+
+  buy(type, def, x) {
+    const done = Save.update((p) => {
+      if (p.fighters.includes(type) || p.coins < def.price) return false;
+      p.coins -= def.price;
+      p.fighters.push(type);
+      return true;
+    });
+    if (!done) {
+      const msg = this.add.text(x, 440, 'Not enough coins', textStyle(22, '#ff6b6b')).setOrigin(0.5);
+      this.tweens.add({ targets: msg, y: 420, alpha: 0, delay: 700, duration: 600, onComplete: () => msg.destroy() });
+      return;
+    }
+    Audio.sfx('coin');
+    this.scene.restart();
   }
 }

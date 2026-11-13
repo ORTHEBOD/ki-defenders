@@ -33,6 +33,9 @@ export default class HubScene extends Phaser.Scene {
     this.add.text(330, 32, `★ ${totalStars(player)}`, textStyle(30, '#ffd93b')).setOrigin(0, 0.5);
     this.add.image(450, 32, 'coin');
     this.add.text(470, 32, `${player.coins}`, textStyle(30, '#ffd93b')).setOrigin(0, 0.5);
+    // Diamonds: won on the weekly leaderboard
+    this.add.text(605, 32, '💎', { fontSize: '26px' }).setOrigin(0.5);
+    this.add.text(625, 32, `${player.diamonds}`, textStyle(30, '#7fe3ff')).setOrigin(0, 0.5);
     this.add.text(928, 32, player.name, textStyle(30)).setOrigin(1, 0.5);
     makeButton(this, 954, 32, 36, 36, '✏️', () => this.renamePopup(player), { fontSize: 18, color: 0x3a4470 });
     makeButton(this, 1050, 32, 140, 44, 'Settings', () => this.scene.start('Settings', { back: 'Hub' }),
@@ -73,7 +76,7 @@ export default class HubScene extends Phaser.Scene {
       spin.setEnabled(open);
     }
     this.buttons(player, hero);
-    this.dailyReward();
+    if (!this.dailyReward()) this.prizePopup(player);
 
     if (data && data.welcome) {
       const t = this.add.text(830, 660, data.welcome, textStyle(30, '#5be35b')).setOrigin(0.5);
@@ -141,7 +144,7 @@ export default class HubScene extends Phaser.Scene {
       p.coins += coins;
       return { streak, coins };
     });
-    if (!gift) return;
+    if (!gift) return false;
     Audio.sfx('coin');
     const pop = this.add.container(0, 0).setDepth(300);
     pop.add(this.add.rectangle(0, 0, 1280, 720, 0x000000, 0.6).setOrigin(0).setInteractive());
@@ -152,6 +155,25 @@ export default class HubScene extends Phaser.Scene {
     pop.add(this.add.text(610, 375, `+${gift.coins} coins`, textStyle(40, '#ffd93b')).setOrigin(0, 0.5));
     pop.add(this.add.text(640, 420, 'Come back tomorrow for more (up to 200 a day)', textStyle(20, '#9aa3c7')).setOrigin(0.5));
     pop.add(makeButton(this, 640, 475, 200, 56, 'Collect', () => this.scene.restart(), { color: 0x2f8a4a, fontSize: 30, depth: 301 }));
+    return true;
+  }
+
+  // Diamonds won on last week's leaderboard (already added to the player; this shows them once)
+  prizePopup(player) {
+    const prize = player.prizes[0];
+    if (!prize) return;
+    Audio.sfx('coin');
+    const place = ['1st', '2nd', '3rd'][prize.place - 1] ?? `${prize.place}th`;
+    const pop = this.add.container(0, 0).setDepth(300);
+    pop.add(this.add.rectangle(0, 0, 1280, 720, 0x000000, 0.6).setOrigin(0).setInteractive());
+    pop.add(panel(this, 640, 360, 600, 320, 0x7fe3ff));
+    pop.add(this.add.text(640, 255, 'Weekly leaderboard!', textStyle(48, '#ffd93b')).setOrigin(0.5));
+    pop.add(this.add.text(640, 318, `You finished ${place} last week`, textStyle(30, '#c9d3ff')).setOrigin(0.5));
+    pop.add(this.add.text(640, 378, `💎 +${prize.diamonds} diamonds`, textStyle(42, '#7fe3ff')).setOrigin(0.5));
+    pop.add(makeButton(this, 640, 470, 200, 56, 'Collect', () => {
+      Save.update((p) => p.prizes.shift());
+      this.scene.restart();
+    }, { color: 0x2f8a4a, fontSize: 30, depth: 301 }));
   }
 
   heroCard(player, hero) {
