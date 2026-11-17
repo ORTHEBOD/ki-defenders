@@ -1,7 +1,7 @@
 import { FIGHTERS, FORMS } from '../data/fighters.js';
 import { HEROES } from '../data/hero.js';
 import { GEAR } from '../data/shop.js';
-import { ART_FILES, artSize } from '../data/art.js';
+import { ART_FILES, BASE_ART, artSize } from '../data/art.js';
 import { drawFighterArt, formLook, pts } from '../art/fighterArt.js';
 import {
   drawBrute, drawFlyer, drawSplitter, drawSplitling, drawMedic, drawOgre, drawKrag,
@@ -23,6 +23,7 @@ export default class BootScene extends Phaser.Scene {
     this.load.on('loaderror', (file) => console.warn('Art not found:', file.src));
     for (const key of ART_FILES) this.load.image(`art_${key}`, `art/${key}.png`);
     this.load.image('menu_bg', 'art/menu_bg.jpg');
+    for (const key of BASE_ART) this.load.image(key, `art/${key}.png`);
     // Gear pictures (tools/cut_gear.py): shop icons, and worn on the hero
     for (const id of Object.keys(GEAR)) this.load.image(`gear_${id}`, `art/gear/${id}.png`);
   }
@@ -75,9 +76,9 @@ export default class BootScene extends Phaser.Scene {
       const img = this.textures.get(raw).getSourceImage();
       const size = artSize(key);
       let scale = Math.min(size / img.width, size / img.height);
-      // A fighter's other pictures (kaito_2, kaito_0_attack) are shrunk like its base picture (kaito_0),
+      // A fighter's other pictures (kaito_2, kaito_0_attack, hero_zenko_0_run) are shrunk like its base picture (kaito_0),
       // so the character keeps its size; a stretched-out arm or tall hair may stick out of the square
-      const baseKey = `art_${key.replace(/_\d+(_attack)?$/, '_0')}`;
+      const baseKey = `art_${key.replace(/_\d+(_attack|_run)?$/, '_0')}`;
       if (baseKey !== raw && this.textures.exists(baseKey)) {
         const base = this.textures.get(baseKey).getSourceImage();
         scale = Math.min(size / base.width, size / base.height);

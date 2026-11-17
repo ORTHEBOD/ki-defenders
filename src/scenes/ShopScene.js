@@ -168,10 +168,11 @@ export default class ShopScene extends Phaser.Scene {
     }
   }
 
-  // Draws the hero (in its form) wearing `gear`
+  // Draws the hero (in its form). With no picture for the hero it is drawn wearing `gear`.
   dressHero(hero, def, gear) {
     this.heroArt?.destroy();
-    this.heroArt = fighterPortrait(this, 215, 290, { ...formLook(def.look, heroForm(hero)), ...gearLook(gear) }, 3);
+    this.heroArt = fighterPortrait(this, 215, 290, { ...formLook(def.look, heroForm(hero)), ...gearLook(gear) }, 3,
+      `hero_${this.player.activeHero}_${heroForm(hero)}`);
     this.layer.add(this.heroArt);
   }
 

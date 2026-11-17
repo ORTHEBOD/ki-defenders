@@ -29,7 +29,7 @@ export default class BaseScene extends Phaser.Scene {
     // The base as it looks in battle, drawn big
     const lv = baseLevels(player);
     panel(this, 640, 200, 520, 210);
-    const box = this.add.container(640, 250).setScale(1.7);
+    const box = this.add.container(640, 255).setScale(1.3);
     box.add(drawBase(this, 0, 0, lv).parts);
     this.add.text(640, 290, 'Upgrades also change how the base looks in battle', textStyle(17, '#9aa3c7')).setOrigin(0.5);
 

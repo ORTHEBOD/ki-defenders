@@ -1,9 +1,11 @@
-// The base (the dome the enemies attack). It looks stronger as it is upgraded:
+// The base (the dome the enemies attack). With the pictures (art/base_0..5, art/cannon_1..5) it grows from an
+// igloo to a crystal castle with the walls level, and the cannon stands beside it. Without them it is drawn:
 // walls add a stone wall, then towers, then gold flags; the reactor adds a glowing Ki crystal;
 // the cannon adds a turret on the roof (returned, so the battle can turn it toward enemies).
 import { COLORS } from '../ui/theme.js';
 
 export function drawBase(scene, x, y, lv = {}, depth = 9) {
+  if (scene.textures.exists(`base_${lv.walls ?? 0}`)) return pictureBase(scene, x, y, lv, depth);
   const parts = [];
   const g = scene.add.graphics().setDepth(depth);
   parts.push(g);
@@ -62,6 +64,43 @@ export function drawBase(scene, x, y, lv = {}, depth = 9) {
     t.fillStyle(0x6a6f7a).fillCircle(0, 0, 10).lineStyle(2.5, O).strokeCircle(0, 0, 10);
     cannon.add(t);
     cannon.rotation = -Math.PI / 4;
+    parts.push(cannon);
+  }
+  return { parts, cannon };
+}
+
+// How big the base pictures show (they are up to 300 px)
+export const BASE_SCALE = 0.42;
+const CANNON_SCALE = 0.36;
+
+function pictureBase(scene, x, y, lv, depth) {
+  const parts = [];
+  const shadow = scene.add.ellipse(x, y + 6, 120, 22, 0x000000, 0.2).setDepth(depth);
+  const img = scene.add.image(x, y + 12, `base_${lv.walls ?? 0}`).setOrigin(0.5, 1).setScale(BASE_SCALE).setDepth(depth);
+  parts.push(shadow, img);
+  // Ki crystal (reactor) floating above the base, brighter at higher levels
+  if (lv.reactor >= 1) {
+    const cx = x - 34;
+    const cy = y + 12 - img.displayHeight - 4;
+    const glow = scene.add.circle(cx, cy, 10 + lv.reactor * 2, 0x5ad8ff, 0.35).setDepth(depth + 0.1);
+    scene.tweens.add({ targets: glow, scale: 1.3, alpha: 0.15, duration: 800, yoyo: true, repeat: -1 });
+    const c = scene.add.graphics().setDepth(depth + 0.1);
+    const pts = [{ x: cx, y: cy - 12 }, { x: cx + 7, y: cy }, { x: cx, y: cy + 10 }, { x: cx - 7, y: cy }];
+    c.fillStyle(0x9fe8ff).fillPoints(pts, true).lineStyle(2, COLORS.outline).strokePoints(pts, true);
+    parts.push(glow, c);
+  }
+  // The cannon stands in front of the base, on the side toward the middle of the screen. It faces the enemy
+  // it shoots (aim) and kicks back.
+  let cannon = null;
+  if (lv.cannon >= 1) {
+    const side = x > scene.scale.width / 2 ? -1 : 1;
+    cannon = scene.add.container(x + side * 46, y + 14).setDepth(depth + 0.2);
+    const gun = scene.add.image(0, 0, `cannon_${lv.cannon}`).setOrigin(0.5, 0.85).setScale(CANNON_SCALE);
+    cannon.add(gun);
+    // The barrel in the picture points up and to the right
+    cannon.muzzle = { x: gun.displayWidth * 0.42, y: -gun.displayHeight * 0.62 };
+    cannon.aim = (angle) => gun.setScale(Math.cos(angle) < 0 ? -CANNON_SCALE : CANNON_SCALE, CANNON_SCALE);
+    cannon.fire = () => scene.tweens.add({ targets: gun, x: -Math.sign(gun.scaleX) * 5, duration: 60, yoyo: true });
     parts.push(cannon);
   }
   return { parts, cannon };

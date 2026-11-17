@@ -13,7 +13,13 @@ export const ART_FILES = [
   'ronin_0_attack', 'ronin_1_attack', 'ronin_2_attack', 'ronin_3_attack', 'ronin_4_attack', 'ronin_5_attack',
   // Blaze (throwing fireballs), Lumi (light flash) and Master Oru (meditating), all 6 forms
   ...['blaze', 'lumi', 'oru'].flatMap((n) => [0, 1, 2, 3, 4, 5].flatMap((i) => [`${n}_${i}`, `${n}_${i}_attack`])),
+  // The heroes, all 6 forms, standing, attacking and running (Sora has no running pictures: he runs standing)
+  ...['zenko', 'mira', 'goran', 'sora'].flatMap((id) => [0, 1, 2, 3, 4, 5].flatMap((i) => [
+    `hero_${id}_${i}`, `hero_${id}_${i}_attack`, ...(id === 'sora' ? [] : [`hero_${id}_${i}_run`])])),
 ];
+
+// The base in battle and on the Base page: art/base_<walls level>.png (0-5) and art/cannon_<level>.png (1-5)
+export const BASE_ART = [0, 1, 2, 3, 4, 5].map((i) => `base_${i}`).concat([1, 2, 3, 4, 5].map((i) => `cannon_${i}`));
 
 // How big each picture is shown in battle (pixels). Bigger PNGs are shrunk to fit;
 // menus and story scenes use the full-size picture.

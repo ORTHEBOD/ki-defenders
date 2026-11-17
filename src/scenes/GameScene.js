@@ -21,7 +21,7 @@ import Fighter from '../objects/Fighter.js';
 import { makeButton } from '../ui/Button.js';
 import { COLORS, textStyle } from '../ui/theme.js';
 import { baseLevels, baseLives, baseKi, cannonStats } from '../data/base.js';
-import { drawBase } from '../art/baseArt.js';
+import { drawBase, BASE_SCALE } from '../art/baseArt.js';
 import { shade } from '../art/fighterArt.js';
 
 // Part of every fighter's EXP that is shared with the whole team (see shareExp)
@@ -581,9 +581,13 @@ export default class GameScene extends Phaser.Scene {
 
   // The base, drawn with its upgrades (see art/baseArt.js)
   drawBase(x, y) {
+    // The base pictures are wide: a base at the edge of the map moves in so all of it shows
+    if (this.textures.exists(`base_${this.baseLv.walls}`)) x = Phaser.Math.Clamp(x, 66, this.scale.width - 66);
     const { cannon } = drawBase(this, x, y, this.baseLv);
     if (cannon) this.cannon = { sprite: cannon, x: cannon.x, y: cannon.y, timer: 1, stats: cannonStats(this.baseLv.cannon) };
-    this.add.text(x, y - (this.baseLv.walls >= 5 ? 82 : 62), 'BASE', textStyle(20)).setOrigin(0.5).setDepth(9);
+    const picture = this.textures.exists(`base_${this.baseLv.walls}`);
+    const top = picture ? this.textures.get(`base_${this.baseLv.walls}`).getSourceImage().height * BASE_SCALE - 12 : (this.baseLv.walls >= 5 ? 70 : 50);
+    this.add.text(x, y - top - 12, 'BASE', textStyle(20)).setOrigin(0.5).setDepth(9);
   }
 
   // Base Cannon: turns toward the closest enemy in range and shoots it
@@ -601,11 +605,16 @@ export default class GameScene extends Phaser.Scene {
       }
     }
     if (!target) return;
-    c.sprite.rotation = Math.atan2(target.y - c.y, target.x - c.x);
+    const r = Math.atan2(target.y - c.y, target.x - c.x);
+    // The cannon picture turns to face left or right; the drawn turret turns all the way round
+    if (c.sprite.aim) c.sprite.aim(r);
+    else c.sprite.rotation = r;
     if (c.timer > 0) return;
     c.timer = c.stats.every;
-    const r = c.sprite.rotation;
-    this.fireBlast(c.x + Math.cos(r) * 22, c.y + Math.sin(r) * 22, target, { damage: c.stats.damage, splash: 26, color: 0xff8a3d, size: 6 });
+    const m = c.sprite.muzzle;
+    const from = m ? { x: c.x + (Math.cos(r) < 0 ? -m.x : m.x), y: c.y + m.y } : { x: c.x + Math.cos(r) * 22, y: c.y + Math.sin(r) * 22 };
+    c.sprite.fire?.();
+    this.fireBlast(from.x, from.y, target, { damage: c.stats.damage, splash: 26, color: 0xff8a3d, size: 6 });
   }
 
   createSpots() {

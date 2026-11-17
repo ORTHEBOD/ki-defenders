@@ -33,6 +33,10 @@ export default class Hero {
     this.respawnTimer = 0;
     this.channel = null;
     this.cd = { kaiWave: 0, flashStep: 0, powerUp: 0, spiritOrb: 0 };
+    this.shown = this.form;
+    this.pose = '';
+    this.posing = 0;
+    this.boltTimer = 0;
 
     this.ring = scene.add.ellipse(x, y + 16, 48, 16).setStrokeStyle(3, this.def.look.gi).setDepth(18);
     this.aura = scene.add.image(x, y - 14, 'aura').setOrigin(0.5, 0.58).setDepth(21);
@@ -52,8 +56,45 @@ export default class Hero {
 
   // The hero's own form (Forms skills), with its aura. Power Up shows one form higher for a while.
   restLook() {
-    this.sprite.setTexture(this.tex(this.form));
+    this.shown = this.form;
+    this.setPose('');
     this.aura.setTint(this.form > 0 ? FORMS[this.form].aura : 0xffd93b).setAlpha(this.form > 0 ? 0.6 : 0);
+  }
+
+  // Standing, running or attacking: the hero's picture for that (art/hero_zenko_2_run.png and so on).
+  // With no picture for the pose (or no AI pictures at all) it stays the standing one.
+  setPose(pose) {
+    const key = `hero_${this.id}_${this.shown}${pose}`;
+    this.pose = pose;
+    this.sprite.setTexture(pose && this.scene.textures.exists(key) ? key : this.tex(this.shown));
+  }
+
+  // Shows the attack picture for a moment
+  attackPose(ms = 240) {
+    this.setPose('_attack');
+    this.posing = ms / 1000;
+  }
+
+  // Super Form 2 and 3 (and Power Up into them): little lightning bolts flicker around the hero
+  crackle(dt) {
+    const f = FORMS[this.shown];
+    if (!f.sparks) return;
+    this.boltTimer -= dt;
+    if (this.boltTimer > 0) return;
+    this.boltTimer = f.longHair ? 0.11 : 0.17;
+    const side = Math.random() < 0.5 ? -1 : 1;
+    let x = this.x + side * Phaser.Math.Between(12, 24);
+    let y = this.y - 14 + Phaser.Math.Between(-30, 22);
+    const pts = [{ x, y }];
+    for (let k = 0; k < 4; k++) {
+      x += side * Phaser.Math.Between(1, 6);
+      y += Phaser.Math.Between(-9, 9);
+      pts.push({ x, y });
+    }
+    const g = this.scene.add.graphics().setDepth(this.sprite.depth + 0.01);
+    g.lineStyle(4, 0x5ad8ff, 0.45).strokePoints(pts);
+    g.lineStyle(1.6, 0xeafcff, 1).strokePoints(pts);
+    this.scene.tweens.add({ targets: g, alpha: 0, duration: 170, onComplete: () => g.destroy() });
   }
 
   mod(key, stat) {
@@ -147,6 +188,12 @@ export default class Hero {
       this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.04 * (1 + this.gear.regen) * dt);
     }
 
+    this.crackle(dt);
+    if (this.posing > 0) {
+      this.posing -= dt;
+      if (this.posing <= 0) this.setPose(this.target ? '_run' : '');
+    }
+
     if (this.channel) {
       this.channel.t -= dt;
       if (this.channel.t <= 0) this.releaseOrb();
@@ -161,9 +208,11 @@ export default class Hero {
         this.target = null;
         this.scene.tweens.killTweensOf(this.marker);
         this.marker.setVisible(false);
+        if (this.posing <= 0) this.setPose('');
       } else {
         this.x += (dx / d) * step;
         this.y += (dy / d) * step;
+        if (this.posing <= 0 && this.pose !== '_run') this.setPose('_run');
       }
       if (Math.abs(dx) > 1) this.sprite.setFlipX(dx < 0);
     } else {
@@ -179,6 +228,7 @@ export default class Hero {
     if (!e) return;
     this.attackTimer = this.attackCooldown;
     this.sprite.setFlipX(e.x < this.x);
+    this.attackPose(Math.min(240, this.attackCooldown * 600));
     let dmg = this.damage;
     const crit = this.has('critical') && Math.random() < 0.15;
     if (crit) dmg *= 2;
@@ -297,6 +347,7 @@ export default class Hero {
     const ex = sx + Math.cos(ang) * a.length;
     const ey = sy + Math.sin(ang) * a.length;
     this.sprite.setFlipX(tx < this.x);
+    this.attackPose(450);
     this.scene.beamFx(sx, sy, ex, ey, a.color, width * 1.4);
     this.scene.cameras.main.shake(140, 0.005);
     this.scene.floatText(this.x, this.y - 80, 'KAI WAVE!', '#ff8a3d', 28);
@@ -333,7 +384,8 @@ export default class Hero {
     this.cd.powerUp = this.abilityCooldown('powerUp');
     this.powerTime = a.duration * this.mod('powerUp', 'duration');
     const up = Math.min(FORMS.length - 1, this.form + 1);
-    this.sprite.setTexture(this.tex(up));
+    this.shown = up;
+    this.setPose(this.pose === '_attack' ? '' : this.pose);
     this.aura.setTint(FORMS[up].aura).setAlpha(0.9);
     this.scene.flashFx(this.x, this.y - 14, 90, 0xffd93b);
     this.scene.floatText(this.x, this.y - 80, 'POWER UP!', '#ffd93b', 28);
@@ -356,6 +408,7 @@ export default class Hero {
     const { tx, ty, orb } = this.channel;
     this.channel = null;
     orb.destroy();
+    this.attackPose(450);
     const plus = this.has('spiritOrbPlus');
     this.scene.fireBlast(this.x, this.y - 70, { x: tx, y: ty, alive: false }, {
       damage: this.abilityDamage(a.damage * (plus ? 1.5 : 1), 'spiritOrb'),
