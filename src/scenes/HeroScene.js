@@ -104,6 +104,10 @@ export default class HeroScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true });
       this.add.text(60, y, slot.name, textStyle(16, '#9aa3c7')).setOrigin(0, 0.5);
       this.add.text(140, y, item ? item.name : '- empty -', textStyle(17, item ? '#ffffff' : '#6a7090')).setOrigin(0, 0.5);
+      if (item && this.textures.exists(`gear_${id}`)) {
+        const icon = this.add.image(392, y, `gear_${id}`);
+        icon.setScale(24 / Math.max(icon.width, icon.height));
+      }
       row.on('pointerdown', () => {
         const owned = player.items.filter((g) => GEAR[g].slot === slot.key);
         if (!owned.length) {

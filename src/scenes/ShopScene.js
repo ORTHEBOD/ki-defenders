@@ -95,7 +95,7 @@ export default class ShopScene extends Phaser.Scene {
         this.show('gear');
       });
       L.add(tab);
-      L.add(this.gearIcon(0, 0, slot.key, item ? item.color : 0x5a6378).setPosition(x, 208).setScale(on ? 1.2 : 1));
+      L.add(this.gearIcon(0, 0, slot.key, item ? item.color : 0x5a6378, worn[slot.key]).setPosition(x, 208).setScale(on ? 1.2 : 1));
       L.add(this.add.text(x, 250, slot.name, textStyle(18, on ? '#ffd93b' : '#9aa3c7')).setOrigin(0.5));
       if (item) L.add(this.add.circle(x + 50, 190, 6, 0x5be35b).setStrokeStyle(2, 0x10131c));
     });
@@ -132,7 +132,7 @@ export default class ShopScene extends Phaser.Scene {
     ring.fillStyle(rarity.color, 0.22).fillCircle(ix, iy, 34);
     ring.lineStyle(3, rarity.color, 0.95).strokeCircle(ix, iy, 34);
     L.add(ring);
-    L.add(this.gearIcon(0, 0, item.slot, item.color).setPosition(ix, iy).setScale(1.5));
+    L.add(this.gearIcon(0, 0, item.slot, item.color, id).setPosition(ix, iy).setScale(1.5));
     L.add(this.add.text(x - 42, y - 86, `${rarity.name.toUpperCase()}${'★'.repeat(Math.max(0, item.tier - 3))}`, textStyle(16, rarity.text)));
     const name = this.add.text(x - 42, y - 67, item.name, { ...textStyle(21), wordWrap: { width: 166 }, lineSpacing: -4 });
     L.add(name);
@@ -175,8 +175,13 @@ export default class ShopScene extends Phaser.Scene {
     this.layer.add(this.heroArt);
   }
 
-  // A small shaded picture of a gear piece
-  gearIcon(x, y, slot, color) {
+  // A small picture of a gear piece: the item's own picture (art/gear), or a drawn one in its color
+  gearIcon(x, y, slot, color, id = null) {
+    if (id && this.textures.exists(`gear_${id}`)) {
+      const img = this.add.image(0, 0, `gear_${id}`);
+      img.setScale(36 / Math.max(img.width, img.height));
+      return this.add.container(x, y, [img]);
+    }
     const g = this.add.graphics();
     const dark = Phaser.Display.Color.ValueToColor(color).darken(30).color;
     const O = 0x0d0d12;

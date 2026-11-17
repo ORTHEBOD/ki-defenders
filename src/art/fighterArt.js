@@ -20,7 +20,13 @@ export function shade(color, f) {
   return (r << 16) | (g << 8) | b;
 }
 
-export function drawFighterArt(g, look) {
+export function drawFighterArt(g, look, part = 'all') {
+  if (part !== 'head') drawBody(g, look);
+  if (part !== 'body') drawHead(g, look);
+}
+
+// Everything below the head (and what is behind it: long hair, cape, shadow)
+function drawBody(g, look) {
   const tiers = look.tiers ?? {};
   g.fillStyle(0x000000, 0.28).fillEllipse(32, 60.5, 36, 8);
   g.lineStyle(2.4, O);
@@ -128,6 +134,12 @@ export function drawFighterArt(g, look) {
     g.fillStyle(look.coin === true ? 0xffe98a : look.coin).fillCircle(38, 46.5, 1.8);
     g.lineStyle(2.4, O);
   }
+}
+
+// The head, hair and what is worn on it, and the Super Form sparks
+function drawHead(g, look) {
+  const tiers = look.tiers ?? {};
+  g.lineStyle(2.4, O);
   // Head and ear, with a soft shade under the hair and on the chin
   g.fillStyle(look.skin);
   g.fillCircle(42.2, 25, 2.8).strokeCircle(42.2, 25, 2.8);
@@ -193,21 +205,96 @@ export function drawFighterArt(g, look) {
 
 // A big, crisp fighter portrait centered on (x, y).
 // `key` (a texture key like 'hero_zenko_0') uses the AI picture when one has been added.
+// A look from gearLook wears the gear pictures (art/gear) on top of the drawn fighter.
 export function fighterPortrait(scene, x, y, look, scale = 3, key = null) {
   if (key && scene.textures.exists(`art_${key}`)) {
     // Fits the picture in the square without stretching it (the pictures are not all square)
     const img = scene.add.image(x, y, `art_${key}`);
     return img.setScale((64 * scale) / Math.max(img.width, img.height));
   }
-  const g = scene.add.graphics();
-  drawFighterArt(g, look);
-  g.setScale(scale).setPosition(x - 32 * scale, y - 32 * scale);
-  return g;
+  const pieces = gearPieces(scene, look.worn);
+  if (!pieces.length) {
+    const g = scene.add.graphics();
+    drawFighterArt(g, look);
+    g.setScale(scale).setPosition(x - 32 * scale, y - 32 * scale);
+    return g;
+  }
+  // Body, the gear on the body, head, the gear on the head - in a container that moves as one picture
+  const box = scene.add.container(x, y);
+  const plain = undress(look, pieces);
+  for (const part of ['body', 'head']) {
+    const g = scene.add.graphics();
+    drawFighterArt(g, plain, part);
+    box.add(g.setScale(scale).setPosition(-32 * scale, -32 * scale));
+    for (const p of pieces.filter((q) => q.part === part)) {
+      const img = scene.add.image((p.x - 32) * scale, (p.y - 32) * scale, p.key, p.frame).setScale(p.s * scale);
+      box.add(img);
+    }
+  }
+  return box;
+}
+
+// Where each gear picture is worn, in the 64 x 64 fighter box: [middle x, middle y, width, height] of the
+// space it fills (the picture keeps its shape). Gloves and boots are a pair in one picture: `pair` puts its
+// left half on the left hand / foot and its right half on the right one.
+const WORN = {
+  weapon: { part: 'body', pair: [[17, 45.5], [47, 45.5]], w: 14, h: 13 },
+  armor: { part: 'body', at: [32, 39.5], w: 32, h: 21 },
+  pants: { part: 'body', at: [32, 51], w: 23, h: 14 },
+  boots: { part: 'body', pair: [[26.5, 57.2], [37.5, 57.2]], w: 12.5, h: 9 },
+  amulet: { part: 'body', at: [32, 38.5], w: 9, h: 10 },
+  coin: { part: 'body', at: [38, 46.5], w: 8, h: 8 },
+  scouter: { part: 'head', at: [37.5, 23.6], w: 17, h: 9 },
+  band: { part: 'head', at: [32, 16.8], w: 24, h: 8 },
+};
+// Gear whose picture shows one piece, not a pair: it is worn on both hands / feet
+const ONE_PIECE = ['windBoots'];
+
+// The gear pictures to wear, for worn item ids that have a picture loaded (BootScene loads art/gear).
+// Each piece: { key, frame, part, x, y, s } (s = scale for a 64 x 64 fighter).
+export function gearPieces(scene, worn = []) {
+  const out = [];
+  for (const id of worn) {
+    const item = GEAR[id];
+    const key = `gear_${id}`;
+    if (!item || !scene.textures.exists(key)) continue;
+    const place = WORN[item.slot === 'accessory' ? item.show : item.slot];
+    const tex = scene.textures.get(key);
+    const img = tex.getSourceImage();
+    if (place.pair && ONE_PIECE.includes(id)) {
+      const s = Math.min(place.w / img.width, place.h / img.height);
+      place.pair.forEach(([x, y]) => out.push({ key, frame: undefined, part: place.part, x, y, s, slot: item.slot }));
+    } else if (place.pair) {
+      // One frame per half of the pair
+      const half = Math.floor(img.width / 2);
+      if (!tex.has('l')) tex.add('l', 0, 0, 0, half, img.height);
+      if (!tex.has('r')) tex.add('r', 0, half, 0, img.width - half, img.height);
+      const s = Math.min(place.w / half, place.h / img.height);
+      place.pair.forEach(([x, y], i) => out.push({ key, frame: i ? 'r' : 'l', part: place.part, x, y, s, slot: item.slot }));
+    } else {
+      const s = Math.min(place.w / img.width, place.h / img.height);
+      out.push({ key, frame: undefined, part: place.part, x: place.at[0], y: place.at[1], s, slot: item.slot });
+    }
+  }
+  return out;
+}
+
+// The look without the drawn version of the gear that is worn as a picture (the picture goes on top)
+function undress(look, pieces) {
+  const plain = { ...look, tiers: { ...look.tiers } };
+  for (const p of pieces) {
+    delete plain.tiers[p.slot];
+    if (p.slot === 'armor') plain.plate = null;
+    if (p.slot === 'amulet') plain.pendant = null;
+    if (p.slot === 'accessory') Object.assign(plain, { scouter: null, band: null, coin: null });
+  }
+  return plain;
 }
 
 // What a hero's worn gear (slot -> item id) adds to its look. Each piece shows in its item's color.
+// `worn` lists the item ids, so the gear pictures can be worn too (see gearPieces).
 export function gearLook(gear = {}) {
-  const look = { tiers: {} };
+  const look = { tiers: {}, worn: Object.values(gear).filter((id) => GEAR[id]) };
   for (const id of Object.values(gear)) {
     const item = GEAR[id];
     if (!item) continue;
@@ -238,10 +325,35 @@ export function heroTexture(scene, id, form, look, gear = {}) {
   if (!worn.length || ART_FILES.includes(base)) return base;
   const key = `${base}~${worn.join('~')}`;
   if (!scene.textures.exists(key)) {
-    const g = scene.make.graphics({ add: false });
-    drawFighterArt(g, { ...formLook(look, form), ...gearLook(gear) });
-    g.generateTexture(key, 64, 64);
-    g.destroy();
+    const full = { ...formLook(look, form), ...gearLook(gear) };
+    const pieces = gearPieces(scene, full.worn);
+    if (!pieces.length) {
+      const g = scene.make.graphics({ add: false });
+      drawFighterArt(g, full);
+      g.generateTexture(key, 64, 64);
+      g.destroy();
+      return key;
+    }
+    // Drawn body, gear pictures on it, drawn head, gear pictures on the head
+    const canvas = scene.textures.createCanvas(key, 64, 64);
+    const c = canvas.context;
+    c.imageSmoothingQuality = 'high';
+    const plain = undress(full, pieces);
+    for (const part of ['body', 'head']) {
+      const g = scene.make.graphics({ add: false });
+      drawFighterArt(g, plain, part);
+      g.generateTexture('~part', 64, 64);
+      g.destroy();
+      c.drawImage(scene.textures.get('~part').getSourceImage(), 0, 0);
+      scene.textures.remove('~part');
+      for (const p of pieces.filter((q) => q.part === part)) {
+        const f = scene.textures.getFrame(p.key, p.frame);
+        const w = f.cutWidth * p.s;
+        const h = f.cutHeight * p.s;
+        c.drawImage(f.source.image, f.cutX, f.cutY, f.cutWidth, f.cutHeight, p.x - w / 2, p.y - h / 2, w, h);
+      }
+    }
+    canvas.refresh();
   }
   return key;
 }

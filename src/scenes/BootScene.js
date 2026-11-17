@@ -1,5 +1,6 @@
 import { FIGHTERS, FORMS } from '../data/fighters.js';
 import { HEROES } from '../data/hero.js';
+import { GEAR } from '../data/shop.js';
 import { ART_FILES, artSize } from '../data/art.js';
 import { drawFighterArt, formLook, pts } from '../art/fighterArt.js';
 import {
@@ -22,6 +23,8 @@ export default class BootScene extends Phaser.Scene {
     this.load.on('loaderror', (file) => console.warn('Art not found:', file.src));
     for (const key of ART_FILES) this.load.image(`art_${key}`, `art/${key}.png`);
     this.load.image('menu_bg', 'art/menu_bg.jpg');
+    // Gear pictures (tools/cut_gear.py): shop icons, and worn on the hero
+    for (const id of Object.keys(GEAR)) this.load.image(`gear_${id}`, `art/gear/${id}.png`);
   }
 
   create() {
