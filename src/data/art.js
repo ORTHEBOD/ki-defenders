@@ -11,6 +11,8 @@ export const ART_FILES = [
   // Ronin, all 6 forms, standing and firing his beam
   'ronin_0', 'ronin_1', 'ronin_2', 'ronin_3', 'ronin_4', 'ronin_5',
   'ronin_0_attack', 'ronin_1_attack', 'ronin_2_attack', 'ronin_3_attack', 'ronin_4_attack', 'ronin_5_attack',
+  // Blaze (throwing fireballs), Lumi (light flash) and Master Oru (meditating), all 6 forms
+  ...['blaze', 'lumi', 'oru'].flatMap((n) => [0, 1, 2, 3, 4, 5].flatMap((i) => [`${n}_${i}`, `${n}_${i}_attack`])),
 ];
 
 // How big each picture is shown in battle (pixels). Bigger PNGs are shrunk to fit;

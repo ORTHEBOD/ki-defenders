@@ -225,12 +225,12 @@ export default class Fighter {
   }
 
   // Shows the fighter's attack picture for a moment (art/kaito_0_attack.png and so on), if there is one
-  attackPose() {
+  // `ms`: how long the pose shows (by default short, and shorter for fast attackers)
+  attackPose(ms = Math.min(220, this.stats.cooldown * 600)) {
     const key = `${this.def.texture}_${this.form}_attack`;
     if (!this.scene.textures.exists(key)) return;
     this.sprite.setTexture(key);
     this.poseTimer?.remove();
-    const ms = Math.min(220, this.stats.cooldown * 600);
     this.poseTimer = this.scene.time.delayedCall(ms, () => this.sprite.setTexture(this.textureKey()));
   }
 
@@ -270,7 +270,10 @@ export default class Fighter {
   blast(target, damage) {
     const s = this.stats;
     this.scene.tweens.add({ targets: this.sprite, y: this.y - 20, duration: 70, yoyo: true });
-    this.scene.fireBlast(this.x, this.y - 22, target, {
+    // With Blaze's pictures the fireball leaves from his throwing hand
+    const art = this.scene.textures.exists(`${this.def.texture}_${this.form}_attack`);
+    const dir = target.x < this.x ? -1 : 1;
+    this.scene.fireBlast(art ? this.x + dir * 14 : this.x, art ? this.y - 16 : this.y - 22, target, {
       damage, splash: s.splash, burn: s.burn, color: this.form > 0 ? this.formInfo.aura : this.def.color, by: this,
     });
   }
@@ -292,6 +295,8 @@ export default class Fighter {
     if (this.kiTimer >= this.stats.kiEvery) {
       this.kiTimer -= this.stats.kiEvery;
       this.scene.addKi(this.stats.ki, this.x, this.y - 50);
+      // Master Oru meditates for a moment while he makes Ki
+      this.attackPose(900);
     }
   }
 
