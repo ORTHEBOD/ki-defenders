@@ -36,6 +36,8 @@ export default class Hero {
     this.shown = this.form;
     this.pose = '';
     this.posing = 0;
+    this.stepT = 0; // the walking clock: one stride per whole number
+    this.bob = 0;
     this.boltTimer = 0;
 
     this.ring = scene.add.ellipse(x, y + 16, 48, 16).setStrokeStyle(3, this.def.look.gi).setDepth(18);
@@ -49,14 +51,15 @@ export default class Hero {
     this.draw();
   }
 
-  // The form's look, wearing the hero's gear
-  tex(form) {
-    return heroTexture(this.scene, this.id, form, this.def.look, this.worn);
+  // The form's look in a pose ('', '_attack' or '_run'), wearing the hero's gear
+  tex(form, pose = '') {
+    return heroTexture(this.scene, this.id, form, this.def.look, this.worn, pose);
   }
 
   // The hero's own form (Forms skills), with its aura. Power Up shows one form higher for a while.
   restLook() {
     this.shown = this.form;
+    this.stopWalking();
     this.setPose('');
     this.aura.setTint(this.form > 0 ? FORMS[this.form].aura : 0xffd93b).setAlpha(this.form > 0 ? 0.6 : 0);
   }
@@ -64,14 +67,33 @@ export default class Hero {
   // Standing, running or attacking: the hero's picture for that (art/hero_zenko_2_run.png and so on).
   // With no picture for the pose (or no AI pictures at all) it stays the standing one.
   setPose(pose) {
-    const key = `hero_${this.id}_${this.shown}${pose}`;
     this.pose = pose;
-    this.sprite.setTexture(pose && this.scene.textures.exists(key) ? key : this.tex(this.shown));
+    this.sprite.setTexture(this.tex(this.shown, pose));
+  }
+
+  // Walking: the run and stand pictures take turns, one per stride, and the hero bobs up on every stride,
+  // so it steps instead of sliding. A hero with no run picture leans from side to side instead.
+  walk(dt) {
+    this.stepT += dt * 7 * (this.speed / 170);
+    const stride = Math.floor(this.stepT) % 2;
+    this.bob = Math.abs(Math.sin(this.stepT * Math.PI)) * 4;
+    if (this.posing > 0) return;
+    const pose = stride ? '' : '_run';
+    if (this.pose !== pose) this.setPose(pose);
+    const runPicture = this.scene.textures.exists(`hero_${this.id}_${this.shown}_run`);
+    this.sprite.setAngle(runPicture ? 0 : (stride ? 4 : -4));
+  }
+
+  stopWalking() {
+    this.stepT = 0;
+    this.bob = 0;
+    this.sprite.setAngle(0);
   }
 
   // Shows the attack picture for a moment
   attackPose(ms = 240) {
     this.setPose('_attack');
+    this.sprite.setAngle(0);
     this.posing = ms / 1000;
   }
 
@@ -191,7 +213,7 @@ export default class Hero {
     this.crackle(dt);
     if (this.posing > 0) {
       this.posing -= dt;
-      if (this.posing <= 0) this.setPose(this.target ? '_run' : '');
+      if (this.posing <= 0) this.setPose(this.target ? this.pose === '_attack' ? '_run' : this.pose : '');
     }
 
     if (this.channel) {
@@ -208,14 +230,20 @@ export default class Hero {
         this.target = null;
         this.scene.tweens.killTweensOf(this.marker);
         this.marker.setVisible(false);
+        this.stopWalking();
         if (this.posing <= 0) this.setPose('');
       } else {
         this.x += (dx / d) * step;
         this.y += (dy / d) * step;
-        if (this.posing <= 0 && this.pose !== '_run') this.setPose('_run');
+        this.walk(dt);
       }
       if (Math.abs(dx) > 1) this.sprite.setFlipX(dx < 0);
     } else {
+      // Stopped by an ability (Flash Step, Spirit Orb) in the middle of a stride
+      if (this.stepT) {
+        this.stopWalking();
+        if (this.posing <= 0) this.setPose('');
+      }
       this.attack(dt);
     }
     this.draw();
@@ -297,7 +325,8 @@ export default class Hero {
   }
 
   draw() {
-    this.sprite.setPosition(this.x, this.y - 14).setDepth(22 + this.y / 1000);
+    this.sprite.setPosition(this.x, this.y - 14 - this.bob).setDepth(22 + this.y / 1000);
+    this.ring.setScale(1 - this.bob * 0.03, 1);
     this.aura.setPosition(this.x, this.y - 14);
     this.ring.setPosition(this.x, this.y + 16);
     this.label.setPosition(this.x, this.y - 62);

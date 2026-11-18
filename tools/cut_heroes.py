@@ -121,14 +121,17 @@ def place(fig, scale):
 
 
 def fix_goran_hair(img):
-    """Goran's normal-form attack picture has gold hair: it is made his own brown"""
+    """Goran's normal-form attack picture has gold hair: it is made his own brown. Every yellow or pale-yellow
+    pixel in the top of the picture keeps its light and dark, in brown."""
     px = np.array(img).astype(np.float32)
-    r, g, b = px[..., 0], px[..., 1], px[..., 2]
-    gold = (r > 140) & (g > 100) & (b < 120) & (r - b > 70) & (g - b > 40) & (px[..., 3] > 0)
-    for y, x in zip(*np.nonzero(gold)):
-        h, s, v = colorsys.rgb_to_hsv(r[y, x] / 255, g[y, x] / 255, b[y, x] / 255)
-        nr, ng, nb = colorsys.hsv_to_rgb(0.07, min(1, s * 1.1), v * 0.55)
-        px[y, x, :3] = (nr * 255, ng * 255, nb * 255)
+    r, g, b, a = px[..., 0], px[..., 1], px[..., 2], px[..., 3]
+    rows = np.arange(px.shape[0])[:, None]
+    hair = (a > 0) & (r > 110) & (r - b > 22) & (g - b > 8) & (r - g < 70) & (rows < px.shape[0] * 0.5)
+    # Not his skin (more red than yellow)
+    hair &= ~((r - g > 35) & (g - b > 15) & (g - b < 70))
+    light = (0.3 * r + 0.59 * g + 0.11 * b) / 255
+    for c, base in enumerate((120, 76, 42)):
+        px[..., c] = np.where(hair, np.clip(base * (0.35 + light), 0, 255), px[..., c])
     return Image.fromarray(px.astype(np.uint8))
 
 

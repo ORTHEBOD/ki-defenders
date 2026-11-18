@@ -1,8 +1,8 @@
 import { FIGHTERS, FORMS } from '../data/fighters.js';
 import { HEROES } from '../data/hero.js';
 import { GEAR } from '../data/shop.js';
-import { ART_FILES, BASE_ART, artSize } from '../data/art.js';
-import { drawFighterArt, formLook, pts } from '../art/fighterArt.js';
+import { ART_FILES, BASE_ART } from '../data/art.js';
+import { drawFighterArt, fitArt, formLook, pts } from '../art/fighterArt.js';
 import {
   drawBrute, drawFlyer, drawSplitter, drawSplitling, drawMedic, drawOgre, drawKrag,
   drawScorpion, drawSandKing, drawMech, drawVorn, drawCoin,
@@ -24,6 +24,8 @@ export default class BootScene extends Phaser.Scene {
     for (const key of ART_FILES) this.load.image(`art_${key}`, `art/${key}.png`);
     this.load.image('menu_bg', 'art/menu_bg.jpg');
     for (const key of BASE_ART) this.load.image(key, `art/${key}.png`);
+    // Which parts of each hero picture the armor, pants and boots recolor (tools/hero_anchors.py)
+    for (const key of ART_FILES.filter((k) => k.startsWith('hero_'))) this.load.image(`mask_${key}`, `art/hero_masks/${key}.png`);
     // Gear pictures (tools/cut_gear.py): shop icons, and worn on the hero
     for (const id of Object.keys(GEAR)) this.load.image(`gear_${id}`, `art/gear/${id}.png`);
   }
@@ -73,41 +75,10 @@ export default class BootScene extends Phaser.Scene {
     for (const key of ART_FILES) {
       const raw = `art_${key}`;
       if (!this.textures.exists(raw)) continue;
-      const img = this.textures.get(raw).getSourceImage();
-      const size = artSize(key);
-      let scale = Math.min(size / img.width, size / img.height);
-      // A fighter's other pictures (kaito_2, kaito_0_attack, hero_zenko_0_run) are shrunk like its base picture (kaito_0),
-      // so the character keeps its size; a stretched-out arm or tall hair may stick out of the square
+      // A fighter's other pictures (kaito_2, kaito_0_attack, hero_zenko_0_run) are shrunk like its base picture
       const baseKey = `art_${key.replace(/_\d+(_attack|_run)?$/, '_0')}`;
-      if (baseKey !== raw && this.textures.exists(baseKey)) {
-        const base = this.textures.get(baseKey).getSourceImage();
-        scale = Math.min(size / base.width, size / base.height);
-      }
-      const w = img.width * scale;
-      const h = img.height * scale;
-      const cw = Math.max(size, Math.ceil(w));
-      // Taller than the square: room is added above and below alike, so the feet stay where they were
-      const over = Math.max(0, Math.ceil(h - size));
-      const ch = size + over * 2;
-      if (this.textures.exists(key)) this.textures.remove(key);
-      const canvas = this.textures.createCanvas(key, cw, ch);
-      const c = canvas.context;
-      c.imageSmoothingQuality = 'high';
-      const x = (cw - w) / 2;
-      const y = over + size - h;
-      // A dark outline around the picture, so it stands out on the map like the drawn art
-      const shape = document.createElement('canvas');
-      shape.width = cw;
-      shape.height = ch;
-      const sc = shape.getContext('2d');
-      sc.imageSmoothingQuality = 'high';
-      sc.drawImage(img, x, y, w, h);
-      sc.globalCompositeOperation = 'source-in';
-      sc.fillStyle = '#0d0d12';
-      sc.fillRect(0, 0, cw, ch);
-      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) c.drawImage(shape, dx, dy);
-      c.drawImage(img, x, y, w, h);
-      canvas.refresh();
+      const img = this.textures.get(raw).getSourceImage();
+      fitArt(this, key, img, this.textures.exists(baseKey) ? this.textures.get(baseKey).getSourceImage() : img);
     }
   }
 

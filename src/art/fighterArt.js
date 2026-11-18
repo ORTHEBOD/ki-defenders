@@ -7,7 +7,8 @@
 //   `tiers` (slot -> gear tier) adds gold trim, gems and wings to Legendary gear and better.
 import { GEAR } from '../data/shop.js';
 import { FORMS } from '../data/fighters.js';
-import { ART_FILES } from '../data/art.js';
+import { ART_FILES, artSize } from '../data/art.js';
+import { HERO_ANCHORS } from '../data/heroAnchors.js';
 
 const O = 0x0d0d12;
 export const pts = (arr) => arr.map(([x, y]) => ({ x, y }));
@@ -208,8 +209,15 @@ function drawHead(g, look) {
 // A look from gearLook wears the gear pictures (art/gear) on top of the drawn fighter.
 export function fighterPortrait(scene, x, y, look, scale = 3, key = null) {
   if (key && scene.textures.exists(`art_${key}`)) {
-    // Fits the picture in the square without stretching it (the pictures are not all square)
-    const img = scene.add.image(x, y, `art_${key}`);
+    // Fits the picture in the square without stretching it (the pictures are not all square).
+    // A hero picture wears the hero's gear (look.worn).
+    const worn = (look.worn ?? []).filter((g) => GEAR[g]).sort();
+    let tex = `art_${key}`;
+    if (worn.length && HERO_ANCHORS[key]) {
+      tex = `art_${key}~${worn.join('~')}`;
+      if (!scene.textures.exists(tex)) scene.textures.addCanvas(tex, wearOnPicture(scene, key, worn));
+    }
+    const img = scene.add.image(x, y, tex);
     return img.setScale((64 * scale) / Math.max(img.width, img.height));
   }
   const pieces = gearPieces(scene, look.worn);
@@ -317,13 +325,129 @@ export function formLook(look, form) {
   return { ...look, hair: f.hair ?? look.hair, longHair: f.longHair, sparks: f.sparks };
 }
 
-// The texture of a hero in a form, wearing its gear. Made the first time it is needed.
-// With no gear (or with an AI picture for that hero) it is the plain 'hero_zenko_0' texture.
-export function heroTexture(scene, id, form, look, gear = {}) {
-  const base = `hero_${id}_${form}`;
+// A hero picture (full size) wearing gear, as a canvas. Armor, pants and boots recolor the gi top, the gi pants
+// and the boots (art/hero_masks, made by tools/hero_anchors.py) in the item's color, keeping the picture's shading.
+// Gloves, the amulet and the band / scouter / coin are pasted on at the spots in src/data/heroAnchors.js.
+// tools/hero_anchors.py --sheet uses the same rules.
+export function wearOnPicture(scene, key, worn) {
+  const src = scene.textures.get(`art_${key}`).getSourceImage();
+  const canvas = document.createElement('canvas');
+  canvas.width = src.width;
+  canvas.height = src.height;
+  const c = canvas.getContext('2d');
+  c.drawImage(src, 0, 0);
+  const items = worn.map((id) => ({ id, ...GEAR[id] }));
+  const color = (slot) => items.find((it) => it.slot === slot)?.color;
+  const colors = { 80: color('armor'), 160: color('pants'), 240: color('boots') };
+  if (scene.textures.exists(`mask_${key}`) && Object.values(colors).some((v) => v !== undefined)) {
+    recolor(c, scene.textures.get(`mask_${key}`).getSourceImage(), colors);
+  }
+  const s = HERO_ANCHORS[key];
+  const [fx, fy, fw, fh] = s.face;
+  const [bx, by, bw] = s.belt;
+  for (const it of items) {
+    if (!scene.textures.exists(`gear_${it.id}`)) continue;
+    const img = scene.textures.get(`gear_${it.id}`).getSourceImage();
+    let spots = [];
+    if (it.slot === 'weapon') spots = s.fists.map(([x, y, z], i) => [i % 2 ? 'r' : 'l', x, y, z * 1.35, z * 1.35]);
+    else if (it.slot === 'amulet') spots = [[null, fx, fy + fh + fw * 0.2, fw * 0.36, fw * 0.36]];
+    else if (it.show === 'band') spots = [[null, fx, fy + fh * 0.1, fw * 1.15, fh * 0.3]];
+    else if (it.show === 'scouter') spots = [[null, fx + fw * 0.2, fy + fh * 0.42, fw * 0.62, fh * 0.36]];
+    else if (it.show === 'coin') spots = [[null, bx + bw * 0.32, by, fw * 0.32, fw * 0.32]];
+    for (const [half, x, y, w, h] of spots) {
+      const sw = half ? Math.floor(img.width / 2) : img.width;
+      const sx = half === 'r' ? img.width - sw : 0;
+      const k = Math.min(w / sw, h / img.height);
+      const dw = sw * k;
+      const dh = img.height * k;
+      c.drawImage(img, sx, 0, sw, img.height, x - dw / 2, y - dh / 2, dw, dh);
+    }
+  }
+  return canvas;
+}
+
+// Paints each marked part of the picture in its color: a pixel lighter or darker than its part's average stays
+// that much lighter or darker. Black outlines are not marked, so they stay.
+function recolor(c, maskImg, colors) {
+  const { width, height } = c.canvas;
+  const data = c.getImageData(0, 0, width, height);
+  const m = document.createElement('canvas');
+  m.width = width;
+  m.height = height;
+  const mc = m.getContext('2d');
+  mc.drawImage(maskImg, 0, 0);
+  const mask = mc.getImageData(0, 0, width, height).data;
+  const px = data.data;
+  const lum = (i) => 0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2];
+  const sum = {};
+  const count = {};
+  for (let i = 0; i < px.length; i += 4) {
+    const v = mask[i];
+    if (colors[v] === undefined) continue;
+    sum[v] = (sum[v] ?? 0) + lum(i);
+    count[v] = (count[v] ?? 0) + 1;
+  }
+  for (let i = 0; i < px.length; i += 4) {
+    const v = mask[i];
+    const col = colors[v];
+    if (col === undefined) continue;
+    const f = Math.min(1.6, Math.max(0, 0.35 + (0.65 * lum(i)) / Math.max(1, sum[v] / count[v])));
+    px[i] = Math.min(255, ((col >> 16) & 255) * f);
+    px[i + 1] = Math.min(255, ((col >> 8) & 255) * f);
+    px[i + 2] = Math.min(255, (col & 255) * f);
+  }
+  c.putImageData(data, 0, 0);
+}
+
+// Makes the game texture `key` (the size the battle uses, with a dark outline) from a full-size picture.
+// `ref` is the fighter's base picture (kaito_0): every picture of a fighter is shrunk like it, so the
+// character keeps its size and a stretched-out arm or tall hair may stick out of the square.
+export function fitArt(scene, key, img, ref = img, size = artSize(key)) {
+  const scale = Math.min(size / ref.width, size / ref.height);
+  const w = img.width * scale;
+  const h = img.height * scale;
+  const cw = Math.max(size, Math.ceil(w));
+  // Taller than the square: room is added above and below alike, so the feet stay where they were
+  const over = Math.max(0, Math.ceil(h - size));
+  const ch = size + over * 2;
+  if (scene.textures.exists(key)) scene.textures.remove(key);
+  const canvas = scene.textures.createCanvas(key, cw, ch);
+  const c = canvas.context;
+  c.imageSmoothingQuality = 'high';
+  const x = (cw - w) / 2;
+  const y = over + size - h;
+  // A dark outline around the picture, so it stands out on the map like the drawn art
+  const shape = document.createElement('canvas');
+  shape.width = cw;
+  shape.height = ch;
+  const sc = shape.getContext('2d');
+  sc.imageSmoothingQuality = 'high';
+  sc.drawImage(img, x, y, w, h);
+  sc.globalCompositeOperation = 'source-in';
+  sc.fillStyle = '#0d0d12';
+  sc.fillRect(0, 0, cw, ch);
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) c.drawImage(shape, dx, dy);
+  c.drawImage(img, x, y, w, h);
+  canvas.refresh();
+}
+
+// The texture of a hero in a form and pose ('', '_attack', '_run'), wearing its gear. Made the first time it
+// is needed. A hero picture (art/hero_zenko_2_run.png) wears the gear with wearOnPicture; a drawn hero gets
+// the gear drawn on. With no gear it is the plain texture ('hero_zenko_2_run'). A pose with no picture is
+// the standing one.
+export function heroTexture(scene, id, form, look, gear = {}, pose = '') {
+  let base = `hero_${id}_${form}`;
+  if (pose && scene.textures.exists(`${base}${pose}`)) base += pose;
   const worn = Object.values(gear).filter((g) => GEAR[g]).sort();
-  if (!worn.length || ART_FILES.includes(base)) return base;
+  if (!worn.length) return base;
   const key = `${base}~${worn.join('~')}`;
+  if (ART_FILES.includes(base)) {
+    if (!HERO_ANCHORS[base] || !scene.textures.exists(`art_${base}`)) return base;
+    if (!scene.textures.exists(key)) {
+      fitArt(scene, key, wearOnPicture(scene, base, worn), scene.textures.get(`art_hero_${id}_0`).getSourceImage(), artSize(base));
+    }
+    return key;
+  }
   if (!scene.textures.exists(key)) {
     const full = { ...formLook(look, form), ...gearLook(gear) };
     const pieces = gearPieces(scene, full.worn);
