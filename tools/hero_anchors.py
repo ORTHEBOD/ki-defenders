@@ -1,6 +1,6 @@
 """Gets every hero picture (art/hero_*.png) ready to wear gear. Writes:
   art/hero_masks/<key>.png  - which pixels are the gi top (80), the gi pants (160) and the boots (240).
-                              Armor, pants and boots recolor those pixels in the item's color, keeping the shading.
+                              Armor, pants and boots paint those pixels with the item's picture, keeping the shading.
   src/data/heroAnchors.js   - where the small pieces are pasted on, in the picture's pixels:
                               face [middle x, top y, width, height] (band, scouter, amulet under the chin),
                               belt [middle x, y, width] (lucky coin), fists [[x, y, size], ...] (gloves).
@@ -175,18 +175,37 @@ def find(path):
 
 # ---------- The same rules as wearOnPicture (src/art/fighterArt.js), for the contact sheet ----------
 
-def recolor(img, mask, colors):
-    """colors: {mask value: (r, g, b)}. Keeps each pixel's light and dark compared to its region's average."""
+ONE_PIECE = {"windBoots"}
+
+
+def recolor(img, mask, items):
+    """items: {mask value: gear id}. Stretches the item's picture over its region (its colors and pattern;
+    its average color where the picture is see-through) and keeps each pixel's light and dark compared to
+    its region's average. A one-boot picture goes on each foot."""
     px = np.array(img).astype(np.float32)
     m = np.array(mask)
-    for value, color in colors.items():
+    lm = lum(px[..., 0], px[..., 1], px[..., 2])
+    for value, gid in items.items():
         sel = m == value
         if not sel.any():
             continue
-        lm = lum(px[..., 0], px[..., 1], px[..., 2])
-        f = np.clip(0.35 + 0.65 * lm[sel] / max(1, lm[sel].mean()), 0, 1.6)
-        for c in range(3):
-            px[..., c][sel] = np.clip(color[c] * f, 0, 255)
+        g = Image.open(os.path.join(ART, "gear", gid + ".png")).convert("RGBA")
+        g = g.crop(g.getbbox())
+        ga = np.array(g).astype(np.float32)
+        a = ga[..., 3:] / 255
+        avg = (ga[..., :3] * a).sum((0, 1)) / max(1, a.sum())
+        ys, xs = np.nonzero(sel)
+        x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+        mid = (x0 + x1) // 2
+        boxes = [(x0, mid), (mid, x1)] if gid in ONE_PIECE else [(x0, x1)]
+        f = np.clip(0.5 + 0.5 * lm / max(1, lm[sel].mean()), 0, 1.6)
+        for bx0, bx1 in boxes:
+            t = np.array(g.resize((bx1 - bx0, y1 - y0), Image.LANCZOS)).astype(np.float32)
+            ta = t[..., 3:] / 255
+            col = t[..., :3] * ta + avg * (1 - ta)
+            sub = sel[y0:y1, bx0:bx1]
+            for c in range(3):
+                px[y0:y1, bx0:bx1, c][sub] = np.clip(col[..., c][sub] * f[y0:y1, bx0:bx1][sub], 0, 255)
     return Image.fromarray(px.astype(np.uint8), "RGBA")
 
 
@@ -212,23 +231,14 @@ SLOTS = {"weapon": ["trainingGloves", "powerBracers", "dragonGauntlets", "titanF
          "pants": ["trainingPants", "weightedPants", "dragonPants", "titanLeggings", "stormPants", "celestialPants"],
          "boots": ["sandals", "windBoots", "cloudBoots", "thunderBoots", "phoenixBoots", "lightBoots"],
          "amulet": ["kiCharm", "spiritPendant", "dragonPearl", "titanSeal", "phoenixHeart", "godStar"]}
-# Item colors from src/data/shop.js (tier 1 ... 6)
-COLORS = {"armor": [0xc98a3a, 0x8c8f99, 0x5ad8ff, 0xd9772b, 0xff4b3d, 0xe8f4ff],
-          "pants": [0x3a6ad8, 0x6a4a9a, 0xe0661a, 0x8a5a2a, 0x2a8ad8, 0xf2f4f8],
-          "boots": [0xc98a3a, 0x8c8f99, 0xffffff, 0xffd93b, 0xff5a3d, 0x9ffff0]}
 SHOW = {"scouter": "scouter", "eagleScouter": "scouter", "healingBand": "band", "phoenixBand": "band",
         "luckyCoin": "coin", "dragonCoin": "coin"}
-
-
-def rgb(c):
-    return ((c >> 16) & 255, (c >> 8) & 255, c & 255)
 
 
 def dress(key, spots, tier, accessory):
     img = Image.open(os.path.join(ART, key + ".png")).convert("RGBA")
     mask = Image.open(os.path.join(MASKS, key + ".png"))
-    img = recolor(img, mask, {TORSO: rgb(COLORS["armor"][tier]), LEGS: rgb(COLORS["pants"][tier]),
-                              BOOTS: rgb(COLORS["boots"][tier])})
+    img = recolor(img, mask, {TORSO: SLOTS["armor"][tier], LEGS: SLOTS["pants"][tier], BOOTS: SLOTS["boots"][tier]})
     for slot, gid in [("amulet", SLOTS["amulet"][tier]), ("weapon", SLOTS["weapon"][tier]), ("accessory", accessory)]:
         g = Image.open(os.path.join(ART, "gear", gid + ".png")).convert("RGBA")
         for frame, x, y, w, h in places(slot, SHOW.get(gid), spots):

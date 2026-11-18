@@ -325,8 +325,9 @@ export function formLook(look, form) {
   return { ...look, hair: f.hair ?? look.hair, longHair: f.longHair, sparks: f.sparks };
 }
 
-// A hero picture (full size) wearing gear, as a canvas. Armor, pants and boots recolor the gi top, the gi pants
-// and the boots (art/hero_masks, made by tools/hero_anchors.py) in the item's color, keeping the picture's shading.
+// A hero picture (full size) wearing gear, as a canvas. Armor, pants and boots paint the gi top, the gi pants
+// and the boots (art/hero_masks, made by tools/hero_anchors.py) with the item's picture stretched over them
+// (its colors and pattern), keeping the hero picture's shading.
 // Gloves, the amulet and the band / scouter / coin are pasted on at the spots in src/data/heroAnchors.js.
 // tools/hero_anchors.py --sheet uses the same rules.
 export function wearOnPicture(scene, key, worn) {
@@ -337,10 +338,15 @@ export function wearOnPicture(scene, key, worn) {
   const c = canvas.getContext('2d');
   c.drawImage(src, 0, 0);
   const items = worn.map((id) => ({ id, ...GEAR[id] }));
-  const color = (slot) => items.find((it) => it.slot === slot)?.color;
-  const colors = { 80: color('armor'), 160: color('pants'), 240: color('boots') };
-  if (scene.textures.exists(`mask_${key}`) && Object.values(colors).some((v) => v !== undefined)) {
-    recolor(c, scene.textures.get(`mask_${key}`).getSourceImage(), colors);
+  const cloth = (slot) => {
+    const it = items.find((i) => i.slot === slot);
+    if (!it) return undefined;
+    const pic = scene.textures.exists(`gear_${it.id}`) ? scene.textures.get(`gear_${it.id}`).getSourceImage() : null;
+    return { id: it.id, color: it.color, pic };
+  };
+  const parts = { 80: cloth('armor'), 160: cloth('pants'), 240: cloth('boots') };
+  if (scene.textures.exists(`mask_${key}`) && Object.values(parts).some((v) => v !== undefined)) {
+    recolor(c, scene.textures.get(`mask_${key}`).getSourceImage(), parts);
   }
   const s = HERO_ANCHORS[key];
   const [fx, fy, fw, fh] = s.face;
@@ -366,37 +372,104 @@ export function wearOnPicture(scene, key, worn) {
   return canvas;
 }
 
-// Paints each marked part of the picture in its color: a pixel lighter or darker than its part's average stays
-// that much lighter or darker. Black outlines are not marked, so they stay.
-function recolor(c, maskImg, colors) {
+// Paints each marked part of the picture with its item: the item's picture is stretched over the part (its
+// pattern: flames, swirls, plates), or the item's color when it has no picture. A pixel lighter or darker than
+// its part's average stays that much lighter or darker. Black outlines are not marked, so they stay.
+// parts: { mask value: { id, color, pic } }
+function recolor(c, maskImg, parts) {
   const { width, height } = c.canvas;
   const data = c.getImageData(0, 0, width, height);
-  const m = document.createElement('canvas');
-  m.width = width;
-  m.height = height;
-  const mc = m.getContext('2d');
-  mc.drawImage(maskImg, 0, 0);
-  const mask = mc.getImageData(0, 0, width, height).data;
+  const mask = pixelsOf(maskImg, width, height);
   const px = data.data;
   const lum = (i) => 0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2];
   const sum = {};
   const count = {};
+  const box = {};
   for (let i = 0; i < px.length; i += 4) {
     const v = mask[i];
-    if (colors[v] === undefined) continue;
+    if (!parts[v]) continue;
     sum[v] = (sum[v] ?? 0) + lum(i);
     count[v] = (count[v] ?? 0) + 1;
+    const x = (i / 4) % width;
+    const y = Math.floor(i / 4 / width);
+    const b = (box[v] ??= [x, y, x, y]);
+    b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y);
+  }
+  // Each part's item picture, stretched to the part's box (a one-boot picture goes on each foot)
+  const looks = {};
+  for (const v of Object.keys(box)) {
+    const { id, pic } = parts[v];
+    if (!pic) continue;
+    const [x0, y0, x1, y1] = box[v];
+    const w = x1 - x0 + 1;
+    const h = y1 - y0 + 1;
+    const [sx, sy, sw, sh, avg] = gearCrop(id, pic);
+    const t = document.createElement('canvas');
+    t.width = w;
+    t.height = h;
+    const tc = t.getContext('2d');
+    tc.imageSmoothingQuality = 'high';
+    if (ONE_PIECE.includes(id)) {
+      const half = Math.floor(w / 2);
+      tc.drawImage(pic, sx, sy, sw, sh, 0, 0, half, h);
+      tc.drawImage(pic, sx, sy, sw, sh, half, 0, w - half, h);
+    } else tc.drawImage(pic, sx, sy, sw, sh, 0, 0, w, h);
+    looks[v] = { x0, y0, w, avg, px: tc.getImageData(0, 0, w, h).data };
   }
   for (let i = 0; i < px.length; i += 4) {
     const v = mask[i];
-    const col = colors[v];
-    if (col === undefined) continue;
-    const f = Math.min(1.6, Math.max(0, 0.35 + (0.65 * lum(i)) / Math.max(1, sum[v] / count[v])));
-    px[i] = Math.min(255, ((col >> 16) & 255) * f);
-    px[i + 1] = Math.min(255, ((col >> 8) & 255) * f);
-    px[i + 2] = Math.min(255, (col & 255) * f);
+    const part = parts[v];
+    if (!part) continue;
+    const look = looks[v];
+    // The item picture has its own shading, so the picture's shading is laid on more lightly
+    const k = look ? 0.5 : 0.35;
+    const f = Math.min(1.6, Math.max(0, k + ((1 - k) * lum(i)) / Math.max(1, sum[v] / count[v])));
+    let r = (part.color >> 16) & 255;
+    let g = (part.color >> 8) & 255;
+    let b = part.color & 255;
+    if (look) {
+      // The picture where it is drawn, its average color where it is see-through
+      const j = ((Math.floor(i / 4 / width) - look.y0) * look.w + ((i / 4) % width) - look.x0) * 4;
+      const a = look.px[j + 3] / 255;
+      r = look.px[j] * a + look.avg[0] * (1 - a);
+      g = look.px[j + 1] * a + look.avg[1] * (1 - a);
+      b = look.px[j + 2] * a + look.avg[2] * (1 - a);
+    }
+    px[i] = Math.min(255, r * f);
+    px[i + 1] = Math.min(255, g * f);
+    px[i + 2] = Math.min(255, b * f);
   }
   c.putImageData(data, 0, 0);
+}
+
+function pixelsOf(img, width = img.width, height = img.height) {
+  const m = document.createElement('canvas');
+  m.width = width;
+  m.height = height;
+  const mc = m.getContext('2d');
+  mc.drawImage(img, 0, 0);
+  return mc.getImageData(0, 0, width, height).data;
+}
+
+// A gear picture's drawn part [x, y, width, height] and its average color, worked out once per item
+const crops = new Map();
+function gearCrop(id, pic) {
+  if (crops.has(id)) return crops.get(id);
+  const p = pixelsOf(pic);
+  let x0 = pic.width, y0 = pic.height, x1 = 0, y1 = 0;
+  const sum = [0, 0, 0];
+  let n = 0;
+  for (let i = 0; i < p.length; i += 4) {
+    const a = p[i + 3] / 255;
+    if (a < 0.1) continue;
+    const x = (i / 4) % pic.width;
+    const y = Math.floor(i / 4 / pic.width);
+    x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    sum[0] += p[i] * a; sum[1] += p[i + 1] * a; sum[2] += p[i + 2] * a; n += a;
+  }
+  const out = n ? [x0, y0, x1 - x0 + 1, y1 - y0 + 1, sum.map((s) => s / n)] : [0, 0, pic.width, pic.height, [128, 128, 128]];
+  crops.set(id, out);
+  return out;
 }
 
 // Makes the game texture `key` (the size the battle uses, with a dark outline) from a full-size picture.
