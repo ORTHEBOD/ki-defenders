@@ -1130,6 +1130,14 @@ export default class GameScene extends Phaser.Scene {
     };
   }
 
+  // The step a fighter is built at: its start upgrades, but not into a form the story hasn't opened
+  startTier(type) {
+    const tiers = FIGHTERS[type].tiers;
+    let n = Math.min(Save.current()?.startTier?.[type] ?? 0, tiers.length - 1);
+    while (n > 0 && tiers[n].form > this.maxForm) n--;
+    return n;
+  }
+
   buildFighter(spot, type) {
     this.ki -= FIGHTERS[type].cost;
     const f = new Fighter(this, spot, type);

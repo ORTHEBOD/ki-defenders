@@ -99,6 +99,7 @@ export function gearBonus(gear = {}) {
 // A hero you already have turns into `dupeCoins` coins.
 export const SPIN = {
   cost: 300,
+  currency: 'coins',
   dupeCoins: 400,
   slices: [
     { kind: 'hero', hero: 'zenko', label: 'Zenko', color: 0xd8442b, weight: 8 },
@@ -111,6 +112,29 @@ export const SPIN = {
     { kind: 'coins', amount: 50, label: '50', color: 0x6a5a3a, weight: 18 },
     { kind: 'hero', hero: 'sora', label: 'Sora', color: 0x3a6ad8, weight: 4 },
   ],
+};
+
+// What diamonds buy (Shop, Diamonds tab). Fighters can also be bought with diamonds (fighters.js `diamonds`).
+// spin: the Diamond Spin, a better wheel (hero about 50%). hero: the price of any hero.
+// packs: diamonds traded for coins.
+export const DIAMOND = {
+  spin: {
+    cost: 20,
+    currency: 'diamonds',
+    dupeCoins: 600,
+    slices: [
+      { kind: 'hero', hero: 'zenko', label: 'Zenko', color: 0xd8442b, weight: 13 },
+      { kind: 'coins', amount: 300, label: '300', color: 0x8a6a2a, weight: 18 },
+      { kind: 'hero', hero: 'mira', label: 'Mira', color: 0x2fb3a0, weight: 12 },
+      { kind: 'coins', amount: 500, label: '500', color: 0xa07a2a, weight: 14 },
+      { kind: 'gear', label: 'Gear', color: 0x5a6a9a, weight: 10 },
+      { kind: 'hero', hero: 'goran', label: 'Goran', color: 0x3f7a3a, weight: 12 },
+      { kind: 'coins', amount: 1000, label: '1000', color: 0xc98a3a, weight: 8 },
+      { kind: 'hero', hero: 'sora', label: 'Sora', color: 0x3a6ad8, weight: 12 },
+    ],
+  },
+  hero: 150,
+  packs: [{ diamonds: 5, coins: 500 }, { diamonds: 20, coins: 2000 }, { diamonds: 50, coins: 5000 }],
 };
 
 // Coins for a battle. bounty = the hero's Bounty skill, extra = gear bonus (0.3 = +30%).

@@ -94,6 +94,8 @@ function migrate(p) {
   if (!p.heroes[p.activeHero]) p.activeHero = Object.keys(p.heroes)[0] ?? null;
   p.coins ??= 0;
   p.diamonds ??= 0;
+  // Start upgrades bought for each fighter (see START_UPS): { kaito: 2 } = Kaito is built at level 3
+  p.startTier ??= {};
   // Fighters bought on the Fighters page. Players from before fighters cost coins keep the ones
   // whose level they already beat.
   p.fighters ??= Object.keys(FIGHTERS).filter((t) => FIGHTERS[t].unlock === 1 || (p.stars?.[FIGHTERS[t].unlock] ?? 0) > 0);

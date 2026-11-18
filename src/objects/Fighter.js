@@ -11,14 +11,15 @@ export default class Fighter {
     this.def = FIGHTERS[type];
     this.x = spot.x;
     this.y = spot.y;
-    this.tier = 0;
+    // Start upgrades: built some steps up, with the EXP of those steps already earned
+    this.tier = scene.startTier?.(type) ?? 0;
     this.spent = this.def.cost;
     this.cooldown = 0;
     this.hits = 0;
     this.kiTimer = 0;
     this.boltTimer = 0;
     this.stunTime = 0;
-    this.exp = 0;
+    this.exp = EXP_TOTAL[this.tier];
 
     // The flame-shaped power aura, shown from the first transformation
     this.aura = scene.add.image(this.x, this.y - 14, 'aura').setOrigin(0.5, 0.58).setAlpha(0).setDepth(19);
@@ -33,6 +34,10 @@ export default class Fighter {
     scene.tweens.add({ targets: this.readyIcon, y: this.y - 66, duration: 400, yoyo: true, repeat: -1 });
     this.drawExp();
 
+    if (this.form > 0) {
+      this.aura.setTint(this.formInfo.aura).setAlpha(0.62 + this.form * 0.06);
+      this.auraTween = scene.tweens.add({ targets: this.aura, scaleX: 1.12, scaleY: 1.2, duration: 380, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    }
     this.sprite.setScale(0);
     scene.tweens.add({ targets: this.sprite, scale: 1, duration: 250, ease: 'Back.Out' });
     scene.tweens.add({ targets: this.sprite, scaleY: 1.04, duration: 700, yoyo: true, repeat: -1, delay: 260 });

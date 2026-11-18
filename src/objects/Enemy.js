@@ -34,6 +34,7 @@ export default class Enemy {
     // Walking frames from a picture sheet (fireHound, fireHound_1 ...), swapped as it steps
     this.frames = [this.def.texture];
     while (scene.textures.exists(`${this.def.texture}_${this.frames.length}`)) this.frames.push(`${this.def.texture}_${this.frames.length}`);
+    this.picture = scene.textures.exists(`art_${this.def.texture}`);
     this.hpBar = scene.add.graphics().setDepth(this.flying ? 27 : 12);
 
     if (this.def.boss) {
@@ -64,7 +65,7 @@ export default class Enemy {
       // Stopped by Zenko: fight him instead of walking
       this.scene.hero.takeDamage(this.def.dps * dt);
       this.bob += dt * 12;
-      this.sprite.setPosition(this.x + Math.sin(this.bob) * 2, this.y);
+      this.sprite.setPosition(this.x + Math.sin(this.bob) * 2, this.y).setAngle(0).setScale(1);
       this.sprite.setFlipX(this.scene.hero.x < this.x);
       this.applyTint();
       this.drawHpBar();
@@ -82,16 +83,36 @@ export default class Enemy {
       this.destroy();
       return;
     }
-    this.bob += dt * speed * 0.15;
-    const bobH = this.flying ? 5 : 2;
-    this.sprite.setPosition(this.x, this.y - this.lift + Math.sin(this.bob) * bobH);
-    if (this.frames.length > 1) this.sprite.setTexture(this.frames[Math.floor(this.bob / Math.PI) % this.frames.length]);
+    if (this.picture) this.walkPicture(dt, speed);
+    else {
+      this.bob += dt * speed * 0.15;
+      const bobH = this.flying ? 5 : 2;
+      this.sprite.setPosition(this.x, this.y - this.lift + Math.sin(this.bob) * bobH);
+    }
     if (!this.flying) this.sprite.setDepth(10 + this.y / 1000);
     this.shadow?.setPosition(this.x, this.y + 8);
     if (dx !== 0) this.sprite.setFlipX(dx < 0);
     this.applyTint();
     this.drawHpBar();
     this.drawShield();
+  }
+
+  // Monsters from a picture sheet: each step they hop, sway to the other side and squash as the foot lands,
+  // and the walking frame changes. Flyers flap instead.
+  walkPicture(dt, speed) {
+    this.bob += dt * (5 + speed * 0.08);
+    const s = Math.sin(this.bob);
+    const up = Math.abs(s);
+    const tall = this.sprite.height;
+    if (this.flying) {
+      this.sprite.setPosition(this.x, this.y - this.lift + s * 5);
+      this.sprite.setScale(1, 1 + 0.1 * Math.sin(this.bob * 2)).setAngle(s * 4);
+    } else {
+      const sway = this.frames.length > 2 ? 2 : 6;
+      this.sprite.setPosition(this.x, this.y - up * tall * 0.07);
+      this.sprite.setScale(1 + 0.05 * (1 - up), 1 - 0.07 * (1 - up)).setAngle(s * sway);
+    }
+    if (this.frames.length > 1) this.sprite.setTexture(this.frames[Math.floor(this.bob / Math.PI) % this.frames.length]);
   }
 
   // Medic: every few seconds, heals enemies around it (itself included).

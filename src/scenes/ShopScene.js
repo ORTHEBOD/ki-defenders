@@ -1,4 +1,4 @@
-import { GEAR, GEAR_SLOTS, RARITY, SPIN, gearText, gearBonus } from '../data/shop.js';
+import { GEAR, GEAR_SLOTS, RARITY, SPIN, DIAMOND, gearText, gearBonus } from '../data/shop.js';
 import { HEROES, newHeroSave, heroForm } from '../data/hero.js';
 import { fighterPortrait, formLook, gearLook } from '../art/fighterArt.js';
 import { drawMenuBackground, panel } from '../ui/menuBackground.js';
@@ -29,12 +29,15 @@ export default class ShopScene extends Phaser.Scene {
     this.add.text(640, 40, 'Shop', textStyle(52, '#ffd93b')).setOrigin(0.5);
     this.add.image(1080, 40, 'coin');
     this.coinText = this.add.text(1100, 40, `${this.player.coins}`, textStyle(34, '#ffd93b')).setOrigin(0, 0.5);
+    this.add.text(895, 40, '💎', { fontSize: '28px' }).setOrigin(0.5);
+    this.diamondText = this.add.text(917, 40, `${this.player.diamonds}`, textStyle(34, '#7fe3ff')).setOrigin(0, 0.5);
 
     this.tab = data.tab ?? 'gear';
     this.tabs = [
-      makeButton(this, 340, 112, 280, 54, 'Equipment', () => this.show('gear'), { fontSize: 28, color: 0x2a3350 }),
-      makeButton(this, 640, 112, 280, 54, 'Lucky Spin', () => this.show('spin'), { fontSize: 28, color: 0x2a3350 }),
-      makeButton(this, 940, 112, 280, 54, '🎬 Free coins', () => this.show('video'), { fontSize: 28, color: 0x2a3350 }),
+      makeButton(this, 205, 112, 270, 54, 'Equipment', () => this.show('gear'), { fontSize: 26, color: 0x2a3350 }),
+      makeButton(this, 495, 112, 270, 54, 'Lucky Spin', () => this.show('spin'), { fontSize: 26, color: 0x2a3350 }),
+      makeButton(this, 785, 112, 270, 54, '💎 Diamonds', () => this.show('diamonds'), { fontSize: 26, color: 0x2a3350 }),
+      makeButton(this, 1075, 112, 270, 54, '🎬 Free coins', () => this.show('video'), { fontSize: 26, color: 0x2a3350 }),
     ];
     this.layer = this.add.container(0, 0);
     this.show(this.tab);
@@ -43,18 +46,22 @@ export default class ShopScene extends Phaser.Scene {
   show(tab) {
     if (this.spinning) return;
     this.tab = tab;
-    ['gear', 'spin', 'video'].forEach((t, i) => this.tabs[i].setAlpha(tab === t ? 1 : 0.6));
+    const lit = tab === 'dspin' ? 'diamonds' : tab;
+    ['gear', 'spin', 'diamonds', 'video'].forEach((t, i) => this.tabs[i].setAlpha(lit === t ? 1 : 0.6));
     this.shines?.forEach((t) => t.remove());
     this.shines = [];
     this.layer.removeAll(true);
     if (tab === 'gear') this.showGear();
-    else if (tab === 'spin') this.showSpin();
+    else if (tab === 'spin') this.showSpin(SPIN);
+    else if (tab === 'dspin') this.showSpin(DIAMOND.spin);
+    else if (tab === 'diamonds') this.showDiamonds();
     else this.showVideo();
   }
 
   refreshCoins() {
     this.player = Save.current();
     this.coinText.setText(`${this.player.coins}`);
+    this.diamondText.setText(`${this.player.diamonds}`);
   }
 
   // ---------- Equipment ----------
@@ -283,9 +290,97 @@ export default class ShopScene extends Phaser.Scene {
     L.add(b);
   }
 
+  // ---------- Diamonds ----------
+
+  // Diamonds (won on the weekly leaderboard): buy a hero, the Diamond Spin, or trade them for coins
+  showDiamonds() {
+    const L = this.layer;
+    const gems = this.player.diamonds;
+
+    // Heroes
+    L.add(panel(this, 330, 420, 560, 500, 0x7fe3ff));
+    L.add(this.add.text(330, 196, `Buy a hero:  ${DIAMOND.hero} 💎`, textStyle(32, '#7fe3ff')).setOrigin(0.5));
+    Object.entries(HEROES).forEach(([id, h], i) => {
+      const x = 195 + (i % 2) * 270;
+      const y = 330 + Math.floor(i / 2) * 210;
+      const owned = !!this.player.heroes[id];
+      L.add(fighterPortrait(this, x, y - 40, h.look, 1.5, `hero_${id}_0`));
+      L.add(this.add.text(x, y + 30, h.name, textStyle(24, owned ? '#5be35b' : '#ffffff')).setOrigin(0.5));
+      const b = makeButton(this, x, y + 72, 200, 40, owned ? '✓ Owned' : `Buy  ${DIAMOND.hero} 💎`, () => this.buyHero(id),
+        { fontSize: 20, color: owned ? 0x3a4470 : 0x2a7fa8 });
+      b.setEnabled(!owned && gems >= DIAMOND.hero);
+      L.add(b);
+    });
+
+    // Diamond Spin
+    const spin = DIAMOND.spin;
+    const heroChance = spin.slices.filter((s) => s.kind === 'hero').reduce((a, s) => a + s.weight, 0)
+      / spin.slices.reduce((a, s) => a + s.weight, 0);
+    L.add(panel(this, 930, 285, 600, 230, 0xc86bff));
+    L.add(this.add.text(930, 205, 'Diamond Spin', textStyle(34, '#e0a8ff')).setOrigin(0.5));
+    L.add(this.add.text(930, 255, `A better wheel: hero chance ${Math.round(heroChance * 100)}%,\ncoins up to 1000!`,
+      { ...textStyle(20, '#c9d3ff'), align: 'center' }).setOrigin(0.5));
+    L.add(makeButton(this, 930, 340, 300, 56, `Open  (${spin.cost} 💎 a spin)`, () => this.show('dspin'), { fontSize: 22, color: 0x8a3fc8 }));
+
+    // Diamonds for coins
+    L.add(panel(this, 930, 545, 600, 250, 0xffd93b));
+    L.add(this.add.text(930, 452, 'Trade for coins', textStyle(32, '#ffd93b')).setOrigin(0.5));
+    DIAMOND.packs.forEach((pack, i) => {
+      const x = 750 + i * 180;
+      L.add(this.add.text(x, 505, `${pack.diamonds} 💎`, textStyle(26, '#7fe3ff')).setOrigin(0.5));
+      L.add(this.add.text(x, 540, '▼', textStyle(18, '#9aa3c7')).setOrigin(0.5));
+      L.add(this.add.image(x - 34, 575, 'coin'));
+      L.add(this.add.text(x - 16, 575, `${pack.coins}`, textStyle(26, '#ffd93b')).setOrigin(0, 0.5));
+      const b = makeButton(this, x, 625, 150, 44, 'Trade', () => this.trade(pack), { fontSize: 22, color: 0x2f8a4a });
+      b.setEnabled(gems >= pack.diamonds);
+      L.add(b);
+    });
+  }
+
+  buyHero(id) {
+    let first = false;
+    const ok = Save.update((p) => {
+      if (p.heroes[id] || p.diamonds < DIAMOND.hero) return false;
+      p.diamonds -= DIAMOND.hero;
+      p.heroes[id] = newHeroSave();
+      first = !p.activeHero;
+      if (first) p.activeHero = id;
+      return true;
+    });
+    if (!ok) return;
+    Audio.sfx('win');
+    this.cameras.main.flash(300, 255, 230, 120);
+    this.refreshCoins();
+    this.show('diamonds');
+    this.toast(first ? `${HEROES[id].name} is your hero!` : `NEW HERO: ${HEROES[id].name}!\nChoose them on the Heroes screen.`);
+  }
+
+  trade(pack) {
+    const ok = Save.update((p) => {
+      if (p.diamonds < pack.diamonds) return false;
+      p.diamonds -= pack.diamonds;
+      p.coins += pack.coins;
+      return true;
+    });
+    if (!ok) return;
+    Audio.sfx('coin');
+    this.refreshCoins();
+    this.show('diamonds');
+    this.toast(`+${pack.coins} coins!`);
+  }
+
+  toast(text) {
+    const t = this.add.text(640, 700, text, { ...textStyle(28, '#5be35b'), align: 'center' }).setOrigin(0.5, 1).setDepth(50);
+    this.layer.add(t);
+    this.tweens.add({ targets: t, y: 670, alpha: 0, delay: 1400, duration: 700, onComplete: () => t.destroy() });
+  }
+
   // ---------- Lucky Spin ----------
 
-  showSpin() {
+  // The wheel: the normal Lucky Spin (coins) or the Diamond Spin, by `table`
+  showSpin(table) {
+    this.spinTable = table;
+    const SPIN = table;
     const L = this.layer;
     const cx = 430;
     const cy = 420;
@@ -326,14 +421,18 @@ export default class ShopScene extends Phaser.Scene {
     L.add(this.add.text(960, 400, `Hero chance: ${Math.round(heroChance * 100)}%   -   Already have it? You get ${SPIN.dupeCoins} coins`,
       { ...textStyle(17, '#c9d3ff'), wordWrap: { width: 480 }, align: 'center' }).setOrigin(0.5));
 
-    this.spinBtn = makeButton(this, 960, 500, 360, 90, `SPIN!  ${SPIN.cost}`, () => this.spin(), { color: 0xc99a00, fontSize: 40 });
-    this.spinBtn.setEnabled(this.player.coins >= SPIN.cost);
+    const gem = SPIN.currency === 'diamonds';
+    this.spinBtn = makeButton(this, 960, 500, 360, 90, `SPIN!  ${SPIN.cost}${gem ? ' 💎' : ''}`, () => this.spin(),
+      { color: gem ? 0x2a7fa8 : 0xc99a00, fontSize: 40 });
+    this.spinBtn.setEnabled(this.player[SPIN.currency] >= SPIN.cost);
+    if (gem) L.add(makeButton(this, 960, 590, 240, 44, '< Diamonds', () => this.show('diamonds'), { fontSize: 22, color: 0x3a4470 }));
     L.add(this.spinBtn);
-    this.result = this.add.text(960, 600, '', { ...textStyle(30, '#5be35b'), align: 'center' }).setOrigin(0.5);
+    this.result = this.add.text(960, gem ? 650 : 600, '', { ...textStyle(30, '#5be35b'), align: 'center' }).setOrigin(0.5);
     L.add(this.result);
   }
 
   pickSlice() {
+    const SPIN = this.spinTable;
     const total = SPIN.slices.reduce((a, s) => a + s.weight, 0);
     let roll = Math.random() * total;
     for (let i = 0; i < SPIN.slices.length; i++) {
@@ -344,11 +443,12 @@ export default class ShopScene extends Phaser.Scene {
   }
 
   spin() {
-    if (this.spinning || this.player.coins < SPIN.cost) return;
+    const SPIN = this.spinTable;
+    if (this.spinning || this.player[SPIN.currency] < SPIN.cost) return;
     const index = this.pickSlice();
     const slice = SPIN.slices[index];
     // Pay first, so leaving mid-spin can't give a free try
-    Save.update((p) => { p.coins -= SPIN.cost; });
+    Save.update((p) => { p[SPIN.currency] -= SPIN.cost; });
     this.refreshCoins();
     this.spinning = true;
     this.spinBtn.setEnabled(false);
@@ -376,6 +476,7 @@ export default class ShopScene extends Phaser.Scene {
   }
 
   givePrize(slice) {
+    const SPIN = this.spinTable;
     let text = '';
     Save.update((p) => {
       if (slice.kind === 'coins') {
@@ -408,7 +509,7 @@ export default class ShopScene extends Phaser.Scene {
     if (slice.kind === 'hero') this.cameras.main.flash(300, 255, 230, 120);
     this.spinning = false;
     this.refreshCoins();
-    this.show('spin');
+    this.show(SPIN === DIAMOND.spin ? 'dspin' : 'spin');
     this.result.setText(text);
     this.result.setScale(0.5);
     this.tweens.add({ targets: this.result, scale: 1, duration: 300, ease: 'Back.Out' });

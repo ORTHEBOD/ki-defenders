@@ -1,4 +1,4 @@
-import { FIGHTERS, FORMS, FORM_LEVELS } from '../data/fighters.js';
+import { FIGHTERS, FORMS, FORM_LEVELS, START_UPS } from '../data/fighters.js';
 import { fighterPortrait, formLook } from '../art/fighterArt.js';
 import { drawMenuBackground, panel } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
@@ -26,6 +26,8 @@ export default class FightersScene extends Phaser.Scene {
     drawMenuBackground(this);
     makeButton(this, 90, 40, 140, 50, '< Back', () => this.scene.start('Hub'), { fontSize: 26, color: 0x3a4470 });
     this.add.text(640, 40, 'Fighters', textStyle(44, '#ffd93b')).setOrigin(0.5);
+    this.add.text(905, 40, '💎', { fontSize: '26px' }).setOrigin(0.5);
+    this.add.text(925, 40, `${player.diamonds}`, textStyle(30, '#7fe3ff')).setOrigin(0, 0.5);
     this.add.image(1110, 40, 'coin');
     this.add.text(1130, 40, `${player.coins}`, textStyle(30, '#ffd93b')).setOrigin(0, 0.5);
     this.add.text(640, 84, 'In battle, fighters share the EXP of each enemy by the damage they did. Spend Ki to upgrade them.',
@@ -53,10 +55,13 @@ export default class FightersScene extends Phaser.Scene {
       if (forSale) {
         makeButton(this, x, 396, 190, 40, `Buy  ${def.price} coins`, () => this.buy(type, def, x),
           { fontSize: 20, color: player.coins >= def.price ? 0x2f8a4a : 0x5a5f72 });
+        makeButton(this, x, 442, 190, 34, `or  ${def.diamonds} 💎`, () => this.buy(type, def, x, 'diamonds'),
+          { fontSize: 18, color: player.diamonds >= def.diamonds ? 0x2a7fa8 : 0x5a5f72 });
       } else {
         this.add.text(x, 398, joined ? `Up to ${form.name}` : `Joins at level ${def.unlock}`,
           textStyle(19, joined ? form.color : '#ffd93b')).setOrigin(0.5);
       }
+      if (joined) this.startUp(player, type, x);
     });
 
     // The forms, and the story level that opens each one
@@ -74,15 +79,43 @@ export default class FightersScene extends Phaser.Scene {
     });
   }
 
-  buy(type, def, x) {
+  // Start upgrade: the fighter is built one step higher. The next one opens 8 levels after its form.
+  startUp(player, type, x) {
+    const have = player.startTier[type] ?? 0;
+    const up = START_UPS[have];
+    if (!up) {
+      this.add.text(x, 442, `Starts at level ${have + 1} (max)`, textStyle(17, '#5be35b')).setOrigin(0.5);
+      return;
+    }
+    if (!player.super && !(player.stars[up.level] > 0)) {
+      this.add.text(x, 442, `Start Lv ${have + 2}: beat level ${up.level}`, textStyle(17, '#9aa3c7')).setOrigin(0.5);
+      return;
+    }
+    const b = makeButton(this, x, 442, 214, 36, `Start Lv ${have + 2}:  ${up.cost} coins`, () => {
+      const done = Save.update((p) => {
+        if ((p.startTier[type] ?? 0) !== have || p.coins < up.cost) return false;
+        p.coins -= up.cost;
+        p.startTier[type] = have + 1;
+        return true;
+      });
+      if (done) {
+        Audio.sfx('coin');
+        this.scene.restart();
+      }
+    }, { fontSize: 16, color: 0xc99a00 });
+    b.setEnabled(player.coins >= up.cost);
+  }
+
+  buy(type, def, x, currency = 'coins') {
+    const price = currency === 'diamonds' ? def.diamonds : def.price;
     const done = Save.update((p) => {
-      if (p.fighters.includes(type) || p.coins < def.price) return false;
-      p.coins -= def.price;
+      if (p.fighters.includes(type) || p[currency] < price) return false;
+      p[currency] -= price;
       p.fighters.push(type);
       return true;
     });
     if (!done) {
-      const msg = this.add.text(x, 440, 'Not enough coins', textStyle(22, '#ff6b6b')).setOrigin(0.5);
+      const msg = this.add.text(x, 440, currency === 'diamonds' ? 'Not enough 💎' : 'Not enough coins', textStyle(22, '#ff6b6b')).setOrigin(0.5);
       this.tweens.add({ targets: msg, y: 420, alpha: 0, delay: 700, duration: 600, onComplete: () => msg.destroy() });
       return;
     }

@@ -22,6 +22,10 @@ export const FORMS = [
 // Frozen Peaks, Ascended Form in the Volcano).
 export const FORM_LEVELS = [0, 4, 12, 22, 36, 50];
 
+// Start upgrades, bought for each fighter on the Fighters page: 8 levels after a form opens, one more
+// upgrade can be bought, and from then on that fighter is built one step higher (level 2, 3 ... 6).
+export const START_UPS = FORM_LEVELS.slice(1).map((lv, i) => ({ level: lv + 8, cost: [400, 900, 1600, 2600, 4000][i] }));
+
 // The form bonus (stun, burn, freeze...) switches on at this form
 export const BONUS_FORM = 4;
 
@@ -85,6 +89,7 @@ export const FIGHTERS = {
     name: 'Blaze',
     unlock: 5,
     price: 1000,
+    diamonds: 50,
     role: 'Barrage',
     texture: 'blaze',
     cost: 100,
@@ -102,6 +107,7 @@ export const FIGHTERS = {
     name: 'Lumi',
     unlock: 3,
     price: 500,
+    diamonds: 25,
     role: 'Control',
     texture: 'lumi',
     cost: 80,
@@ -120,6 +126,7 @@ export const FIGHTERS = {
     name: 'Master Oru',
     unlock: 8,
     price: 2000,
+    diamonds: 100,
     role: 'Support',
     texture: 'oru',
     cost: 120,
