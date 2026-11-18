@@ -3,7 +3,7 @@
 // when online, so the next launch gets the newest version.
 // Bump CACHE when the file list changes.
 
-const CACHE = 'ki-defenders-v33';
+const CACHE = 'ki-defenders-v34';
 
 const FILES = [
   './',
@@ -304,6 +304,29 @@ const FILES = [
   'art/cannon_3.png',
   'art/cannon_4.png',
   'art/cannon_5.png',
+  'art/snowImp.png',
+  'art/iceGolem.png',
+  'art/iceGolem_1.png',
+  'art/frostBat.png',
+  'art/frostBat_1.png',
+  'art/yetiCub.png',
+  'art/yetiCub_1.png',
+  'art/lavaSlime.png',
+  'art/fireHound.png',
+  'art/fireHound_1.png',
+  'art/fireHound_2.png',
+  'art/fireHound_3.png',
+  'art/magmaBrute.png',
+  'art/emberWisp.png',
+  'art/emberWisp_1.png',
+  'art/frostGiant.png',
+  'art/frostGiant_1.png',
+  'art/iceQueen.png',
+  'art/iceQueen_1.png',
+  'art/lavaTitan.png',
+  'art/lavaTitan_1.png',
+  'art/pyrax.png',
+  'art/pyrax_1.png',
 ];
 
 self.addEventListener('install', (event) => {

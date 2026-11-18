@@ -31,6 +31,9 @@ export default class Enemy {
     this.lift = this.flying ? 26 : 0;
     if (this.flying) this.shadow = scene.add.ellipse(this.x, this.y + 8, 30, 9, 0x000000, 0.25).setDepth(9);
     this.sprite = scene.add.image(this.x, this.y - this.lift, this.def.texture).setDepth(this.flying ? 26 : 10);
+    // Walking frames from a picture sheet (fireHound, fireHound_1 ...), swapped as it steps
+    this.frames = [this.def.texture];
+    while (scene.textures.exists(`${this.def.texture}_${this.frames.length}`)) this.frames.push(`${this.def.texture}_${this.frames.length}`);
     this.hpBar = scene.add.graphics().setDepth(this.flying ? 27 : 12);
 
     if (this.def.boss) {
@@ -82,6 +85,7 @@ export default class Enemy {
     this.bob += dt * speed * 0.15;
     const bobH = this.flying ? 5 : 2;
     this.sprite.setPosition(this.x, this.y - this.lift + Math.sin(this.bob) * bobH);
+    if (this.frames.length > 1) this.sprite.setTexture(this.frames[Math.floor(this.bob / Math.PI) % this.frames.length]);
     if (!this.flying) this.sprite.setDepth(10 + this.y / 1000);
     this.shadow?.setPosition(this.x, this.y + 8);
     if (dx !== 0) this.sprite.setFlipX(dx < 0);

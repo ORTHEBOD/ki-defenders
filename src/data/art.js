@@ -16,6 +16,11 @@ export const ART_FILES = [
   // The heroes, all 6 forms, standing, attacking and running (Sora has no running pictures: he runs standing)
   ...['zenko', 'mira', 'goran', 'sora'].flatMap((id) => [0, 1, 2, 3, 4, 5].flatMap((i) => [
     `hero_${id}_${i}`, `hero_${id}_${i}_attack`, ...(id === 'sora' ? [] : [`hero_${id}_${i}_run`])])),
+  // Frozen Peaks and Volcano monsters (tools/cut_monsters.py), with their walking frames
+  ...Object.entries({
+    snowImp: 1, iceGolem: 2, frostBat: 2, yetiCub: 2, lavaSlime: 1, fireHound: 4, magmaBrute: 1, emberWisp: 2,
+    frostGiant: 2, iceQueen: 2, lavaTitan: 2, pyrax: 2,
+  }).flatMap(([k, n]) => [k, ...Array.from({ length: n - 1 }, (_, i) => `${k}_${i + 1}`)]),
 ];
 
 // The base in battle and on the Base page: art/base_<walls level>.png (0-5) and art/cannon_<level>.png (1-5)
@@ -26,10 +31,11 @@ export const BASE_ART = [0, 1, 2, 3, 4, 5].map((i) => `base_${i}`).concat([1, 2,
 const SIZES = {
   grunt: 48, runner: 48, flyer: 48, splitter: 48, medic: 48, brute: 56, splitling: 32,
   ogre: 80, scorpion: 80, mech: 80, krag: 100, sandKing: 100, vorn: 100, coin: 28,
-  snowImp: 48, iceGolem: 56, frostBat: 48, yetiCub: 48, snowball: 32, lavaSlime: 48, fireHound: 48, magmaBrute: 56,
+  snowImp: 48, iceGolem: 56, frostBat: 56, yetiCub: 48, snowball: 32, lavaSlime: 52, fireHound: 58, magmaBrute: 56,
   emberWisp: 48, frostGiant: 80, lavaTitan: 80, iceQueen: 100, pyrax: 100,
 };
 
 export function artSize(key) {
-  return SIZES[key] ?? 64;
+  // A monster's walking frames (fireHound_2) are shown at its size
+  return SIZES[key] ?? SIZES[key.replace(/_\d+$/, '')] ?? 64;
 }
