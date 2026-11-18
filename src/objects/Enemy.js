@@ -46,6 +46,12 @@ export default class Enemy {
     this.flashTime -= dt;
     if (this.def.heal) this.healTick(dt);
     if (this.def.boss) this.bossTick(dt);
+    // Magma Brute: runs once it is badly hurt
+    if (this.def.rage && !this.enraged && this.hp < this.maxHp / 2) {
+      this.enraged = true;
+      this.speedMul = this.def.rage;
+      this.applyTint();
+    }
     if (this.stunTime > 0) {
       this.stunTime -= dt;
       this.applyTint();
@@ -229,6 +235,13 @@ export default class Enemy {
     if (this.hp <= 0) {
       this.scene.onEnemyKilled(this);
       this.destroy();
+      // Lava Slime: blows up, burning the hero if he is close
+      const burst = this.def.burst;
+      if (burst && !this.reachedEnd) {
+        this.scene.flashFx(this.x, this.y - 6, burst.radius, 0xff6a1a);
+        const h = this.scene.hero;
+        if (h?.alive && Math.hypot(h.x - this.x, h.y - this.y) <= burst.radius) h.takeDamage(burst.damage * this.hpScale ** 0.5);
+      }
       const split = this.def.splitInto;
       if (split && !this.reachedEnd) {
         for (let i = 0; i < split.count; i++) this.scene.spawnFrom(this, split.type, this.hpScale, i * 14);

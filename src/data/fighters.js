@@ -18,8 +18,9 @@ export const FORMS = [
 ];
 
 // Forms open as the story goes on: a fighter can reach form i (and its +1, +2) once level
-// FORM_LEVELS[i] has been beaten. Base is always open.
-export const FORM_LEVELS = [0, 3, 8, 13, 18, 25];
+// FORM_LEVELS[i] has been beaten. Base is always open. Spread over all 60 levels (Divine Form in the
+// Frozen Peaks, Ascended Form in the Volcano).
+export const FORM_LEVELS = [0, 4, 12, 22, 36, 50];
 
 // The form bonus (stun, burn, freeze...) switches on at this form
 export const BONUS_FORM = 4;
@@ -29,7 +30,7 @@ export const BONUS_FORM = 4;
 const POWER = [1, 1.15, 1.3, 1.8, 2, 2.2, 2.8, 3.05, 3.3, 4, 4.3, 4.6, 5.5, 5.9, 6.3, 7.4, 7.9, 8.4];
 const COST = [0, 0.8, 1, 2, 1.4, 1.6, 3, 2, 2.2, 4, 2.6, 2.8, 5, 3.2, 3.4, 6.5, 4, 4.4];
 // EXP a fighter needs for each step (added up as it goes). Big enemies and bosses give more EXP.
-const EXP = [0, 3, 4, 6, 6, 8, 11, 10, 11, 16, 13, 14, 20, 16, 18, 27, 21, 24];
+const EXP = [0, 4, 6, 8, 8, 11, 15, 14, 15, 22, 18, 20, 28, 22, 25, 38, 29, 34];
 export const EXP_TOTAL = EXP.reduce((list, n, i) => [...list, (list[i - 1] ?? 0) + n], []);
 
 // Builds the 18 steps from the base stats. `grow(t, form)` adds the stats that change on their own

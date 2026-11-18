@@ -1,4 +1,4 @@
-import { LEVELS, MAPS, levelById, endlessWave } from '../data/levels.js';
+import { LEVELS, MAPS, levelById, endlessWave, mapOf } from '../data/levels.js';
 import { storyAfter, storyBefore } from '../data/story.js';
 import { battleCoins } from '../data/shop.js';
 import { Ads } from '../systems/Ads.js';
@@ -428,6 +428,10 @@ export default class GameScene extends Phaser.Scene {
       g.fillStyle(rnd.pick(th.blobs), 1);
       g.fillEllipse(rnd.between(0, W), rnd.between(0, H), rnd.between(30, 90), rnd.between(14, 40));
     }
+    if (th.snow || th.lava) {
+      this.drawColdOrHot(g, rnd);
+      return;
+    }
     const sandy = th.deco.includes('cactus');
     for (let i = 0; i < 260; i++) {
       const x = rnd.between(0, W);
@@ -456,6 +460,48 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  // Frozen Peaks: snow drifts and glittering ice. Volcano: dark rock with glowing lava cracks.
+  drawColdOrHot(g, rnd) {
+    const th = this.theme;
+    if (th.snow) {
+      for (let i = 0; i < 60; i++) {
+        g.fillStyle(0xffffff, 0.7).fillEllipse(rnd.between(0, W), rnd.between(64, H), rnd.between(40, 110), rnd.between(10, 24));
+      }
+      for (let i = 0; i < 90; i++) {
+        const x = rnd.between(0, W);
+        const y = rnd.between(64, H);
+        g.fillStyle(0xffffff, 0.95).fillRect(x - 0.5, y - 3, 1, 6).fillRect(x - 3, y - 0.5, 6, 1);
+      }
+      for (let i = 0; i < 18; i++) {
+        // Small frozen puddles
+        const x = rnd.between(0, W);
+        const y = rnd.between(64, H);
+        g.fillStyle(0xa8d4f0, 0.8).fillEllipse(x, y, rnd.between(26, 50), rnd.between(10, 18));
+        g.fillStyle(0xffffff, 0.6).fillEllipse(x - 6, y - 2, 10, 3);
+      }
+      return;
+    }
+    for (let i = 0; i < 26; i++) {
+      // Glowing cracks
+      let x = rnd.between(0, W);
+      let y = rnd.between(64, H);
+      const pts = [{ x, y }];
+      for (let k = 0; k < 4; k++) {
+        x += rnd.between(-26, 26);
+        y += rnd.between(-16, 16);
+        pts.push({ x, y });
+      }
+      g.lineStyle(5, 0xff6a1a, 0.25).strokePoints(pts);
+      g.lineStyle(2, 0xffa31a, 0.9).strokePoints(pts);
+    }
+    for (let i = 0; i < 40; i++) {
+      const x = rnd.between(0, W);
+      const y = rnd.between(64, H);
+      g.fillStyle(shade(th.ground, 0.7)).fillEllipse(x + 1, y + 1.5, 8, 5);
+      g.fillStyle(shade(th.ground, 1.25)).fillEllipse(x, y, 8, 5);
+    }
+  }
+
   // Turns the finished map drawing into one picture (much lighter than drawing every shape again
   // each frame), then lays soft light from the top left and darker corners over it
   bakeMap(g) {
@@ -464,7 +510,8 @@ export default class GameScene extends Phaser.Scene {
     g.destroy();
     this.add.image(0, 0, 'battleMap').setOrigin(0).setDepth(0);
     const metal = this.theme.metal;
-    this.add.image(250, 130, 'glow').setTint(metal ? 0x3fd0f5 : 0xfff2c0).setBlendMode('ADD').setScale(9).setAlpha(metal ? 0.1 : 0.2).setDepth(1);
+    const tint = metal ? 0x3fd0f5 : this.theme.lava ? 0xff6a1a : this.theme.snow ? 0xdff4ff : 0xfff2c0;
+    this.add.image(250, 130, 'glow').setTint(tint).setBlendMode('ADD').setScale(9).setAlpha(metal ? 0.1 : 0.2).setDepth(1);
     this.add.image(0, 0, 'vignette').setOrigin(0).setDisplaySize(W, H).setDepth(1);
   }
 
@@ -501,6 +548,48 @@ export default class GameScene extends Phaser.Scene {
       g.lineBetween(x - 12, y - 4, x + 12, y + 4);
       g.lineBetween(x - 10, y + 6, x + 10, y - 6);
       g.fillStyle(0xf2e6c4).fillCircle(x - 18, y - 2, 6).fillCircle(x - 15, y + 5, 4);
+    } else if (kind === 'pine') {
+      // A snowy pine tree
+      const s = rnd.realInRange(0.85, 1.25);
+      g.fillStyle(0x000000, 0.16).fillEllipse(x + 4, y + 16 * s, 34 * s, 8 * s);
+      g.fillStyle(0x6b4a2a).fillRect(x - 3 * s, y + 4 * s, 6 * s, 12 * s);
+      g.lineStyle(2, COLORS.outline);
+      for (const [dy, w] of [[4, 22], [-8, 18], [-20, 13]]) {
+        const tri = [{ x: x - w * s, y: y + dy * s }, { x, y: y + (dy - 18) * s }, { x: x + w * s, y: y + dy * s }];
+        g.fillStyle(0x2f6a4a).fillPoints(tri, true).strokePoints(tri, true);
+        g.fillStyle(0xffffff).fillPoints([{ x: x - w * 0.55 * s, y: y + (dy - 8) * s }, { x, y: y + (dy - 18) * s },
+          { x: x + w * 0.55 * s, y: y + (dy - 8) * s }], true);
+      }
+    } else if (kind === 'icerock') {
+      const s = rnd.realInRange(0.8, 1.3);
+      g.fillStyle(0x000000, 0.14).fillEllipse(x + 3 * s, y + 10 * s, 36 * s, 8 * s);
+      const ice = [{ x: x - 16 * s, y: y + 8 * s }, { x: x - 8 * s, y: y - 18 * s }, { x: x + 4 * s, y: y - 8 * s },
+        { x: x + 10 * s, y: y - 22 * s }, { x: x + 17 * s, y: y + 8 * s }];
+      g.lineStyle(2, COLORS.outline).fillStyle(0x9fd4f5).fillPoints(ice, true).strokePoints(ice, true);
+      g.fillStyle(0xe8f8ff, 0.9).fillPoints([{ x: x - 8 * s, y: y - 18 * s }, { x: x - 4 * s, y: y + 4 * s }, { x: x - 11 * s, y: y + 4 * s }], true);
+    } else if (kind === 'snowbush') {
+      g.fillStyle(0x000000, 0.14).fillEllipse(x + 1, y + 9, 36, 8);
+      g.lineStyle(2, COLORS.outline);
+      [[-8, 0, 9], [8, 0, 9], [0, -6, 10]].forEach(([dx, dy, r]) => this.leafClump(g, x + dx, y + dy, r, 0x3a7a5a));
+      g.fillStyle(0xffffff).fillEllipse(x - 2, y - 13, 18, 6).fillEllipse(x + 8, y - 6, 10, 4);
+    } else if (kind === 'lavarock') {
+      const s = rnd.realInRange(0.8, 1.4);
+      g.fillStyle(0x000000, 0.2).fillEllipse(x + 3 * s, y + 12 * s, 40 * s, 9 * s);
+      g.lineStyle(2, COLORS.outline).fillStyle(0x3a2a2a);
+      g.fillRoundedRect(x - 18 * s, y - 12 * s, 36 * s, 24 * s, 8 * s).strokeRoundedRect(x - 18 * s, y - 12 * s, 36 * s, 24 * s, 8 * s);
+      g.lineStyle(2, 0xff8a1a).lineBetween(x - 10 * s, y - 6 * s, x - 2 * s, y + 4 * s).lineBetween(x - 2 * s, y + 4 * s, x + 8 * s, y - 2 * s);
+      g.fillStyle(0x5a4444).fillRoundedRect(x - 14 * s, y - 9 * s, 26 * s, 4 * s, 2 * s);
+    } else if (kind === 'vent') {
+      // A small pool of lava
+      g.fillStyle(0xff6a1a, 0.18).fillCircle(x, y, 34);
+      g.lineStyle(3, 0x2a1a1a).fillStyle(0xd8401a).fillEllipse(x, y, 46, 22).strokeEllipse(x, y, 46, 22);
+      g.fillStyle(0xffa31a).fillEllipse(x - 4, y - 2, 30, 12);
+      g.fillStyle(0xffe14d).fillCircle(x - 8, y - 3, 3).fillCircle(x + 6, y + 1, 2);
+    } else if (kind === 'deadtree') {
+      g.fillStyle(0x000000, 0.18).fillEllipse(x + 4, y + 14, 30, 7);
+      g.lineStyle(5, 0x2a1e1a);
+      g.lineBetween(x, y + 12, x, y - 22).lineBetween(x, y - 8, x - 12, y - 20).lineBetween(x, y - 14, x + 11, y - 26);
+      g.lineStyle(3, 0x2a1e1a).lineBetween(x - 12, y - 20, x - 16, y - 28).lineBetween(x + 11, y - 26, x + 17, y - 30);
     } else if (kind === 'crate') {
       g.fillStyle(0x000000, 0.25).fillRect(x - 13, y - 11, 34, 32);
       g.lineStyle(2, COLORS.outline).fillStyle(0x5a6378).fillRect(x - 16, y - 16, 32, 32).strokeRect(x - 16, y - 16, 32, 32);
@@ -522,11 +611,18 @@ export default class GameScene extends Phaser.Scene {
   // Small moving details: drifting leaves, blowing sand, or blinking ship lights
   addAmbience() {
     const th = this.theme;
-    const color = th.metal ? 0x3fd0f5 : th.deco.includes('cactus') ? 0xf2d49a : 0xa8e070;
+    const color = th.metal ? 0x3fd0f5 : th.snow ? 0xffffff : th.lava ? 0xffa31a : th.deco.includes('cactus') ? 0xf2d49a : 0xa8e070;
     for (let i = 0; i < 14; i++) {
       const p = this.add.circle(Phaser.Math.Between(0, W), Phaser.Math.Between(70, H), Phaser.Math.Between(2, 3), color, 0.6).setDepth(3);
       if (th.metal) {
         this.tweens.add({ targets: p, alpha: 0.1, duration: Phaser.Math.Between(600, 1600), yoyo: true, repeat: -1 });
+      } else if (th.snow || th.lava) {
+        // Snow falls down, embers float up
+        const dir = th.snow ? 1 : -1;
+        this.tweens.add({
+          targets: p, x: p.x + Phaser.Math.Between(-60, 60), y: p.y + dir * Phaser.Math.Between(120, 260), alpha: 0,
+          duration: Phaser.Math.Between(3000, 6000), delay: Phaser.Math.Between(0, 3000), repeat: -1,
+        });
       } else {
         this.tweens.add({
           targets: p, x: p.x + Phaser.Math.Between(120, 300), y: p.y + Phaser.Math.Between(-40, 40), alpha: 0,
@@ -1569,7 +1665,7 @@ export default class GameScene extends Phaser.Scene {
 
   // Straight into the next level on the same difficulty (with its story first, if there is one)
   playNext(id) {
-    const m = Math.floor((id - 1) / 10);
+    const m = mapOf(id);
     const game = { scene: 'Game', data: { levelId: id, difficulty: this.diffKey, mapIndex: m } };
     const story = storyBefore(id);
     if (story && !(Save.current()?.seenStory ?? []).includes(story)) this.scene.start('Story', { id: story, next: game });

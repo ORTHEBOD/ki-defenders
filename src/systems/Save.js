@@ -106,6 +106,9 @@ function migrate(p) {
   p.tutorialDone ??= Object.keys(p.stars ?? {}).length > 0;
   p.daily ??= { last: null, streak: 0 };
   p.base ??= {};
+  // Fighter forms the player had opened before the forms were spread over 60 levels (they were opened by
+  // levels 3, 8, 13, 18 and 25): kept, so nobody loses a form
+  p.formsKept ??= [0, 3, 8, 13, 18, 25].filter((id) => id === 0 || (p.stars?.[id] ?? 0) > 0).length - 1;
   p.updatedAt ??= 0;
   return p;
 }

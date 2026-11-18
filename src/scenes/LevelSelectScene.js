@@ -1,4 +1,4 @@
-import { LEVELS, MAPS, NODES } from '../data/levels.js';
+import { LEVELS, MAPS, nodesFor } from '../data/levels.js';
 import { DIFFICULTY } from '../data/difficulty.js';
 import { storyBefore } from '../data/story.js';
 import { drawMenuBackground, panel } from '../ui/menuBackground.js';
@@ -31,13 +31,9 @@ export default class LevelSelectScene extends Phaser.Scene {
     if (!this.mapOpen(this.mapIndex)) this.mapIndex = 0;
     this.tabs = MAPS.map((m, i) => {
       const open = this.mapOpen(i);
-      return makeButton(this, 190 + i * 300, 108, 284, 54, open ? m.name : `🔒 ${m.name}`, () => this.showMap(i),
-        { fontSize: 24, color: 0x2a3350 });
+      return makeButton(this, 148 + i * 246, 108, 236, 54, open ? m.name : `🔒 ${m.name}`, () => this.showMap(i),
+        { fontSize: 21, color: 0x2a3350 });
     });
-    // The next area is still being made
-    const soon = makeButton(this, 190 + MAPS.length * 300, 108, 284, 54, '✨ Coming soon', () => this.showSoon(),
-      { fontSize: 24, color: 0x4a2a6a });
-    soon.setAlpha(0.75);
     this.mapLayer = this.add.container(0, 0);
     this.showMap(this.mapIndex);
   }
@@ -76,13 +72,14 @@ export default class LevelSelectScene extends Phaser.Scene {
 
     this.mapLayer.add(drawAreaMap(this, i));
     const got = LEVELS.filter((l) => l.map === i).reduce((a, l) => a + this.stars(l.id), 0);
-    this.mapLayer.add(this.add.text(1210, 680, `${map.name}: ★ ${got} / 30`, textStyle(24, '#ffd93b')).setOrigin(1, 0.5));
+    this.mapLayer.add(this.add.text(1210, 680, `${map.name}: ★ ${got} / ${map.count * 3}`, textStyle(24, '#ffd93b')).setOrigin(1, 0.5));
 
-    NODES.forEach(([x, y], n) => {
-      const id = i * 10 + n + 1;
+    const nodes = nodesFor(map);
+    nodes.forEach(([x, y], n) => {
+      const id = map.first + n;
       const level = LEVELS.find((l) => l.id === id);
       const open = this.isUnlocked(id);
-      const boss = n === 9;
+      const boss = n === nodes.length - 1;
       const r = boss ? 48 : 40;
       const fill = !open ? 0x3a3f52 : boss ? 0xb8303a : level.maze ? 0x6a3ab8 : 0xe0661a;
       const next = open && this.stars(id) === 0;
@@ -113,24 +110,11 @@ export default class LevelSelectScene extends Phaser.Scene {
     pop.add(this.add.rectangle(0, 0, 1280, 720, 0x000000, 0.5).setOrigin(0).setInteractive());
     pop.add(panel(this, 640, 400, 640, 300, map.color));
     pop.add(this.add.text(640, 300, `🔒 ${map.name}`, textStyle(40, '#ffd93b')).setOrigin(0.5));
-    const prev = i * 10;
+    const prev = map.first - 1;
     const needLevel = this.stars(prev) > 0 ? '✔' : '✘';
     const haveStars = totalStars(this.player) >= map.needStars ? '✔' : '✘';
     pop.add(this.add.text(640, 370, `${needLevel}  Win level ${prev}`, textStyle(28)).setOrigin(0.5));
     pop.add(this.add.text(640, 412, `${haveStars}  Collect ★ ${map.needStars} stars (you have ${totalStars(this.player)})`, textStyle(28)).setOrigin(0.5));
-    pop.add(makeButton(this, 640, 495, 200, 50, 'OK', () => {
-      pop.setVisible(false);
-      this.time.delayedCall(1, () => pop.destroy());
-    }, { fontSize: 26 }));
-  }
-
-  showSoon() {
-    const pop = this.add.container(0, 0).setDepth(200);
-    pop.add(this.add.rectangle(0, 0, 1280, 720, 0x000000, 0.5).setOrigin(0).setInteractive());
-    pop.add(panel(this, 640, 400, 640, 300, 0xc9a8ff));
-    pop.add(this.add.text(640, 305, '✨ New area', textStyle(44, '#c9a8ff')).setOrigin(0.5));
-    pop.add(this.add.text(640, 385, 'Coming soon!\nNew levels, enemies and a new boss are on the way.',
-      { ...textStyle(26), align: 'center' }).setOrigin(0.5));
     pop.add(makeButton(this, 640, 495, 200, 50, 'OK', () => {
       pop.setVisible(false);
       this.time.delayedCall(1, () => pop.destroy());

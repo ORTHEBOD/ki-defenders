@@ -26,6 +26,8 @@ export const BASE_ART = [0, 1, 2, 3, 4, 5].map((i) => `base_${i}`).concat([1, 2,
 const SIZES = {
   grunt: 48, runner: 48, flyer: 48, splitter: 48, medic: 48, brute: 56, splitling: 32,
   ogre: 80, scorpion: 80, mech: 80, krag: 100, sandKing: 100, vorn: 100, coin: 28,
+  snowImp: 48, iceGolem: 56, frostBat: 48, yetiCub: 48, snowball: 32, lavaSlime: 48, fireHound: 48, magmaBrute: 56,
+  emberWisp: 48, frostGiant: 80, lavaTitan: 80, iceQueen: 100, pyrax: 100,
 };
 
 export function artSize(key) {

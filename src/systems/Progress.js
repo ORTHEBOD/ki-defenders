@@ -1,4 +1,4 @@
-import { LEVELS, MAPS } from '../data/levels.js';
+import { LEVELS, MAPS, mapOf } from '../data/levels.js';
 import { FORM_LEVELS } from '../data/fighters.js';
 import { totalStars } from './Save.js';
 
@@ -9,21 +9,22 @@ const stars = (player, id) => player.stars[id] || 0;
 // An area opens when the last level of the area before it is won AND the player has enough stars
 export function mapOpen(player, i) {
   if (i === 0 || player.super) return true;
-  return stars(player, i * 10) > 0 && totalStars(player) >= MAPS[i].needStars;
+  return stars(player, MAPS[i].first - 1) > 0 && totalStars(player) >= MAPS[i].needStars;
 }
 
 // A level opens once the level before it has been won (the first level of an area opens with the area)
 export function levelOpen(player, id) {
   if (!LEVELS.some((l) => l.id === id)) return false;
-  const m = Math.floor((id - 1) / 10);
+  const m = mapOf(id);
   if (!mapOpen(player, m)) return false;
-  return player.super || id % 10 === 1 || stars(player, id - 1) > 0;
+  return player.super || id === MAPS[m].first || stars(player, id - 1) > 0;
 }
 
 // The highest fighter form opened by the story (0 = Base ... 5 = Ascended)
 export function maxForm(player) {
   if (!player || player.super) return FORM_LEVELS.length - 1;
-  return FORM_LEVELS.filter((id) => id === 0 || stars(player, id) > 0).length - 1;
+  const opened = FORM_LEVELS.filter((id) => id === 0 || stars(player, id) > 0).length - 1;
+  return Math.max(opened, player.formsKept ?? 0);
 }
 
 // The shop and Endless mode open with stars

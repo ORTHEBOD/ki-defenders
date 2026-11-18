@@ -39,6 +39,25 @@ const SONGS = {
     kick: 'x---x---x---x---', snare: '----x-------x---', hat: 'x-xxx-xxx-xxx-xx',
     leadVol: 0.03,
   },
+  // Frozen Peaks: slow, bell-like notes over a soft beat
+  frost: {
+    bpm: 112, perBeat: 4, leadWave: 'triangle',
+    lead: 'E5 _ B4 _ G5 _ _ _ F#5 _ E5 _ B4 _ _ _ C5 _ E5 _ A5 _ _ _ G5 _ F#5 _ E5 _ _ _ '
+      + 'D5 _ F#5 _ B5 _ _ _ A5 _ G5 _ F#5 _ _ _ E5 _ G5 _ B4 _ D5 _ E5 _ _ _ - - - -',
+    bass: 'E2 _ _ _ B2 _ _ _ E2 _ _ _ B2 _ _ _ C2 _ _ _ G2 _ _ _ C2 _ _ _ G2 _ _ _ '
+      + 'D2 _ _ _ A2 _ _ _ D2 _ _ _ A2 _ _ _ E2 _ _ _ B2 _ _ _ E2 _ _ _ E2 _ _ _',
+    kick: 'x-------x-------', snare: '--------x-------', hat: '--x---x---x---x-',
+    leadVol: 0.06,
+  },
+  // Volcano: heavy, low and fast
+  volcano: {
+    bpm: 150, perBeat: 4, leadWave: 'square',
+    lead: 'C5 _ C5 - D#5 _ C5 _ G5 _ F5 _ D#5 _ D5 _ C5 _ - - G4 _ A#4 _ C5 _ _ _ - - - - '
+      + 'D#5 _ D#5 - F5 _ D#5 _ A#5 _ G5 _ F5 _ D#5 _ D5 _ - - C5 _ D5 _ C5 _ _ _ - - - -',
+    bass: 'C2 C2 C3 C2 C2 C2 C3 C2 G#1 G#1 G#2 G#1 G#1 G#1 G#2 G#1 A#1 A#1 A#2 A#1 A#1 A#1 A#2 A#1 G1 G1 G2 G1 G1 G1 G2 G1',
+    kick: 'x-x---x-x-x---x-', snare: '----x-------x---', hat: 'x-x-x-x-x-x-x-x-',
+    leadVol: 0.028,
+  },
   boss: {
     bpm: 155, perBeat: 4,
     lead: 'D5 _ - D5 F5 _ D5 _ C5 _ A4 _ C5 _ D5 _ A#4 _ - A#4 D5 _ A#4 _ A4 _ G4 _ A4 _ C#5 _',
@@ -207,7 +226,7 @@ export const Audio = {
     sfxGain.gain.value = Settings.get('sfx');
   },
 
-  // Starts a song by name ('menu', 'battle', 'desert', 'ship', 'boss'). Keeps playing if it is already on.
+  // Starts a song by name ('menu', 'battle', 'desert', 'ship', 'frost', 'volcano', 'boss'). Keeps playing if it is already on.
   music(name) {
     wanted = name;
     if (!ctx) return;

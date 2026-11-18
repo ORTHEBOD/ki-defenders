@@ -6,6 +6,8 @@ import { drawFighterArt, fitArt, formLook, pts } from '../art/fighterArt.js';
 import {
   drawBrute, drawFlyer, drawSplitter, drawSplitling, drawMedic, drawOgre, drawKrag,
   drawScorpion, drawSandKing, drawMech, drawVorn, drawCoin,
+  drawSnowImp, drawIceGolem, drawFrostBat, drawYetiCub, drawSnowball, drawFrostGiant, drawIceQueen,
+  drawLavaSlime, drawFireHound, drawMagmaBrute, drawEmberWisp, drawLavaTitan, drawPyrax,
 } from '../art/enemyArt.js';
 
 // Placeholder art drawn in code. When the AI art is ready, this scene will load PNG files instead,
@@ -62,6 +64,20 @@ export default class BootScene extends Phaser.Scene {
     this.makeArt('mech', 80, drawMech);
     this.makeArt('vorn', 100, drawVorn);
     this.makeArt('coin', 28, drawCoin);
+    // Frozen Peaks and Volcano
+    this.makeArt('snowImp', 48, drawSnowImp);
+    this.makeArt('iceGolem', 56, drawIceGolem);
+    this.makeArt('frostBat', 48, drawFrostBat);
+    this.makeArt('yetiCub', 48, drawYetiCub);
+    this.makeArt('snowball', 32, drawSnowball);
+    this.makeArt('frostGiant', 80, drawFrostGiant);
+    this.makeArt('iceQueen', 100, drawIceQueen);
+    this.makeArt('lavaSlime', 48, drawLavaSlime);
+    this.makeArt('fireHound', 48, drawFireHound);
+    this.makeArt('magmaBrute', 56, drawMagmaBrute);
+    this.makeArt('emberWisp', 48, drawEmberWisp);
+    this.makeArt('lavaTitan', 80, drawLavaTitan);
+    this.makeArt('pyrax', 100, drawPyrax);
     this.makeSpot();
     this.makeWall();
     this.makeKi();

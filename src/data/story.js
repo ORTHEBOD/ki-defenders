@@ -56,12 +56,71 @@ export const STORY = {
       { who: 'zenko', name: 'Zenko', text: 'A hundred worlds... but not this one.' },
     ],
   },
-  ending: {
+  vornFalls: {
     after: 30,
+    title: 'Vorn Falls',
+    lines: [
+      { who: 'vorn', name: 'Emperor Vorn', text: 'Impossible... beaten by a handful of warriors... But my allies in the north will avenge me!' },
+      { who: 'oru', name: 'Master Oru', text: 'His allies? A cold wind is blowing from the mountains. This is not over yet.' },
+      { who: 'zenko', name: 'Zenko', text: 'Then we head north. Pack something warm, everyone!' },
+    ],
+  },
+  toPeaks: {
+    before: 31,
+    title: 'Chapter 4: The Frozen Peaks',
+    lines: [
+      { who: 'mira', name: 'Mira', text: 'Brr! The whole mountain is frozen. And those little ice imps are FAST.' },
+      { who: 'lumi', name: 'Lumi', text: 'Something up there is making the snow move like an army.' },
+      { who: 'goran', name: 'Goran', text: 'Good. I was getting too warm anyway. Let them come.' },
+    ],
+  },
+  frostGiant: {
+    before: 40,
+    title: 'The Frost Giant',
+    lines: [
+      { who: 'frostGiant', name: 'Frost Giant', text: 'Nobody climbs the Peaks while I guard the gate. NOBODY!' },
+      { who: 'kaito', name: 'Kaito', text: 'Big guy, big club. I love it!' },
+    ],
+  },
+  iceQueen: {
+    before: 45,
+    title: 'The Ice Queen',
+    lines: [
+      { who: 'iceQueen', name: 'Ice Queen Seraka', text: 'Vorn was a fool. I will freeze your whole world - and keep it forever.' },
+      { who: 'sora', name: 'Sora', text: 'Ki burns hotter than any ice. Let\'s see how long your winter lasts.' },
+    ],
+  },
+  toVolcano: {
+    before: 46,
+    title: 'Chapter 5: The Volcano',
+    lines: [
+      { who: 'oru', name: 'Master Oru', text: 'The Ice Queen is gone, but the mountain to the south has woken up. The air is burning.' },
+      { who: 'blaze', name: 'Blaze', text: 'Fire against fire? Finally, my kind of fight!' },
+      { who: 'zenko', name: 'Zenko', text: 'Whoever leads them is hiding inside that volcano. We end this there.' },
+    ],
+  },
+  lavaTitan: {
+    before: 55,
+    title: 'The Lava Titan',
+    lines: [
+      { who: 'lavaTitan', name: 'Lava Titan', text: 'I was made in the fire of the mountain. You will melt like wax.' },
+      { who: 'ronin', name: 'Ronin', text: 'Then I will cool you down. With one very big beam.' },
+    ],
+  },
+  pyrax: {
+    before: 60,
+    title: 'The Inferno Lord',
+    lines: [
+      { who: 'pyrax', name: 'Inferno Lord Pyrax', text: 'Krag, Ozul, Vorn, Seraka... all were MY servants. Now kneel before the true master!' },
+      { who: 'zenko', name: 'Zenko', text: 'We beat every one of them. You\'re just the last one in line.' },
+    ],
+  },
+  ending: {
+    after: 60,
     title: 'Victory!',
     lines: [
-      { who: 'vorn', name: 'Emperor Vorn', text: 'Impossible... beaten by a handful of warriors...' },
-      { who: 'oru', name: 'Master Oru', text: 'It is over. The valley, the desert, our whole world - safe, thanks to you.' },
+      { who: 'pyrax', name: 'Inferno Lord Pyrax', text: 'No... my fire... going out...' },
+      { who: 'oru', name: 'Master Oru', text: 'The valley, the desert, the sky, the peaks and the volcano. Our whole world is safe, thanks to you.' },
       { who: 'zenko', name: 'Zenko', text: 'Let\'s keep training. Try the Endless Battle - who knows what comes next!' },
     ],
   },

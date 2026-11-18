@@ -1,4 +1,4 @@
-import { MAPS, NODES } from '../data/levels.js';
+import { MAPS, nodesFor } from '../data/levels.js';
 
 // The level map of an area: its ground, a road joining the levels, and scenery.
 // Scenery is placed with a fixed seed, so it looks the same every visit.
@@ -11,7 +11,7 @@ function rng(seed) {
   };
 }
 
-function nearRoad(x, y, gap) {
+function nearRoad(NODES, x, y, gap) {
   for (let i = 0; i < NODES.length - 1; i++) {
     const [x1, y1] = NODES[i];
     const [x2, y2] = NODES[i + 1];
@@ -66,6 +66,21 @@ function crate(g, x, y, s) {
   g.fillStyle(0xffd93b).fillRect(x - 13 * s, y - 13 * s, 26 * s, 4 * s);
 }
 
+function pine(g, x, y, s) {
+  g.fillStyle(0x000000, 0.15).fillEllipse(x + 3, y + 4, 30 * s, 10 * s);
+  g.fillStyle(0x6b4a2a).fillRect(x - 3 * s, y - 8 * s, 6 * s, 10 * s);
+  for (const [dy, w] of [[-8, 16], [-18, 13], [-28, 9]]) {
+    g.fillStyle(0x2f6a4a).fillTriangle(x - w * s, y + dy * s, x, y + (dy - 16) * s, x + w * s, y + dy * s);
+    g.fillStyle(0xffffff).fillTriangle(x - w * 0.5 * s, y + (dy - 8) * s, x, y + (dy - 16) * s, x + w * 0.5 * s, y + (dy - 8) * s);
+  }
+}
+
+function vent(g, x, y, s) {
+  g.fillStyle(0xff6a1a, 0.2).fillCircle(x, y, 26 * s);
+  g.fillStyle(0xd8401a).fillEllipse(x, y, 40 * s, 18 * s);
+  g.fillStyle(0xffa31a).fillEllipse(x - 3, y - 2, 26 * s, 10 * s);
+}
+
 function light(g, x, y) {
   g.fillStyle(0x3fd0f5, 0.15).fillCircle(x, y, 22);
   g.fillStyle(0x3fd0f5, 0.35).fillCircle(x, y, 11);
@@ -74,6 +89,7 @@ function light(g, x, y) {
 
 export function drawAreaMap(scene, mapIndex) {
   const map = MAPS[mapIndex];
+  const NODES = nodesFor(map);
   const t = map.theme;
   const X = 40;
   const Y = 150;
@@ -104,12 +120,13 @@ export function drawAreaMap(scene, mapIndex) {
     }
     if (mapIndex === 1) for (let i = 0; i < 7; i++) dune(g, X + 90 + rand() * (W - 180), Y + 60 + rand() * (H - 120), 0.8 + rand() * 0.6);
     else {
-      // A river across the valley
-      g.lineStyle(30, 0x3f8ad8, 0.85);
+      // A river across the valley: a frozen one in the Peaks, a lava flow in the Volcano
+      const [water, shine] = t.lava ? [0xe0501a, 0xffd93b] : t.snow ? [0x9fd4f5, 0xffffff] : [0x3f8ad8, 0xbfe6ff];
+      g.lineStyle(30, water, 0.85);
       g.beginPath().moveTo(X + 10, Y + 120);
       for (let x = X + 10; x <= X + W - 10; x += 40) g.lineTo(x, Y + 110 + Math.sin(x / 90) * 26 + (x - X) * 0.05);
       g.strokePath();
-      g.lineStyle(8, 0xbfe6ff, 0.45);
+      g.lineStyle(8, shine, 0.45);
       g.beginPath().moveTo(X + 10, Y + 114);
       for (let x = X + 10; x <= X + W - 10; x += 40) g.lineTo(x, Y + 104 + Math.sin(x / 90) * 26 + (x - X) * 0.05);
       g.strokePath();
@@ -141,7 +158,7 @@ export function drawAreaMap(scene, mapIndex) {
   for (let tries = 0; tries < 400 && items.length < 34; tries++) {
     const x = X + 40 + rand() * (W - 80);
     const y = Y + 50 + rand() * (H - 80);
-    if (nearRoad(x, y, 62) || (y > Y + H - 60 && x > X + W - 300)) continue;
+    if (nearRoad(NODES, x, y, 62) || (y > Y + H - 60 && x > X + W - 300)) continue;
     if (items.some((it) => Math.hypot(it.x - x, it.y - y) < 46)) continue;
     items.push({ x, y, kind: t.deco[Math.floor(rand() * t.deco.length)], s: 0.8 + rand() * 0.5 });
   }
@@ -152,6 +169,15 @@ export function drawAreaMap(scene, mapIndex) {
     else if (kind === 'cactus') cactus(g, x, y, s);
     else if (kind === 'bones') rock(g, x, y, s * 0.6, 0xf0e6d0);
     else if (kind === 'crate') crate(g, x, y, s);
+    else if (kind === 'pine') pine(g, x, y, s);
+    else if (kind === 'icerock') rock(g, x, y, s, 0x9fd4f5);
+    else if (kind === 'snowbush') bush(g, x, y, s);
+    else if (kind === 'lavarock') rock(g, x, y, s, 0x3a2a2a);
+    else if (kind === 'vent') vent(g, x, y, s);
+    else if (kind === 'deadtree') {
+      g.lineStyle(4 * s, 0x2a1e1a).lineBetween(x, y, x, y - 30 * s).lineBetween(x, y - 16 * s, x - 10 * s, y - 26 * s)
+        .lineBetween(x, y - 22 * s, x + 9 * s, y - 32 * s);
+    }
     else if (kind === 'light') light(g, x, y);
     else if (kind === 'pipe') {
       g.fillStyle(0x2a3040).fillRoundedRect(x - 30 * s, y - 6, 60 * s, 12, 6);

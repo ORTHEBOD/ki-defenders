@@ -1,10 +1,10 @@
 import { distToSegment } from '../systems/Path.js';
 
-// The 3 maps (areas). Each has 10 levels, a look (theme) for the battle field,
-// and needs a number of stars (plus the last level of the map before it) to open.
+// The 5 maps (areas). Each has `count` levels starting at level `first`, a look (theme) for the battle
+// field, and needs a number of stars (plus the last level of the map before it) to open.
 export const MAPS = [
   {
-    name: 'Green Valley', color: 0x4f9a3a, needStars: 0,
+    name: 'Green Valley', color: 0x4f9a3a, needStars: 0, first: 1, count: 10,
     theme: {
       ground: 0x6fb552, blobs: [0x64a84a, 0x7cc25e, 0x5d9e44], edge: 0xa8864f, road: 0xe0c08c, pebble: 0xc9a66b,
       deco: ['tree', 'tree', 'rock', 'bush'], boulder: 0x8c8f99,
@@ -12,7 +12,7 @@ export const MAPS = [
     miniBoss: 'ogre', boss: 'krag', music: 'battle',
   },
   {
-    name: 'Desert Wasteland', color: 0xc98a3a, needStars: 15,
+    name: 'Desert Wasteland', color: 0xc98a3a, needStars: 15, first: 11, count: 10,
     theme: {
       ground: 0xe2b86a, blobs: [0xd6a858, 0xecc684, 0xc99a4a], edge: 0x9a6a3a, road: 0xc48a52, pebble: 0xa87040,
       deco: ['cactus', 'cactus', 'sandrock', 'bones'], boulder: 0xb8865a,
@@ -20,20 +20,49 @@ export const MAPS = [
     miniBoss: 'scorpion', boss: 'sandKing', music: 'desert',
   },
   {
-    name: 'Enemy Mothership', color: 0x6a5aa8, needStars: 40,
+    name: 'Enemy Mothership', color: 0x6a5aa8, needStars: 40, first: 21, count: 10,
     theme: {
       ground: 0x3a4152, blobs: [0x343a4a, 0x40485a, 0x2e3442], edge: 0x1a1d28, road: 0x5a6378, pebble: 0x3fd0f5,
       deco: ['crate', 'light', 'pipe', 'crate'], boulder: 0x5a6378, metal: true,
     },
     miniBoss: 'mech', boss: 'vorn', music: 'ship',
   },
+  {
+    name: 'Frozen Peaks', color: 0x7fc8f0, needStars: 70, first: 31, count: 15,
+    theme: {
+      ground: 0xe4eef8, blobs: [0xd4e2f0, 0xf2f7fc, 0xc8dcee], edge: 0x8aa8c8, road: 0xb8cce0, pebble: 0x9fb8d0,
+      deco: ['pine', 'pine', 'icerock', 'snowbush'], boulder: 0x9fc4e0, snow: true,
+    },
+    miniBoss: 'frostGiant', boss: 'iceQueen', music: 'frost',
+  },
+  {
+    name: 'Volcano', color: 0xe0501a, needStars: 105, first: 46, count: 15,
+    theme: {
+      ground: 0x4a3434, blobs: [0x3e2c2c, 0x553c38, 0x382828], edge: 0x1e1414, road: 0x7a5a4a, pebble: 0xff8a1a,
+      deco: ['lavarock', 'lavarock', 'vent', 'deadtree'], boulder: 0x5a4040, lava: true,
+    },
+    miniBoss: 'lavaTitan', boss: 'pyrax', music: 'volcano',
+  },
 ];
 
-// Where each level button sits on the level map screen (same layout for every map)
+// The map a level is in (its index in MAPS)
+export function mapOf(id) {
+  return MAPS.findIndex((m) => id >= m.first && id < m.first + m.count);
+}
+
+// Where each level button sits on the level map screen: 10-level maps and 15-level maps
 export const NODES = [
   [140, 560], [270, 420], [170, 270], [360, 220], [500, 360],
   [650, 500], [800, 380], [740, 230], [930, 230], [1090, 380],
 ];
+const NODES15 = [
+  [120, 600], [300, 630], [480, 580], [660, 620], [850, 580], [1060, 520], [1130, 370], [940, 410],
+  [740, 450], [540, 410], [340, 450], [140, 400], [230, 250], [500, 240], [820, 240],
+];
+
+export function nodesFor(map) {
+  return map.count === 15 ? NODES15 : NODES;
+}
 
 const NAMES = [
   ['The Valley Road', 'Riverside', 'Old Bridge', 'Boulder Field', 'Farm Fields',
@@ -42,6 +71,12 @@ const NAMES = [
     'Scorpion Nest', 'Mirage Oasis', 'Dune Labyrinth', 'Bone Valley', 'Throne of Sand'],
   ['Landing Bay', 'Cargo Hold', 'Engine Room', 'Prison Maze', 'Laser Halls',
     'Reactor Core', 'Command Deck', 'Circuit Maze', 'Bridge Gate', 'Emperor\'s Throne'],
+  ['Snowy Trail', 'Pine Forest', 'Frozen Lake', 'Ice Maze', 'Yeti Caves', 'Avalanche Pass', 'Crystal Bridge',
+    'Glacier Maze', 'Howling Ridge', 'Frost Giant\'s Gate', 'Blizzard Peak', 'Frozen Labyrinth', 'Ice Palace Steps',
+    'Hall of Mirrors', 'Throne of Ice'],
+  ['Ash Road', 'Smoking Fields', 'Lava River', 'Ember Maze', 'Burning Forest', 'Obsidian Bridge', 'Magma Falls',
+    'Cinder Maze', 'Fire Hound Den', 'Titan\'s Forge', 'Sulfur Lake', 'Molten Labyrinth', 'Crater Rim',
+    'Heart of the Volcano', 'Inferno Throne'],
 ];
 
 // Road shapes. Enemies start at the first point (left side) and the base is at the last one.
@@ -61,6 +96,10 @@ const ROAD_ORDER = [
   [[0, false], [1, false], [2, false], [3, false], [5, false], [6, false], [7, false], [4, false]],
   [[1, true], [5, true], [3, true], [6, true], [2, true], [0, true], [7, true], [4, true]],
   [[6, false], [2, true], [7, false], [0, true], [3, false], [5, true], [1, false], [4, true]],
+  [[2, true], [4, false], [6, true], [1, false], [7, true], [0, false], [5, false], [3, true], [2, false], [6, false],
+    [1, true], [4, true]],
+  [[7, false], [5, true], [0, true], [3, false], [6, true], [2, true], [4, false], [1, true], [7, true], [3, true],
+    [5, false], [0, false]],
 ];
 
 // Tiny seeded random numbers, so every level is the same each time
@@ -117,13 +156,13 @@ export function spotsFor(road, count = 13) {
 }
 
 // Random boulders for a maze level, always leaving a way through
-function mazeFor(n, rand) {
+function mazeFor(n, rand, i) {
   const cols = 17;
   const rows = 9;
   const entryRow = 2 + Math.floor(rand() * 5);
   const exitRow = 2 + Math.floor(rand() * 5);
   const rocks = [];
-  const want = 11 + (n % 10 === 8 ? 5 : 0) + Math.floor(n / 10) * 2;
+  const want = 11 + (i >= 8 ? 5 : 0) + Math.min(6, Math.floor(n / 10)) * 2;
   const has = (c, r) => rocks.some(([a, b]) => a === c && b === r);
   for (let tries = 0; rocks.length < want && tries < 500; tries++) {
     const c = 2 + Math.floor(rand() * (cols - 4));
@@ -152,8 +191,21 @@ function mazeOpen(cols, rows, entryRow, exitRow, rocks) {
   return false;
 }
 
-// Which enemies can show up by level number (1-30)
+// Which enemies can show up by level number (1-60). The Frozen Peaks and the Volcano bring their own.
 function enemyPool(n) {
+  if (n >= 46) {
+    const pool = ['fireHound', 'lavaSlime', 'magmaBrute', 'fireHound', 'iceGolem', 'yetiCub'];
+    if (n >= 48) pool.push('emberWisp', 'lavaSlime');
+    if (n >= 52) pool.push('magmaBrute', 'frostBat');
+    return pool;
+  }
+  if (n >= 31) {
+    const pool = ['snowImp', 'snowImp', 'yetiCub', 'brute'];
+    if (n >= 33) pool.push('iceGolem');
+    if (n >= 35) pool.push('frostBat', 'medic');
+    if (n >= 38) pool.push('iceGolem', 'frostBat', 'splitter');
+    return pool;
+  }
   const pool = ['runner'];
   if (n >= 3) pool.push('brute');
   if (n >= 5) pool.push('flyer');
@@ -163,8 +215,11 @@ function enemyPool(n) {
   return pool;
 }
 
+// Enemies that come only a few at a time (slow, tough or healers)
+const HEAVY = ['brute', 'medic', 'iceGolem', 'magmaBrute', 'emberWisp'];
+
 // Waves get bigger and tougher through each level and from level to level.
-// The last wave always brings the map's boss: a mini boss, or the big boss on level 10, 20 and 30.
+// The last wave always brings the map's boss: a mini boss, or the big boss on the map's last level.
 export function makeWaves(n, mapIndex, rand) {
   const count = Math.min(10, 5 + Math.floor((n - 1) / 3));
   const base = 1 + 0.06 * (n - 1);
@@ -176,7 +231,7 @@ export function makeWaves(n, mapIndex, rand) {
     const groups = [{ type: 'grunt', count: 8 + w * 2, interval: +(1.0 - 0.5 * t).toFixed(2), hpScale: hp }];
     if (w > 0) {
       const type = pool[Math.floor(rand() * pool.length)];
-      const heavy = type === 'brute' || type === 'medic';
+      const heavy = HEAVY.includes(type);
       groups.push({
         type, count: heavy ? 2 + Math.floor(w / 2) : 4 + w, interval: heavy ? 2.2 : 0.6, delay: 4, hpScale: +(hp * 0.9).toFixed(2),
       });
@@ -187,18 +242,19 @@ export function makeWaves(n, mapIndex, rand) {
     }
     waves.push({ groups });
   }
-  const bossLevel = n % 10 === 0;
-  const boss = bossLevel ? MAPS[mapIndex].boss : MAPS[mapIndex].miniBoss;
+  const map = MAPS[mapIndex];
+  const bossLevel = n === map.first + map.count - 1;
+  const boss = bossLevel ? map.boss : map.miniBoss;
   waves[count - 1].groups.push({ type: boss, count: 1, interval: 1, delay: 8, hpScale: +(bossLevel ? 1 : base).toFixed(2) });
   return waves;
 }
 
 function buildLevels() {
   const levels = [];
-  for (let m = 0; m < 3; m++) {
+  MAPS.forEach((map, m) => {
     let fixed = 0;
-    for (let i = 1; i <= 10; i++) {
-      const id = m * 10 + i;
+    for (let i = 1; i <= map.count; i++) {
+      const id = map.first + i - 1;
       const rand = rng(id * 7919);
       const level = {
         id,
@@ -207,8 +263,8 @@ function buildLevels() {
         startKi: Math.min(450, 160 + 10 * (id - 1)),
         lives: 20,
       };
-      if (i === 4 || i === 8) {
-        level.maze = mazeFor(id, rand);
+      if (i === 4 || i === 8 || i === 12) {
+        level.maze = mazeFor(id, rand, i);
         level.startKi += 80;
       } else {
         const [r, flip] = ROAD_ORDER[m][fixed++];
@@ -218,7 +274,7 @@ function buildLevels() {
       level.waves = makeWaves(id, m, rand);
       levels.push(level);
     }
-  }
+  });
   return levels;
 }
 
@@ -279,7 +335,7 @@ export const ENDLESS = {
 
 // The waves for endless mode, made one at a time (w starts at 0)
 export function endlessWave(w) {
-  const pool = enemyPool(Math.min(30, 3 + w));
+  const pool = enemyPool(Math.min(60, 3 + w));
   const rand = rng(1000 + w);
   const hp = +(Math.pow(1.13, w)).toFixed(2);
   const groups = [{ type: 'grunt', count: 8 + Math.min(20, w), interval: Math.max(0.3, 1 - w * 0.03), hpScale: hp }];
@@ -290,7 +346,7 @@ export function endlessWave(w) {
     groups.push({ type, count: type === 'medic' ? Math.min(4, count) : count, interval: 0.7, delay: 4, hpScale: hp });
   }
   if ((w + 1) % 10 === 0) {
-    const bosses = ['ogre', 'scorpion', 'mech', 'krag', 'sandKing', 'vorn'];
+    const bosses = ['ogre', 'scorpion', 'mech', 'frostGiant', 'lavaTitan', 'krag', 'sandKing', 'vorn', 'iceQueen', 'pyrax'];
     groups.push({
       type: bosses[Math.floor((w + 1) / 10 - 1) % bosses.length], count: 1, interval: 1, delay: 6,
       hpScale: +(Math.pow(1.08, w)).toFixed(2),
