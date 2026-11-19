@@ -5,6 +5,8 @@ import { makeButton } from '../ui/Button.js';
 import { Save, totalStars } from '../systems/Save.js';
 import { Online } from '../systems/Online.js';
 import { textStyle } from '../ui/theme.js';
+import { RANK_FRAMES } from '../data/titles.js';
+import { titleOf } from '../systems/Rewards.js';
 
 // This week's Endless Battle board: more waves first, then the faster time. It starts again every
 // Monday 10:00, and the top 20 win diamonds (see src/data/weekly.js).
@@ -73,10 +75,17 @@ export default class LeaderboardScene extends Phaser.Scene {
       const y = 165 + i * 26;
       const mine = r.name.toLowerCase() === me;
       if (mine) this.layer.add(this.add.rectangle(640, y, 960, 24, 0xffd93b, 0.15));
+      // The top 10 get a colored frame and this week's title; your own row shows your title
+      const frame = RANK_FRAMES.find(([last]) => i + 1 <= last);
+      if (frame) this.layer.add(this.add.rectangle(640, y, 964, 24).setStrokeStyle(i === 0 ? 3 : 2, frame[1], i === 0 ? 1 : 0.7));
       const medal = ['#ffd93b', '#d4d8e6', '#d0884a'][i] ?? '#ffffff';
+      const name = this.add.text(cols[1], y, r.name, textStyle(20, mine ? '#5be35b' : '#ffffff')).setOrigin(0, 0.5);
+      const mineTitle = mine && Save.current() ? titleOf(Save.current()) : null;
+      const title = frame ? { name: frame[2], color: `#${frame[1].toString(16).padStart(6, '0')}` } : mineTitle;
+      if (title) this.layer.add(this.add.text(cols[1] + name.width + 10, y, title.name, textStyle(15, title.color)).setOrigin(0, 0.5));
       this.layer.add([
         this.add.text(cols[0], y, `${i + 1}`, textStyle(20, medal)).setOrigin(0.5),
-        this.add.text(cols[1], y, r.name, textStyle(20, mine ? '#5be35b' : '#ffffff')).setOrigin(0, 0.5),
+        name,
         this.add.text(cols[2], y, `${r.wave}`, textStyle(20)).setOrigin(0.5),
         this.add.text(cols[3], y, formatTime(r.time), textStyle(20, '#c9d3ff')).setOrigin(0.5),
         this.add.text(cols[4], y, r.hero, textStyle(18, '#c9d3ff')).setOrigin(0.5),

@@ -1,5 +1,6 @@
 import { DAILY_GIFTS, QUESTS, QUESTS_A_DAY, QUEST_BONUS, BADGES, CHEST_PRIZES, CHEST_VIDEOS } from '../data/rewards.js';
 import { addXp } from '../data/hero.js';
+import { TITLES } from '../data/titles.js';
 import { FIGHTERS } from '../data/fighters.js';
 import { totalStars, activeHero } from './Save.js';
 import { shopOpen, endlessOpen } from './Progress.js';
@@ -103,6 +104,7 @@ export function badgeStat(p, stat) {
   if (stat === 'kills') return p.kills;
   if (stat === 'endlessBest') return p.endlessBest;
   if (stat === 'heroes') return Object.keys(p.heroes).length;
+  if (stat === 'perfect') return p.perfect.length;
   return p.totals[stat] ?? 0;
 }
 
@@ -145,6 +147,13 @@ export function useChestVideo(p) {
   if (chestVideosLeft(p) <= 0) return false;
   p.chestAds = { day: dayKey(), count: p.chestAds?.day === dayKey() ? p.chestAds.count + 1 : 1 };
   return true;
+}
+
+// The player's title: { name, color } (see src/data/titles.js)
+export function titleOf(p) {
+  const places = (p.prizes ?? []).map((r) => r.place).filter((n) => n > 0);
+  const s = { bestPlace: places.length ? Math.min(...places) : 99, stars: totalStars(p), perfect: p.perfect?.length ?? 0 };
+  return TITLES.find((t) => t.fits(p, s));
 }
 
 // How many rewards wait to be collected (the dot on the Rewards button)

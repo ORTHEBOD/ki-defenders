@@ -111,6 +111,8 @@ function migrate(p) {
   // counts started: one for each level won.
   p.totals ??= { wins: Object.keys(p.stars ?? {}).length, streakBest: p.daily.streak };
   p.badges ??= [];
+  // Levels won on Hard without losing a life (the 4th star)
+  p.perfect ??= [];
   p.base ??= {};
   // Fighter forms the player had opened before the forms were spread over 60 levels (they were opened by
   // levels 3, 8, 13, 18 and 25): kept, so nobody loses a form

@@ -1,5 +1,5 @@
 import { LEVELS, MAPS, nodesFor } from '../data/levels.js';
-import { DIFFICULTY } from '../data/difficulty.js';
+import { DIFFICULTY, PERFECT_DIAMONDS } from '../data/difficulty.js';
 import { storyBefore } from '../data/story.js';
 import { drawMenuBackground, panel } from '../ui/menuBackground.js';
 import { makeButton } from '../ui/Button.js';
@@ -94,6 +94,10 @@ export default class LevelSelectScene extends Phaser.Scene {
       node.add(this.add.text(0, -2, open ? `${id}` : '🔒', open ? textStyle(boss ? 40 : 34) : { fontSize: '28px' }).setOrigin(0.5));
       const sub = this.add.text(x, y + r + 20, starText(this.stars(id)), textStyle(22, '#ffd93b')).setOrigin(0.5);
       this.mapLayer.add([node, sub]);
+      // The 4th star (Hard without losing a life)
+      if (this.player.perfect.includes(id)) {
+        this.mapLayer.add(this.add.text(x + sub.width / 2 + 2, y + r + 20, '★', textStyle(22, '#ff4b6b')).setOrigin(0, 0.5));
+      }
       if (boss) this.mapLayer.add(this.add.text(x, y - r - 20, 'BOSS', textStyle(22, '#ff8a8a')).setOrigin(0.5));
       else if (level.maze) this.mapLayer.add(this.add.text(x, y - r - 20, 'MAZE', textStyle(20, '#c9a8ff')).setOrigin(0.5));
       if (open) {
@@ -137,6 +141,10 @@ export default class LevelSelectScene extends Phaser.Scene {
       const b = makeButton(this, x, 400, 180, 80, d.label, () => this.start(id, key), { color: d.color, fontSize: 32 });
       pop.add([b, this.add.text(x, 465, starText(d.stars), textStyle(24, '#ffd93b')).setOrigin(0.5)]);
     });
+    // Hard also has the 4th star
+    const got = this.player.perfect.includes(id);
+    pop.add(this.add.text(840, 494, got ? '★ 4th star won!' : `+★ no lives lost: ${level.id === MAPS[level.map].first + MAPS[level.map].count - 1 ? PERFECT_DIAMONDS.boss : PERFECT_DIAMONDS.level} 💎`,
+      textStyle(18, '#ff8a9a')).setOrigin(0.5));
     pop.add(makeButton(this, 640, 535, 200, 50, 'Cancel', () => {
       pop.setVisible(false);
       this.time.delayedCall(1, () => pop.destroy());

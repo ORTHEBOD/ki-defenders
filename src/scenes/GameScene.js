@@ -6,7 +6,8 @@ import { Ads } from '../systems/Ads.js';
 import { Settings } from '../systems/Settings.js';
 import { Audio } from '../systems/Audio.js';
 import { FIGHTERS, FORMS, BONUS_FORM, EXP_TOTAL, FORM_LEVELS, WALL, fightersFor } from '../data/fighters.js';
-import { DIFFICULTY } from '../data/difficulty.js';
+import { DIFFICULTY, PERFECT_DIAMONDS } from '../data/difficulty.js';
+import { BOSS_TALK, HERO_REPLIES } from '../data/bossTalk.js';
 import { Analytics } from '../systems/Analytics.js';
 import { ENEMIES } from '../data/enemies.js';
 import { addXp, SUPER_NEED, SUPER_FILL } from '../data/hero.js';
@@ -102,6 +103,7 @@ export default class GameScene extends Phaser.Scene {
     this.baseLv = baseLevels(Save.current());
     this.ki = Math.round(this.level.startKi * (this.diff.ki ?? 1)) + baseKi(this.baseLv);
     this.lives = this.level.lives + baseLives(this.baseLv);
+    this.startLives = this.lives;
     this.cannon = null;
     this.waveIndex = -1;
     this.waveActive = false;
@@ -1439,6 +1441,7 @@ export default class GameScene extends Phaser.Scene {
     Audio.music('boss');
     this.cameras.main.shake(400, 0.008);
     this.banner(`BOSS: ${e.def.name}!`);
+    this.bossTalk(e);
     this.bossBar?.destroy();
     const c = this.add.container(W / 2, 84).setDepth(105);
     c.add(this.add.rectangle(0, 0, 520, 40, COLORS.panel, 0.9).setStrokeStyle(2, 0xff5a5a));
@@ -1446,6 +1449,41 @@ export default class GameScene extends Phaser.Scene {
     this.bossBarFill = this.add.graphics();
     c.add(this.bossBarFill);
     this.bossBar = c;
+  }
+
+  // The boss shouts as it arrives, and the hero answers back
+  bossTalk(e) {
+    const lines = BOSS_TALK[e.type];
+    if (!lines || this.endless) return;
+    this.time.delayedCall(900, () => e.alive && this.say(e, Phaser.Utils.Array.GetRandom(lines), '#ff9a9a'));
+    if (this.hero) this.time.delayedCall(3200, () => this.hero.alive && this.say(this.hero, Phaser.Utils.Array.GetRandom(HERO_REPLIES), '#ffffff'));
+  }
+
+  // A speech bubble that follows someone on the map for a few seconds
+  say(who, text, color) {
+    const t = this.add.text(0, 0, text, { ...textStyle(18, color), align: 'center', wordWrap: { width: 260 } }).setOrigin(0.5);
+    const w = t.width + 24;
+    const h = t.height + 14;
+    const g = this.add.graphics();
+    g.fillStyle(0x10131c, 0.88).fillRoundedRect(-w / 2, -h / 2, w, h, 10);
+    g.lineStyle(2, 0xffffff, 0.8).strokeRoundedRect(-w / 2, -h / 2, w, h, 10);
+    g.fillStyle(0x10131c, 0.88).fillTriangle(-8, h / 2 - 1, 8, h / 2 - 1, 0, h / 2 + 10);
+    const c = this.add.container(0, 0, [g, t]).setDepth(62).setScale(0.3);
+    const above = (who.def?.barOffset ?? 50) + 26 + h / 2;
+    const follow = () => c.setPosition(Phaser.Math.Clamp(who.x, w / 2 + 6, W - w / 2 - 6), Math.max(h / 2 + 64, who.y - above));
+    const stop = () => this.events.off('update', follow);
+    follow();
+    this.events.on('update', follow);
+    this.events.once('shutdown', stop);
+    this.tweens.add({ targets: c, scale: 1, duration: 220, ease: 'Back.Out' });
+    this.time.delayedCall(2600, () => this.tweens.add({
+      targets: c, alpha: 0, duration: 300,
+      onComplete: () => {
+        stop();
+        this.events.off('shutdown', stop);
+        c.destroy();
+      },
+    }));
   }
 
   updateBossBar() {
@@ -1599,6 +1637,7 @@ export default class GameScene extends Phaser.Scene {
       endlessWaves: this.endless ? wavesDone : undefined,
     });
     let weekBest = false;
+    let perfect = 0;
     const result = Save.update((p) => {
       let newBest = false;
       if (this.endless) {
@@ -1614,6 +1653,12 @@ export default class GameScene extends Phaser.Scene {
       } else {
         newBest = stars > (p.stars[this.level.id] || 0);
         if (newBest) p.stars[this.level.id] = stars;
+        // The 4th star: Hard, and not a single life lost
+        if (win && this.diffKey === 'hard' && this.lives >= this.startLives && !p.perfect.includes(this.level.id)) {
+          p.perfect.push(this.level.id);
+          perfect = this.level.id === MAPS[this.level.map ?? 0].first + MAPS[this.level.map ?? 0].count - 1 ? PERFECT_DIAMONDS.boss : PERFECT_DIAMONDS.level;
+          p.diamonds += perfect;
+        }
       }
       p.kills += this.kills;
       p.coins += coins;
@@ -1626,7 +1671,7 @@ export default class GameScene extends Phaser.Scene {
       });
       const hero = activeHero(p);
       const gained = hero ? addXp(hero, xp) : 0;
-      return { newBest, weekBest, gained, heroLevel: hero?.level, best: p.endlessBest, week: p.week };
+      return { newBest, weekBest, gained, heroLevel: hero?.level, best: p.endlessBest, week: p.week, perfect, hasPerfect: p.perfect.includes(this.level.id) };
     });
     return { xp, stars, coins, wavesDone, ...(result || { newBest: false, gained: 0 }) };
   }
@@ -1658,6 +1703,15 @@ export default class GameScene extends Phaser.Scene {
     } else if (win) {
       this.add.text(W / 2, 245, '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars), textStyle(64, '#ffd93b'))
         .setOrigin(0.5).setDepth(201);
+      if (r.perfect) {
+        // A new 4th star: a red star pops in next to the others
+        const star = this.add.text(W / 2 + 150, 245, '★', textStyle(80, '#ff4b6b')).setOrigin(0.5).setDepth(201).setScale(3).setAlpha(0);
+        this.tweens.add({ targets: star, scale: 1, alpha: 1, delay: 500, duration: 400, ease: 'Back.Out' });
+        this.add.text(W / 2 + 330, 245, `PERFECT!\n+${r.perfect} 💎`, { ...textStyle(30, '#ff8a9a'), align: 'center' }).setOrigin(0.5).setDepth(201);
+      } else if (this.diffKey === 'hard' && !r.hasPerfect) {
+        this.add.text(W / 2 + 290, 245, 'Win without losing a life\nfor the 4th star!', { ...textStyle(20, '#ff8a9a'), align: 'center' })
+          .setOrigin(0.5).setDepth(201);
+      }
       this.add.text(W / 2, 305, `${this.diff.label} cleared${r.newBest ? '  -  New best!' : ''}`, textStyle(28))
         .setOrigin(0.5).setDepth(201);
     } else {

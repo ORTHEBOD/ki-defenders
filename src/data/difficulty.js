@@ -6,3 +6,7 @@ export const DIFFICULTY = {
   normal: { label: 'Normal', hp: 1, ki: 1, stars: 2, color: 0xe0661a },
   hard: { label: 'Hard', hp: 1.5, ki: 1.15, stars: 3, color: 0xb8303a },
 };
+
+// The 4th star: win a level on Hard without losing a single life. Pays diamonds once per level
+// (more on an area's last level, the big boss).
+export const PERFECT_DIAMONDS = { level: 2, boss: 5 };

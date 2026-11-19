@@ -56,6 +56,8 @@ export const BADGES = [
   { id: 'boss5', stat: 'bossKills', need: 5, diamonds: 3, name: 'Boss Breaker', text: 'Defeat 5 bosses' },
   { id: 'boss25', stat: 'bossKills', need: 25, diamonds: 8, name: 'Boss Master', text: 'Defeat 25 bosses' },
   { id: 'hard10', stat: 'hardWins', need: 10, diamonds: 5, name: 'Tough One', text: 'Win 10 levels on Hard' },
+  { id: 'perfect10', stat: 'perfect', need: 10, diamonds: 5, name: 'Flawless', text: 'Get the 4th star on 10 levels' },
+  { id: 'perfect60', stat: 'perfect', need: 60, diamonds: 30, name: 'Untouchable', text: 'Get the 4th star on all 60 levels' },
   { id: 'stars30', stat: 'stars', need: 30, diamonds: 3, name: 'Rising Star', text: 'Collect 30 stars' },
   { id: 'stars90', stat: 'stars', need: 90, diamonds: 8, name: 'Shining Star', text: 'Collect 90 stars' },
   { id: 'stars180', stat: 'stars', need: 180, diamonds: 20, name: 'Superstar', text: 'Collect all 180 stars' },

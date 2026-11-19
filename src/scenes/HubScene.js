@@ -7,7 +7,7 @@ import { Save, Sync, totalStars, activeHero, renameCost } from '../systems/Save.
 import { Audio } from '../systems/Audio.js';
 import { SHOP_STARS, ENDLESS_STARS, shopOpen, endlessOpen } from '../systems/Progress.js';
 import { textStyle } from '../ui/theme.js';
-import { claimDaily, todayQuests, rewardsWaiting, dayKey } from '../systems/Rewards.js';
+import { claimDaily, todayQuests, rewardsWaiting, dayKey, titleOf } from '../systems/Rewards.js';
 import { drawCalendar } from './RewardsScene.js';
 
 export default class HubScene extends Phaser.Scene {
@@ -39,6 +39,10 @@ export default class HubScene extends Phaser.Scene {
     this.add.text(605, 32, '💎', { fontSize: '26px' }).setOrigin(0.5);
     this.add.text(625, 32, `${player.diamonds}`, textStyle(30, '#7fe3ff')).setOrigin(0, 0.5);
     this.add.text(928, 32, player.name, textStyle(30)).setOrigin(1, 0.5);
+    // The player's title (src/data/titles.js), just under the top bar
+    const title = titleOf(player);
+    const tt = this.add.text(918, 86, title.name, textStyle(22, title.color)).setOrigin(1, 0.5).setDepth(1);
+    this.add.rectangle(928, 86, tt.width + 28, 32, 0x10131c, 0.85).setOrigin(1, 0.5).setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(title.color).color);
     makeButton(this, 954, 32, 36, 36, '✏️', () => this.renamePopup(player), { fontSize: 18, color: 0x3a4470 });
     makeButton(this, 1050, 32, 140, 44, 'Settings', () => this.scene.start('Settings', { back: 'Hub' }),
       { fontSize: 22, color: 0x3a4470 });
