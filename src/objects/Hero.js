@@ -1,4 +1,4 @@
-import { HEROES, ABILITIES, FREE_ABILITY, heroPower, heroMaxHp, learnedSkills, heroForm, formDamage, formHp } from '../data/hero.js';
+import { HEROES, ABILITIES, SUPERS, SUPER_NEED, FREE_ABILITY, heroPower, heroMaxHp, learnedSkills, heroForm, formDamage, formHp } from '../data/hero.js';
 import { FORMS } from '../data/fighters.js';
 import { gearBonus } from '../data/shop.js';
 import { heroTexture } from '../art/fighterArt.js';
@@ -7,7 +7,7 @@ import { distToSegment } from '../systems/Path.js';
 import { textStyle } from '../ui/theme.js';
 
 // The hero in battle: tap to move, auto-attacks when standing still, blocks enemies,
-// has 4 abilities, and respawns at the base after being defeated.
+// has 4 abilities and a super attack, and respawns at the base after being defeated.
 export default class Hero {
   constructor(scene, x, y, saved, heroId = 'zenko') {
     this.scene = scene;
@@ -15,6 +15,8 @@ export default class Hero {
     this.def = HEROES[this.id];
     this.B = this.def.base;
     this.A = ABILITIES;
+    this.S = SUPERS[this.id];
+    this.superPower = 0;
     this.mods = this.def.mods ?? {};
     this.gear = gearBonus(saved.gear);
     this.worn = saved.gear ?? {};
@@ -352,7 +354,141 @@ export default class Hero {
   }
 
   canUse(key) {
+    if (key === 'super') return this.alive && !this.channel && this.superReady;
     return this.knows(key) && this.alive && !this.channel && this.cd[key] <= 0;
+  }
+
+  // An ability's name, color and aiming (the super attack has its own)
+  info(key) {
+    return key === 'super' ? this.S : this.A[key];
+  }
+
+  // ---------- Super attack ----------
+
+  get superReady() {
+    return this.superPower >= SUPER_NEED;
+  }
+
+  // Fills the super attack button (monsters defeated by anyone count)
+  charge(n) {
+    const was = this.superReady;
+    this.superPower = Math.min(SUPER_NEED, this.superPower + n);
+    if (!was && this.superReady) this.scene.floatText(640, 600, `${this.S.name} is ready!`, '#ffd93b', 30, 150);
+  }
+
+  superAttack(tx, ty) {
+    this.superPower = 0;
+    this.target = null;
+    this.scene.tweens.killTweensOf(this.marker);
+    this.marker.setVisible(false);
+    const s = this.S;
+    const dmg = this.abilityDamage(s.damage, 'super');
+    this.scene.cameras.main.flash(160, 255, 255, 255);
+    this.scene.floatText(this.x, this.y - 90, `${s.name.toUpperCase()}!`, '#ffd93b', 34);
+    if (this.id === 'mira') this.lightningDash(s, dmg);
+    else if (this.id === 'goran') this.earthquake(s, dmg);
+    else if (this.id === 'sora') this.skyLightning(s, dmg);
+    else this.giantWave(s, dmg, tx, ty);
+  }
+
+  // Zenko: a huge Kai Wave across the whole map
+  giantWave(s, dmg, tx, ty) {
+    const sx = this.x;
+    const sy = this.y - 18;
+    const ang = Math.atan2(ty - sy, tx - sx);
+    const ex = sx + Math.cos(ang) * s.length;
+    const ey = sy + Math.sin(ang) * s.length;
+    this.sprite.setFlipX(tx < this.x);
+    this.attackPose(800);
+    for (let i = 0; i < 3; i++) this.scene.time.delayedCall(i * 120, () => this.scene.beamFx(sx, sy, ex, ey, s.color, s.width * (1.6 - i * 0.3)));
+    this.scene.cameras.main.shake(450, 0.014);
+    for (const e of [...this.scene.enemies]) {
+      if (e.alive && distToSegment(e.x, e.y, sx, sy, ex, ey) < s.width) {
+        this.scene.damageNumber(e.x, e.y - 20, dmg);
+        this.hitEnemy(e, dmg);
+      }
+    }
+  }
+
+  // Mira: zips from monster to monster, hitting each with lightning, then flashes back to where she was
+  lightningDash(s, dmg) {
+    const home = { x: this.x, y: this.y };
+    let x = this.x;
+    let y = this.y;
+    const left = this.scene.enemies.filter((e) => e.alive);
+    const hops = [];
+    while (hops.length < s.hits && left.length) {
+      left.sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y));
+      const e = left.shift();
+      hops.push(e);
+      x = e.x;
+      y = e.y;
+    }
+    this.scene.flashFx(this.x, this.y - 14, 60, s.color);
+    hops.forEach((e, i) => this.scene.time.delayedCall(i * 70, () => {
+      if (!this.alive) return;
+      this.bolt(this.x, this.y - 14, e.x, e.y - 14, s.color);
+      this.x = Phaser.Math.Clamp(e.x, 20, 1260);
+      this.y = Phaser.Math.Clamp(e.y, 80, 700);
+      this.scene.hitSpark(this.x, this.y - 14, s.color, 1.4);
+      if (e.alive) {
+        this.scene.damageNumber(e.x, e.y - 20, dmg);
+        this.hitEnemy(e, dmg);
+      }
+      this.draw();
+    }));
+    this.scene.time.delayedCall(hops.length * 70 + 150, () => {
+      if (!this.alive) return;
+      this.bolt(this.x, this.y - 14, home.x, home.y - 14, s.color);
+      this.x = home.x;
+      this.y = home.y;
+      this.scene.flashFx(this.x, this.y - 14, 60, s.color);
+      this.draw();
+    });
+    this.attackPose(hops.length * 70 + 200);
+  }
+
+  // Goran: the ground shakes around him, hurting and stopping the monsters for a while
+  earthquake(s, dmg) {
+    this.attackPose(600);
+    this.scene.cameras.main.shake(700, 0.02);
+    for (let i = 0; i < 3; i++) this.scene.time.delayedCall(i * 150, () => this.scene.flashFx(this.x, this.y + 10, s.radius * (0.6 + i * 0.2), s.color));
+    for (const e of [...this.scene.enemies]) {
+      if (!e.alive || Math.hypot(e.x - this.x, e.y - this.y) > s.radius) continue;
+      this.scene.damageNumber(e.x, e.y - 20, dmg);
+      this.hitEnemy(e, dmg);
+      if (e.alive && !e.flying) e.stunTime = Math.max(e.stunTime, e.def.boss ? s.stun / 2 : s.stun);
+    }
+  }
+
+  // Sora: lightning falls from the sky on monsters all over the map, bosses first
+  skyLightning(s, dmg) {
+    this.attackPose(700);
+    const alive = Phaser.Utils.Array.Shuffle(this.scene.enemies.filter((e) => e.alive));
+    alive.sort((a, b) => (b.def.boss ? 1 : 0) - (a.def.boss ? 1 : 0));
+    alive.slice(0, s.hits).forEach((e, i) => this.scene.time.delayedCall(i * 80, () => {
+      if (!e.alive) return;
+      this.bolt(e.x + Phaser.Math.Between(-40, 40), e.y - 520, e.x, e.y - 10, s.color);
+      this.scene.explosionFx(e.x, e.y - 10, 46, s.color);
+      this.scene.damageNumber(e.x, e.y - 20, dmg);
+      this.hitEnemy(e, dmg);
+    }));
+    this.scene.cameras.main.shake(300 + s.hits * 40, 0.008);
+  }
+
+  // A zigzag lightning bolt
+  bolt(x1, y1, x2, y2, color) {
+    const pts = [{ x: x1, y: y1 }];
+    const steps = Math.max(3, Math.round(Math.hypot(x2 - x1, y2 - y1) / 40));
+    for (let k = 1; k < steps; k++) {
+      const t = k / steps;
+      pts.push({ x: x1 + (x2 - x1) * t + Phaser.Math.Between(-14, 14), y: y1 + (y2 - y1) * t + Phaser.Math.Between(-14, 14) });
+    }
+    pts.push({ x: x2, y: y2 });
+    const g = this.scene.add.graphics().setDepth(31);
+    g.lineStyle(12, color, 0.35).strokePoints(pts);
+    g.lineStyle(4, 0xffffff, 1).strokePoints(pts);
+    this.scene.tweens.add({ targets: g, alpha: 0, duration: 260, onComplete: () => g.destroy() });
   }
 
   cast(key, x, y) {
@@ -363,6 +499,7 @@ export default class Hero {
     else if (key === 'flashStep') this.flashStep(x, y);
     else if (key === 'powerUp') this.powerUp();
     else if (key === 'spiritOrb') this.spiritOrb(x, y);
+    else if (key === 'super') this.superAttack(x, y);
   }
 
   kaiWave(tx, ty) {

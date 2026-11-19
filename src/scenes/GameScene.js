@@ -1,5 +1,5 @@
 import { LEVELS, MAPS, levelById, endlessWave, mapOf } from '../data/levels.js';
-import { track } from '../systems/Rewards.js';
+import { track, rollChests, chestText, payChest, chestVideosLeft, useChestVideo } from '../systems/Rewards.js';
 import { storyAfter, storyBefore } from '../data/story.js';
 import { battleCoins } from '../data/shop.js';
 import { Ads } from '../systems/Ads.js';
@@ -9,7 +9,7 @@ import { FIGHTERS, FORMS, BONUS_FORM, EXP_TOTAL, FORM_LEVELS, WALL, fightersFor 
 import { DIFFICULTY } from '../data/difficulty.js';
 import { Analytics } from '../systems/Analytics.js';
 import { ENEMIES } from '../data/enemies.js';
-import { addXp } from '../data/hero.js';
+import { addXp, SUPER_NEED, SUPER_FILL } from '../data/hero.js';
 import Hero from '../objects/Hero.js';
 import { Save, activeHero } from '../systems/Save.js';
 import { weekOf, compareScores, formatTime } from '../data/weekly.js';
@@ -291,6 +291,21 @@ export default class GameScene extends Phaser.Scene {
       });
       return { key, a, c, bg, shade, timer, r };
     });
+    // The super attack: fills up as monsters are defeated, glows when it is ready
+    const s = this.hero.S;
+    const c = this.add.container(1030, 664).setDepth(110);
+    const glow = this.add.circle(0, 0, 58, s.color, 0.35).setVisible(false);
+    const bg = this.add.circle(0, 0, 48, COLORS.panel, 0.92).setStrokeStyle(4, 0x6a6f8f);
+    const shade = this.add.graphics();
+    const label = this.add.text(0, 0, s.label, { ...textStyle(14), align: 'center' }).setOrigin(0.5);
+    c.add([glow, bg, shade, label]);
+    this.tweens.add({ targets: glow, scale: 1.18, alpha: 0.7, duration: 420, yoyo: true, repeat: -1 });
+    bg.setInteractive({ useHandCursor: true });
+    bg.on('pointerdown', () => {
+      this.uiClickFrame = this.game.loop.frame;
+      this.useAbility('super');
+    });
+    this.superButton = { key: 'super', a: s, c, bg, shade, glow, label };
     this.refreshAbilities();
   }
 
@@ -303,7 +318,11 @@ export default class GameScene extends Phaser.Scene {
     this.cancelAim();
     this.selectHero(false);
     const hero = this.hero;
-    if (!hero.knows(key)) {
+    if (key === 'super' && !hero.superReady) {
+      this.floatText(W / 2, 600, `Defeat monsters to fill ${hero.S.name}`, '#ffd93b', 26, SCREEN);
+      return;
+    }
+    if (key !== 'super' && !hero.knows(key)) {
       this.floatText(W / 2, 600, `Learn ${hero.A[key].name} in the Heroes skill tree`, '#ffd93b', 26, SCREEN);
       return;
     }
@@ -313,7 +332,7 @@ export default class GameScene extends Phaser.Scene {
     }
     if (!hero.canUse(key)) return;
     this.closeMenu();
-    const a = this.hero.A[key];
+    const a = hero.info(key);
     if (!a.aim) {
       hero.cast(key);
       return;
@@ -343,6 +362,20 @@ export default class GameScene extends Phaser.Scene {
       b.bg.setStrokeStyle(this.aiming === b.key ? 6 : 4, this.aiming === b.key ? 0xffffff : b.a.color);
       b.c.setAlpha(this.hero.alive ? 1 : 0.45);
     }
+    const s = this.superButton;
+    if (!s) return;
+    const fill = this.hero.superPower / SUPER_NEED;
+    const ready = this.hero.superReady;
+    s.shade.clear();
+    if (!ready) {
+      // The empty part stays dark; a colored ring shows how full it is
+      s.shade.fillStyle(0x000000, 0.6).slice(0, 0, 48, -Math.PI / 2 + Math.PI * 2 * fill, Math.PI * 1.5, false).fillPath();
+      s.shade.lineStyle(6, s.a.color, 1).beginPath().arc(0, 0, 45, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * fill, false).strokePath();
+    }
+    s.glow.setVisible(ready);
+    s.label.setAlpha(ready ? 1 : 0.7);
+    s.bg.setStrokeStyle(this.aiming === 'super' ? 6 : 4, this.aiming === 'super' ? 0xffffff : ready ? s.a.color : 0x6a6f8f);
+    s.c.setAlpha(this.hero.alive ? 1 : 0.45);
   }
 
   // ---------- Map ----------
@@ -1448,6 +1481,7 @@ export default class GameScene extends Phaser.Scene {
 
   onEnemyKilled(e) {
     this.shareExp(e);
+    this.hero?.charge(e.def.boss ? SUPER_FILL.boss : SUPER_FILL.kill);
     if (e.def.boss) {
       this.bossKills++;
       Audio.sfx('explode');
@@ -1605,6 +1639,7 @@ export default class GameScene extends Phaser.Scene {
     this.refreshHud();
     this.startBtn.setVisible(false);
     this.speedBtn.setVisible(false);
+    for (const b of [...this.abilityButtons, this.superButton]) b?.c.setVisible(false);
     const r = this.saveRewards(win);
     Analytics.event(this.endless ? 'endless_end' : 'level_end', { ...this.statsInfo(), win: this.endless ? 0 : win ? 1 : 0, stars: r.stars, waves: r.wavesDone });
     Audio.stopMusic();
@@ -1654,13 +1689,18 @@ export default class GameScene extends Phaser.Scene {
     // The next level starts by itself after NEXT_SECONDS. Any other button, or a tap on the dark
     // screen, stops the countdown.
     let countdown = null;
+    let nextBtn = null;
+    const stop = () => {
+      countdown?.remove();
+      nextBtn?.setLabel('Next level');
+    };
     const leave = (fn) => () => {
       countdown?.remove();
       Ads.between(this, fn);
     };
     if (hasNext) {
       const goNext = leave(() => this.playNext(nextId));
-      const nextBtn = makeButton(this, W / 2 - 290, 540, 260, 64, `Next level (${NEXT_SECONDS})`, goNext, { color: 0x2f8a4a, depth: 202 });
+      nextBtn = makeButton(this, W / 2 - 290, 540, 260, 64, `Next level (${NEXT_SECONDS})`, goNext, { color: 0x2f8a4a, depth: 202 });
       let left = NEXT_SECONDS;
       // `time` runs faster at 2x and 3x speed, so the delay is stretched to keep real seconds
       countdown = this.time.addEvent({
@@ -1674,15 +1714,102 @@ export default class GameScene extends Phaser.Scene {
       });
       dim.on('pointerdown', () => {
         if (this.uiClickFrame === this.game.loop.frame) return;
-        countdown.remove();
-        nextBtn.setLabel('Next level');
+        stop();
       });
     }
+    if (win && !this.endless) this.luckyChests(stop);
     const x0 = hasNext ? 0 : -150;
     makeButton(this, W / 2 + x0, 540, 260, 64, win ? (hasNext ? 'Back to map' : 'Continue') : this.endless ? 'Back' : 'Back to map', leave(cont),
       { color: 0xe0661a, depth: 202 });
     makeButton(this, W / 2 + x0 + (hasNext ? 290 : 300), 540, 260, 64, win ? 'Play again' : 'Try again', leave(() => this.scene.restart(this.startData)),
       { depth: 202 });
+  }
+
+  // The lucky chests under the win screen: open 1 of 3, and one more for a video.
+  // Opening a chest stops the next level countdown (`stop`).
+  luckyChests(stop) {
+    const prizes = rollChests(this.level.id, !!this.hero);
+    let picks = 1;
+    const title = this.add.text(330, 670, 'Pick a lucky chest!', textStyle(28, '#ffd93b')).setOrigin(0.5).setDepth(201);
+    const more = makeButton(this, 1010, 668, 250, 54, '📺 Open one more', async () => {
+      more.setVisible(false);
+      const watched = await Ads.show(this);
+      if (!this.scene.isActive() || !watched || !Save.update((p) => useChestVideo(p))) return;
+      picks = 1;
+      title.setText('Pick one more chest!');
+    }, { fontSize: 24, color: 0x6a3ab8, depth: 202 }).setVisible(false);
+    const chests = prizes.map((prize, i) => this.chestArt(W / 2 + (i - 1) * 130, 670, () => {
+      const chest = chests[i];
+      if (picks <= 0 || chest.open) return;
+      picks--;
+      stop();
+      this.openChest(chest, prize, true);
+      const levels = Save.update((p) => payChest(p, prize));
+      if (levels > 0) this.floatText(W / 2, 470, `LEVEL UP!  ${this.hero.def.name} is now level ${activeHero(Save.current()).level}`, '#5be35b', 34, 203);
+      const shut = chests.filter((c) => !c.open);
+      const canMore = shut.length && chestVideosLeft(Save.current()) > 0 && !more.used;
+      if (canMore) {
+        more.used = true;
+        more.setVisible(true);
+        title.setText('Lucky!');
+      } else {
+        title.setText(shut.length ? 'Lucky!' : 'All chests opened!');
+        this.time.delayedCall(500, () => shut.forEach((c) => this.openChest(c, prizes[chests.indexOf(c)], false)));
+        more.setVisible(false);
+      }
+    }));
+  }
+
+  // A treasure chest drawn in code, tapped to open
+  chestArt(x, y, onTap) {
+    const c = this.add.container(x, y).setDepth(202);
+    const glow = this.add.image(0, -6, 'glow').setTint(0xffd93b).setBlendMode('ADD').setScale(1.2).setAlpha(0);
+    const body = this.add.graphics();
+    body.fillStyle(0x000000, 0.3).fillEllipse(0, 26, 86, 14);
+    body.fillStyle(0x8a4b22).fillRoundedRect(-38, -8, 76, 34, 5);
+    body.fillStyle(0x6a3612).fillRect(-38, 6, 76, 4);
+    body.fillStyle(0xffc93b).fillRect(-28, -8, 8, 34).fillRect(20, -8, 8, 34);
+    body.lineStyle(3, 0x3a1c08).strokeRoundedRect(-38, -8, 76, 34, 5);
+    const lid = this.add.container(0, -8);
+    const lg = this.add.graphics();
+    lg.fillStyle(0xa35a2a).fillRoundedRect(-40, -22, 80, 22, { tl: 14, tr: 14, bl: 2, br: 2 });
+    lg.fillStyle(0xffc93b).fillRect(-29, -22, 8, 22).fillRect(21, -22, 8, 22).fillRoundedRect(-7, -8, 14, 14, 3);
+    lg.lineStyle(3, 0x3a1c08).strokeRoundedRect(-40, -22, 80, 22, { tl: 14, tr: 14, bl: 2, br: 2 });
+    lid.add(lg);
+    c.add([glow, body, lid]);
+    const hit = this.add.rectangle(0, 0, 100, 80, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
+    c.add(hit);
+    hit.on('pointerdown', () => {
+      this.uiClickFrame = this.game.loop.frame;
+      onTap();
+    });
+    this.tweens.add({ targets: c, angle: { from: -3, to: 3 }, duration: 260, yoyo: true, repeat: -1, delay: x });
+    c.lid = lid;
+    c.glow = glow;
+    return c;
+  }
+
+  // Opens a chest and shows its prize: bright for a picked chest, faded for the ones left closed
+  openChest(c, prize, picked) {
+    c.open = true;
+    this.tweens.killTweensOf(c);
+    c.setAngle(0);
+    this.tweens.add({ targets: c.lid, y: -30, angle: -25, duration: 260, ease: 'Back.Out' });
+    const text = this.add.text(c.x, c.y - 52, chestText(prize), textStyle(picked ? 28 : 22, picked ? '#ffd93b' : '#9aa3c7'))
+      .setOrigin(0.5).setDepth(203).setScale(0.3);
+    this.tweens.add({ targets: text, scale: 1, duration: 300, ease: 'Back.Out' });
+    if (!picked) {
+      c.setAlpha(0.55);
+      return;
+    }
+    Audio.sfx('coin', 0.5);
+    c.glow.setAlpha(0.9);
+    this.tweens.add({ targets: c.glow, scale: 2, alpha: 0.4, duration: 400, yoyo: true, repeat: 1 });
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const bit = this.add.circle(c.x, c.y - 14, Phaser.Math.Between(3, 5), i % 2 ? 0xffd93b : 0xffffff).setDepth(203);
+      this.tweens.add({ targets: bit, x: c.x + Math.cos(a) * 60, y: c.y - 14 + Math.sin(a) * 40 - 20, alpha: 0, duration: 500, ease: 'Cubic.Out', onComplete: () => bit.destroy() });
+    }
   }
 
   // Straight into the next level on the same difficulty (with its story first, if there is one)

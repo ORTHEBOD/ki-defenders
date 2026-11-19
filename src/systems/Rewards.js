@@ -1,6 +1,7 @@
-import { DAILY_GIFTS, QUESTS, QUESTS_A_DAY, QUEST_BONUS, BADGES } from '../data/rewards.js';
+import { DAILY_GIFTS, QUESTS, QUESTS_A_DAY, QUEST_BONUS, BADGES, CHEST_PRIZES, CHEST_VIDEOS } from '../data/rewards.js';
+import { addXp } from '../data/hero.js';
 import { FIGHTERS } from '../data/fighters.js';
-import { totalStars } from './Save.js';
+import { totalStars, activeHero } from './Save.js';
 import { shopOpen, endlessOpen } from './Progress.js';
 
 // The daily gift, today's quests and the badges, worked out from the player's save:
@@ -8,6 +9,7 @@ import { shopOpen, endlessOpen } from './Progress.js';
 //   p.quests { day, list: [{ id, stat, need, coins, text, have, claimed }], bonus: claimed }
 //   p.totals lifetime counts (wins, bossKills, built, ...) for the badges
 //   p.badges ids of the badges already claimed
+//   p.chestAds { day, count } videos watched today for one more lucky chest
 // Every function here changes `p` in place: call them inside Save.update.
 
 export const dayKey = (d = new Date()) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
@@ -113,6 +115,36 @@ export function claimBadge(p, id) {
   p.badges.push(b.id);
   p.diamonds += b.diamonds;
   return b.diamonds;
+}
+
+// The 3 prizes hidden in the lucky chests after winning level `levelId`. XP prizes only for a player with a hero.
+export function rollChests(levelId, hasHero) {
+  const pool = CHEST_PRIZES.filter((c) => hasHero || !c.hero);
+  const total = pool.reduce((a, c) => a + c.weight, 0);
+  return [0, 1, 2].map(() => {
+    let r = Math.random() * total;
+    const c = pool.find((x) => (r -= x.weight) < 0) ?? pool[0];
+    return c.coins ? { coins: Math.round(c.coins * (1 + levelId / 30) / 5) * 5 } : { xp: c.xp, diamonds: c.diamonds };
+  });
+}
+
+export const chestText = (c) => (c.coins ? `+${c.coins} coins` : c.xp ? `+${c.xp} XP` : `+${c.diamonds} 💎`);
+
+// Pays a lucky chest. Returns the hero levels gained (XP prizes).
+export function payChest(p, c) {
+  p.coins += c.coins ?? 0;
+  p.diamonds += c.diamonds ?? 0;
+  const hero = activeHero(p);
+  return c.xp && hero ? addXp(hero, c.xp) : 0;
+}
+
+export const chestVideosLeft = (p) => (p.chestAds?.day === dayKey() ? Math.max(0, CHEST_VIDEOS - p.chestAds.count) : CHEST_VIDEOS);
+
+// Counts a watched video. Returns false if today's are used up.
+export function useChestVideo(p) {
+  if (chestVideosLeft(p) <= 0) return false;
+  p.chestAds = { day: dayKey(), count: p.chestAds?.day === dayKey() ? p.chestAds.count + 1 : 1 };
+  return true;
 }
 
 // How many rewards wait to be collected (the dot on the Rewards button)

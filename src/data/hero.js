@@ -44,6 +44,17 @@ export const ABILITIES = {
   spiritOrb: { name: 'Spirit Orb', label: 'Spirit\nOrb', color: 0x9fe8ff, aim: true, cooldown: 55, damage: 150, radius: 120, charge: 1 },
 };
 
+// Super attacks: the 5th button, a different move for each hero. The button fills up as monsters are
+// defeated in the battle (SUPER_FILL points each, a boss gives more) and is ready at SUPER_NEED.
+export const SUPER_NEED = 100;
+export const SUPER_FILL = { kill: 2, boss: 25 };
+export const SUPERS = {
+  zenko: { name: 'Giant Kai Wave', label: 'GIANT\nWAVE', color: 0xff5a2b, aim: true, damage: 320, width: 110, length: 1500 },
+  mira: { name: 'Lightning Dash', label: 'LIGHTNING\nDASH', color: 0x3fd0f5, aim: false, damage: 200, hits: 10 },
+  goran: { name: 'Earthquake', label: 'EARTH\nQUAKE', color: 0xd8a02b, aim: false, damage: 220, radius: 300, stun: 2.5 },
+  sora: { name: 'Sky Lightning', label: 'SKY\nLIGHTNING', color: 0xb98bff, aim: false, damage: 180, hits: 14 },
+};
+
 // Kai Wave can be used from the start; the other abilities are learned in the Techniques branch.
 export const FREE_ABILITY = 'kaiWave';
 

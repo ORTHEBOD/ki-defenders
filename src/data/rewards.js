@@ -33,6 +33,18 @@ export const QUESTS_A_DAY = 3;
 // Diamonds for finishing all of today's quests
 export const QUEST_BONUS = 3;
 
+// The lucky chest after a won level: 3 closed chests, the player opens 1. A video opens one more
+// (CHEST_VIDEOS a day). `weight` is how often a prize comes up; coins grow with the level number.
+export const CHEST_PRIZES = [
+  { coins: 60, weight: 30 },
+  { coins: 120, weight: 24 },
+  { coins: 250, weight: 10 },
+  { xp: 150, weight: 20, hero: true },
+  { diamonds: 1, weight: 12 },
+  { diamonds: 3, weight: 4 },
+];
+export const CHEST_VIDEOS = 5;
+
 // Badges: big goals that pay diamonds once. `stat` is a lifetime count (see Rewards.badgeStat).
 export const BADGES = [
   { id: 'wins10', stat: 'wins', need: 10, diamonds: 2, name: 'Defender', text: 'Win 10 battles' },
