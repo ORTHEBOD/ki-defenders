@@ -107,6 +107,10 @@ function migrate(p) {
   // Players who already won a level don't need the Level 1 tutorial
   p.tutorialDone ??= Object.keys(p.stars ?? {}).length > 0;
   p.daily ??= { last: null, streak: 0 };
+  // Daily quests, lifetime counts and claimed badges (see src/systems/Rewards.js). Wins before the
+  // counts started: one for each level won.
+  p.totals ??= { wins: Object.keys(p.stars ?? {}).length, streakBest: p.daily.streak };
+  p.badges ??= [];
   p.base ??= {};
   // Fighter forms the player had opened before the forms were spread over 60 levels (they were opened by
   // levels 3, 8, 13, 18 and 25): kept, so nobody loses a form

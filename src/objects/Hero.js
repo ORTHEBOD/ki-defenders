@@ -358,6 +358,7 @@ export default class Hero {
   cast(key, x, y) {
     if (!this.canUse(key)) return;
     Audio.sfx('ability', 0.2);
+    this.scene.abilityUses = (this.scene.abilityUses ?? 0) + 1;
     if (key === 'kaiWave') this.kaiWave(x, y);
     else if (key === 'flashStep') this.flashStep(x, y);
     else if (key === 'powerUp') this.powerUp();

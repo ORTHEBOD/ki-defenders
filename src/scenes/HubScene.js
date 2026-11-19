@@ -7,6 +7,8 @@ import { Save, Sync, totalStars, activeHero, renameCost } from '../systems/Save.
 import { Audio } from '../systems/Audio.js';
 import { SHOP_STARS, ENDLESS_STARS, shopOpen, endlessOpen } from '../systems/Progress.js';
 import { textStyle } from '../ui/theme.js';
+import { claimDaily, todayQuests, rewardsWaiting, dayKey } from '../systems/Rewards.js';
+import { drawCalendar } from './RewardsScene.js';
 
 export default class HubScene extends Phaser.Scene {
   constructor() {
@@ -131,30 +133,20 @@ export default class HubScene extends Phaser.Scene {
     input.select();
   }
 
-  // Daily reward: coins for the first visit each day, more for days in a row (up to 7)
+  // The daily gift: the first visit each day gets that day's gift on the 7-day calendar (see data/rewards.js)
   dailyReward() {
-    const day = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-    const today = day(new Date());
-    const yesterday = day(new Date(Date.now() - 86400000));
-    const gift = Save.update((p) => {
-      if (p.daily.last === today) return null;
-      const streak = p.daily.last === yesterday ? Math.min(7, p.daily.streak + 1) : 1;
-      const coins = 50 + 25 * (streak - 1);
-      p.daily = { last: today, streak };
-      p.coins += coins;
-      return { streak, coins };
-    });
-    if (!gift) return false;
+    const got = Save.update((p) => claimDaily(p));
+    if (!got) return false;
     Audio.sfx('coin');
     const pop = this.add.container(0, 0).setDepth(300);
-    pop.add(this.add.rectangle(0, 0, 1280, 720, 0x000000, 0.6).setOrigin(0).setInteractive());
-    pop.add(panel(this, 640, 360, 560, 320, 0xffd93b));
-    pop.add(this.add.text(640, 255, 'Daily reward!', textStyle(52, '#ffd93b')).setOrigin(0.5));
-    pop.add(this.add.text(640, 320, `Day ${gift.streak} in a row`, textStyle(28, '#c9d3ff')).setOrigin(0.5));
-    pop.add(this.add.image(580, 375, 'coin').setScale(1.6));
-    pop.add(this.add.text(610, 375, `+${gift.coins} coins`, textStyle(40, '#ffd93b')).setOrigin(0, 0.5));
-    pop.add(this.add.text(640, 420, 'Come back tomorrow for more (up to 200 a day)', textStyle(20, '#9aa3c7')).setOrigin(0.5));
-    pop.add(makeButton(this, 640, 475, 200, 56, 'Collect', () => this.scene.restart(), { color: 0x2f8a4a, fontSize: 30, depth: 301 }));
+    pop.add(this.add.rectangle(0, 0, 1280, 720, 0x000000, 0.7).setOrigin(0).setInteractive());
+    pop.add(panel(this, 640, 360, 1160, 460, 0xffd93b));
+    pop.add(this.add.text(640, 180, 'Daily gift!', textStyle(56, '#ffd93b')).setOrigin(0.5));
+    pop.add(this.add.text(640, 232, `Day ${got.day + 1}  -  ${got.streak} day${got.streak === 1 ? '' : 's'} in a row`, textStyle(26, '#c9d3ff')).setOrigin(0.5));
+    drawCalendar(this, pop, 350, got.streak, false);
+    const text = `+${got.gift.coins} coins${got.gift.diamonds ? `  and  💎 +${got.gift.diamonds}` : ''}`;
+    pop.add(this.add.text(640, 470, text, textStyle(36, got.gift.diamonds ? '#7fe3ff' : '#ffd93b')).setOrigin(0.5));
+    pop.add(makeButton(this, 640, 535, 220, 60, 'Collect', () => this.scene.restart(), { color: 0x2f8a4a, fontSize: 32, depth: 301 }));
     return true;
   }
 
@@ -206,7 +198,16 @@ export default class HubScene extends Phaser.Scene {
       endlessOpen(player) ? `Endless Battle  (best: wave ${player.endlessBest})` : `Endless Battle  (needs ★ ${ENDLESS_STARS})`,
       () => this.scene.start('Game', { levelId: 'endless', difficulty: 'normal' }), { color: 0x6a3ab8, fontSize: 28 });
     endless.setEnabled(endlessOpen(player));
-    makeButton(this, 830, 576, 420, 76, 'Leaderboard', () => this.scene.start('Leaderboard'), { fontSize: 32 });
+    makeButton(this, 722, 576, 204, 76, '🎁 Rewards', () => this.scene.start('Rewards'), { color: 0xc99a00, fontSize: 30 });
+    makeButton(this, 938, 576, 204, 76, 'Leaderboard', () => this.scene.start('Leaderboard'), { fontSize: 28 });
+    // Today's quests are picked on the first visit of the day, so the Rewards dot can count them
+    if (player.quests?.day !== dayKey()) Save.update((p) => { todayQuests(p); });
+    const waiting = rewardsWaiting(Save.current());
+    if (waiting > 0) {
+      const dot = this.add.circle(808, 554, 15, 0x5be35b).setStrokeStyle(3, 0x10131c).setDepth(120);
+      this.add.text(808, 554, `${waiting}`, textStyle(20)).setOrigin(0.5).setDepth(121);
+      this.tweens.add({ targets: dot, scale: 1.2, duration: 500, yoyo: true, repeat: -1 });
+    }
     makeButton(this, 1160, 690, 200, 44, '💡 Tips & bugs', () => this.scene.start('Feedback'), { fontSize: 22, color: 0x3a4470 });
     if (hero && skillPoints(hero) > 0) {
       const dot = this.add.circle(808, 278, 14, 0x5be35b).setStrokeStyle(3, 0x10131c).setDepth(120);

@@ -1,4 +1,5 @@
 import { GEAR, GEAR_SLOTS, RARITY, SPIN, DIAMOND, gearText, gearBonus } from '../data/shop.js';
+import { track } from '../systems/Rewards.js';
 import { HEROES, newHeroSave, heroForm } from '../data/hero.js';
 import { fighterPortrait, formLook, gearLook } from '../art/fighterArt.js';
 import { drawMenuBackground, panel } from '../ui/menuBackground.js';
@@ -448,7 +449,10 @@ export default class ShopScene extends Phaser.Scene {
     const index = this.pickSlice();
     const slice = SPIN.slices[index];
     // Pay first, so leaving mid-spin can't give a free try
-    Save.update((p) => { p[SPIN.currency] -= SPIN.cost; });
+    Save.update((p) => {
+      p[SPIN.currency] -= SPIN.cost;
+      track(p, { spins: 1 });
+    });
     this.refreshCoins();
     this.spinning = true;
     this.spinBtn.setEnabled(false);

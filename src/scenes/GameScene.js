@@ -1,4 +1,5 @@
 import { LEVELS, MAPS, levelById, endlessWave, mapOf } from '../data/levels.js';
+import { track } from '../systems/Rewards.js';
 import { storyAfter, storyBefore } from '../data/story.js';
 import { battleCoins } from '../data/shop.js';
 import { Ads } from '../systems/Ads.js';
@@ -74,6 +75,10 @@ export default class GameScene extends Phaser.Scene {
     this.diffKey = data.difficulty ?? 'normal';
     this.diff = DIFFICULTY[this.diffKey];
     this.kills = 0;
+    // For the daily quests and badges (saved in saveRewards)
+    this.bossKills = 0;
+    this.abilityUses = 0;
+    this.built = {};
     this.maxForm = maxForm(Save.current());
     Analytics.event('level_start', this.statsInfo());
     // Fixed levels follow a drawn road; maze levels use an open grid the player builds on
@@ -1141,6 +1146,7 @@ export default class GameScene extends Phaser.Scene {
   buildFighter(spot, type) {
     this.ki -= FIGHTERS[type].cost;
     const f = new Fighter(this, spot, type);
+    this.built[type] = (this.built[type] ?? 0) + 1;
     spot.fighter = f;
     this.fighters.push(f);
     Audio.sfx('build');
@@ -1443,6 +1449,7 @@ export default class GameScene extends Phaser.Scene {
   onEnemyKilled(e) {
     this.shareExp(e);
     if (e.def.boss) {
+      this.bossKills++;
       Audio.sfx('explode');
       Audio.music(this.areaMusic);
       this.explosionFx(e.x, e.y, 120, 0xff8a3d);
@@ -1576,6 +1583,13 @@ export default class GameScene extends Phaser.Scene {
       }
       p.kills += this.kills;
       p.coins += coins;
+      const built = Object.values(this.built).reduce((a, n) => a + n, 0);
+      track(p, {
+        wins: win && !this.endless ? 1 : 0, hardWins: win && !this.endless && this.diffKey === 'hard' ? 1 : 0,
+        kills: this.kills, bossKills: this.bossKills, abilities: this.abilityUses, coinsEarned: coins,
+        endlessWaves: this.endless ? wavesDone : 0, built,
+        ...Object.fromEntries(Object.entries(this.built).map(([t, n]) => [`built_${t}`, n])),
+      });
       const hero = activeHero(p);
       const gained = hero ? addXp(hero, xp) : 0;
       return { newBest, weekBest, gained, heroLevel: hero?.level, best: p.endlessBest, week: p.week };

@@ -12,6 +12,7 @@ import StoryScene from './scenes/StoryScene.js';
 import FightersScene from './scenes/FightersScene.js';
 import FeedbackScene from './scenes/FeedbackScene.js';
 import BaseScene from './scenes/BaseScene.js';
+import RewardsScene from './scenes/RewardsScene.js';
 import { Audio } from './systems/Audio.js';
 import { Sync } from './systems/Save.js';
 import { Analytics } from './systems/Analytics.js';
@@ -31,6 +32,7 @@ const config = {
   scene: [
     BootScene, TitleScene, LoginScene, HubScene, HeroScene, LevelSelectScene, GameScene,
     ShopScene, SettingsScene, LeaderboardScene, StoryScene, FightersScene, FeedbackScene, BaseScene,
+    RewardsScene,
   ],
 };
 
