@@ -252,7 +252,7 @@ export default class Fighter {
       target.stun(this.stats.stun);
       this.scene.floatText(target.x, target.y - 40, 'STUN!', '#ffd93b', 20);
     }
-    target.takeDamage(damage, true, this);
+    target.takeDamage(damage, true, this, 'fist');
   }
 
   beam(target, damage) {

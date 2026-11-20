@@ -3,7 +3,7 @@
 // when online, so the next launch gets the newest version.
 // Bump CACHE when the file list changes.
 
-const CACHE = 'ki-defenders-v40';
+const CACHE = 'ki-defenders-v41';
 
 const FILES = [
   './',
@@ -333,6 +333,20 @@ const FILES = [
   'art/lavaTitan.png',
   'art/lavaTitan_1.png',
   'art/pyrax.png',
+  'art/shieldKnight.png',
+  'art/shieldKnight_1.png',
+  'art/shieldKnight_2.png',
+  'art/shieldKnight_3.png',
+  'art/shieldKnight_4.png',
+  'art/goldGoblin.png',
+  'art/goldGoblin_1.png',
+  'art/goldGoblin_2.png',
+  'art/goldGoblin_3.png',
+  'art/goldGoblin_4.png',
+  'art/splitSlime.png',
+  'art/splitSlime_1.png',
+  'art/miniSlime.png',
+  'art/miniSlime_1.png',
   'art/pyrax_1.png',
 ];
 

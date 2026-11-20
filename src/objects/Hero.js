@@ -268,22 +268,22 @@ export default class Hero {
     this.scene.damageNumber(e.x, e.y - 20, dmg);
     if (crit) this.scene.floatText(e.x, e.y - 44, 'CRIT!', '#ff6b4a', 20);
     Audio.sfx('hero', 0.08);
-    this.hitEnemy(e, dmg);
+    this.hitEnemy(e, dmg, 'fist');
     // Chain Hit: the blast jumps to one more enemy close by
     if (this.has('chainHit')) {
       const next = this.scene.enemies.find((o) => o !== e && o.alive && Math.hypot(o.x - e.x, o.y - e.y) < 90);
       if (next) {
         this.scene.beamFx(e.x, e.y - 6, next.x, next.y - 6, 0xffd93b, 6);
-        this.hitEnemy(next, Math.round(dmg / 2));
+        this.hitEnemy(next, Math.round(dmg / 2), 'fist');
       }
     }
   }
 
   // Damage an enemy. Boss Slayer hits bosses harder; a final blow gives Ki Harvest.
   // The hero's XP comes only from enemies it hits by how much damage it does (see GameScene.shareExp).
-  hitEnemy(e, dmg) {
+  hitEnemy(e, dmg, kind = null) {
     if (e.def.boss && this.has('bossSlayer')) dmg *= 1.4;
-    e.takeDamage(dmg, true, this);
+    e.takeDamage(dmg, true, this, kind);
     if (!e.alive && this.has('kiHarvest')) this.scene.addKi(2, e.x, e.y - 54);
   }
 

@@ -104,6 +104,8 @@ export default class GameScene extends Phaser.Scene {
     this.ki = Math.round(this.level.startKi * (this.diff.ki ?? 1)) + baseKi(this.baseLv);
     this.lives = this.level.lives + baseLives(this.baseLv);
     this.startLives = this.lives;
+    // Coins won from Golden Goblins, paid with the battle's coins
+    this.loot = 0;
     this.cannon = null;
     this.waveIndex = -1;
     this.waveActive = false;
@@ -1262,7 +1264,11 @@ export default class GameScene extends Phaser.Scene {
     this.updateCannon(dt);
     this.updateBossBar();
 
-    for (const e of this.enemies) if (e.reachedEnd) this.loseLives(e.def.lives);
+    for (const e of this.enemies) {
+      if (!e.reachedEnd) continue;
+      if (e.def.lives) this.loseLives(e.def.lives);
+      else if (e.def.loot) this.floatText(W / 2, 140, `The ${e.def.name} got away!`, '#ffd93b', 30, SCREEN);
+    }
     this.enemies = this.enemies.filter((e) => e.alive);
 
     if (this.state === 'playing' && this.waveActive && this.spawnQueue.length === 0 && this.enemies.length === 0) {
@@ -1404,6 +1410,20 @@ export default class GameScene extends Phaser.Scene {
       if (h.time <= 0) h.g.destroy();
     }
     this.hazards = this.hazards.filter((h) => h.time > 0);
+  }
+
+  // A Golden Goblin's bag: coins for the end of the battle, with a burst of gold
+  addLoot(coins, x, y) {
+    this.loot += coins;
+    Audio.sfx('coin', 0.6);
+    this.floatText(x, y - 60, `+${coins} coins!`, '#ffd93b', 30);
+    for (let i = 0; i < 8; i++) {
+      const c = this.add.image(x, y - 10, 'coin').setDepth(31).setScale(0.8);
+      this.tweens.add({
+        targets: c, x: x + Phaser.Math.Between(-50, 50), y: y - Phaser.Math.Between(30, 80), alpha: 0, duration: 600,
+        ease: 'Cubic.Out', onComplete: () => c.destroy(),
+      });
+    }
   }
 
   // A split or a boss summon: a new enemy appears where `from` is
@@ -1635,7 +1655,7 @@ export default class GameScene extends Phaser.Scene {
     const coins = battleCoins({
       win, stars, levelNumber: this.level.id, kills: this.kills, bounty: !!this.hero?.has('bounty'), extra: this.hero?.gear.coins ?? 0,
       endlessWaves: this.endless ? wavesDone : undefined,
-    });
+    }) + this.loot;
     let weekBest = false;
     let perfect = 0;
     const result = Save.update((p) => {

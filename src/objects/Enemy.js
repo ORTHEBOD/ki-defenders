@@ -240,8 +240,13 @@ export default class Enemy {
 
   // `by` is the fighter or hero that hit it. Each one's damage is counted in `dealt`,
   // so the EXP can be shared by how much each one did (see GameScene.shareExp).
-  takeDamage(amount, flash = true, by = null) {
+  // `kind` 'fist': a punch (a Shield Knight's shield blocks most of it).
+  takeDamage(amount, flash = true, by = null, kind = null) {
     if (!this.alive) return;
+    if (kind === 'fist' && this.def.guard) {
+      amount *= this.def.guard;
+      if (Math.random() < 0.3) this.scene.floatText(this.x, this.y - this.def.barOffset - 14, 'BLOCK!', '#c9d3ff', 18);
+    }
     if (this.def.armor) amount = Math.max(amount * 0.3, amount - this.def.armor);
     if (by) {
       const work = Math.min(amount, Math.max(0, this.hp) + this.shield);
@@ -267,6 +272,8 @@ export default class Enemy {
         const h = this.scene.hero;
         if (h?.alive && Math.hypot(h.x - this.x, h.y - this.y) <= burst.radius) h.takeDamage(burst.damage * this.hpScale ** 0.5);
       }
+      // Golden Goblin: its bag of coins is won
+      if (this.def.loot) this.scene.addLoot(this.def.loot, this.x, this.y);
       const split = this.def.splitInto;
       if (split && !this.reachedEnd) {
         for (let i = 0; i < split.count; i++) this.scene.spawnFrom(this, split.type, this.hpScale, i * 14);

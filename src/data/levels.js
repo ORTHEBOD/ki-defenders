@@ -242,11 +242,31 @@ export function makeWaves(n, mapIndex, rand) {
     }
     waves.push({ groups });
   }
+  addSurprises(waves, n);
   const map = MAPS[mapIndex];
   const bossLevel = n === map.first + map.count - 1;
   const boss = bossLevel ? map.boss : map.miniBoss;
   waves[count - 1].groups.push({ type: boss, count: 1, interval: 1, delay: 8, hpScale: +(bossLevel ? 1 : base).toFixed(2) });
   return waves;
+}
+
+// Shield Knights (from level 8), Split Slimes (from level 12) and now and then a Golden Goblin (from level 4),
+// added to the middle waves. They have their own random numbers, so the rest of each level stays as it was.
+function addSurprises(waves, n) {
+  const rand = rng(n * 4243 + 17);
+  const mid = () => 1 + Math.floor(rand() * Math.max(1, waves.length - 2));
+  if (n >= 8) {
+    const w = mid();
+    waves[w].groups.push({ type: 'shieldKnight', count: 2 + Math.floor(n / 15), interval: 2, delay: 6, hpScale: waves[w].groups[0].hpScale });
+  }
+  if (n >= 12) {
+    const w = mid();
+    waves[w].groups.push({ type: 'splitSlime', count: 3 + Math.floor(n / 12), interval: 1.2, delay: 5, hpScale: waves[w].groups[0].hpScale });
+  }
+  if (n >= 4 && rand() < 0.4) {
+    const w = mid();
+    waves[w].groups.push({ type: 'goldGoblin', count: 1, interval: 1, delay: 3 + Math.floor(rand() * 6), hpScale: waves[w].groups[0].hpScale });
+  }
 }
 
 function buildLevels() {
@@ -345,6 +365,10 @@ export function endlessWave(w) {
     const count = 3 + Math.min(14, Math.floor(w / 2));
     groups.push({ type, count: type === 'medic' ? Math.min(4, count) : count, interval: 0.7, delay: 4, hpScale: hp });
   }
+  // The surprises: Shield Knights every 4th wave, Split Slimes every 5th, a Golden Goblin every 7th
+  if (w >= 7 && w % 4 === 3) groups.push({ type: 'shieldKnight', count: 2 + Math.floor(w / 10), interval: 2, delay: 6, hpScale: hp });
+  if (w >= 9 && w % 5 === 4) groups.push({ type: 'splitSlime', count: 3 + Math.floor(w / 10), interval: 1.2, delay: 5, hpScale: hp });
+  if (w % 7 === 5) groups.push({ type: 'goldGoblin', count: 1, interval: 1, delay: 5, hpScale: hp });
   if ((w + 1) % 10 === 0) {
     const bosses = ['ogre', 'scorpion', 'mech', 'frostGiant', 'lavaTitan', 'krag', 'sandKing', 'vorn', 'iceQueen', 'pyrax'];
     groups.push({

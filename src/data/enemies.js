@@ -5,6 +5,8 @@
 // tip: shown the first time this enemy shows up in a level.
 // xp: hero XP for defeating it (double if the hero lands the final blow).
 // rage: below half HP it moves this much faster. burst: when it falls it blows up, hurting the hero nearby.
+// guard: fists (Kaito's punches, the hero's own attacks) only do this part of their damage.
+// loot: coins won at the end of the battle for defeating it (lives 0: nothing is lost if it gets away).
 
 export const ENEMIES = {
   grunt: { name: 'Grunt', xp: 1, texture: 'grunt', hp: 60, speed: 55, reward: 8, lives: 1, dps: 10, barOffset: 30 },
@@ -62,6 +64,24 @@ export const ENEMIES = {
     name: 'Ember Wisp', xp: 3, texture: 'emberWisp', hp: 110, speed: 62, reward: 14, lives: 1, dps: 0, barOffset: 50, flying: true,
     heal: { amount: 0.08, radius: 110, every: 3 },
     tip: 'Ember Wisp: a flying flame that heals the others. Shoot it down first!',
+  },
+
+  // ---------- Surprises (any area, added to the waves by makeWaves) ----------
+  shieldKnight: {
+    name: 'Shield Knight', xp: 3, texture: 'shieldKnight', hp: 240, speed: 40, reward: 18, lives: 2, dps: 22, barOffset: 40,
+    armor: 2, guard: 0.3,
+    tip: 'Shield Knight: its shield blocks fists. Kaito and your hero barely hurt it - use beams, fire and light!',
+  },
+  splitSlime: {
+    name: 'Split Slime', xp: 2, texture: 'splitSlime', hp: 150, speed: 46, reward: 6, lives: 1, dps: 10, barOffset: 32,
+    splitInto: { type: 'miniSlime', count: 2 },
+    tip: 'Split Slime: pops into 2 Mini Slimes when it falls.',
+  },
+  miniSlime: { name: 'Mini Slime', xp: 1, texture: 'miniSlime', hp: 45, speed: 74, reward: 3, lives: 1, dps: 5, barOffset: 22 },
+  goldGoblin: {
+    name: 'Golden Goblin', xp: 2, texture: 'goldGoblin', hp: 90, speed: 125, reward: 30, lives: 0, dps: 0, barOffset: 34,
+    loot: 60,
+    tip: 'Golden Goblin: catch it before it runs away to win its bag of coins!',
   },
 
   medic: {
