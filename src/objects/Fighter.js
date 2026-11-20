@@ -2,6 +2,7 @@ import { FIGHTERS, FORMS, EXP_TOTAL } from '../data/fighters.js';
 import { distToSegment } from '../systems/Path.js';
 import { textStyle } from '../ui/theme.js';
 import { Audio } from '../systems/Audio.js';
+import { skinTexture } from '../art/skins.js';
 
 export default class Fighter {
   constructor(scene, spot, type) {
@@ -9,6 +10,8 @@ export default class Fighter {
     this.spot = spot;
     this.type = type;
     this.def = FIGHTERS[type];
+    // The skin the player chose for this fighter (Fighters page)
+    this.skin = scene.player?.skins?.[type]?.worn ?? null;
     this.x = spot.x;
     this.y = spot.y;
     // Start upgrades: built some steps up, with the EXP of those steps already earned
@@ -120,7 +123,7 @@ export default class Fighter {
   textureKey() {
     const key = `${this.def.texture}_${this.form}`;
     const ranked = `${key}_${this.formStars}`;
-    return this.formStars > 1 && this.scene.textures.exists(ranked) ? ranked : key;
+    return skinTexture(this.scene, this.formStars > 1 && this.scene.textures.exists(ranked) ? ranked : key, this.skin);
   }
 
   refreshStars() {
@@ -234,7 +237,7 @@ export default class Fighter {
   attackPose(ms = Math.min(220, this.stats.cooldown * 600)) {
     const key = `${this.def.texture}_${this.form}_attack`;
     if (!this.scene.textures.exists(key)) return;
-    this.sprite.setTexture(key);
+    this.sprite.setTexture(skinTexture(this.scene, key, this.skin));
     this.poseTimer?.remove();
     this.poseTimer = this.scene.time.delayedCall(ms, () => this.sprite.setTexture(this.textureKey()));
   }

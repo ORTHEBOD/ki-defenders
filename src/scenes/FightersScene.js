@@ -6,6 +6,8 @@ import { Save } from '../systems/Save.js';
 import { maxForm } from '../systems/Progress.js';
 import { Audio } from '../systems/Audio.js';
 import { textStyle } from '../ui/theme.js';
+import { SKINS, FIGHTER_SKINS } from '../data/skins.js';
+import { skinTexture } from '../art/skins.js';
 
 const hex = (c) => `#${c.toString(16).padStart(6, '0')}`;
 
@@ -17,7 +19,7 @@ export default class FightersScene extends Phaser.Scene {
     super('Fighters');
   }
 
-  create() {
+  create(data) {
     const player = Save.current();
     if (!player) {
       this.scene.start('Login');
@@ -48,6 +50,8 @@ export default class FightersScene extends Phaser.Scene {
       const lit = joined || forSale;
       const art = fighterPortrait(this, x, 220, lit ? look : { ...def.look, gi: 0x202430, skin: 0x202430, hair: 0x202430, belt: 0x202430, boots: 0x202430 }, 2.6,
         lit ? `${def.texture}_${top}` : null);
+      const worn = player.skins[type]?.worn;
+      if (lit && worn && art.setTexture) art.setTexture(skinTexture(this, art.texture.key, worn));
       if (!lit) this.add.text(x, 220, '🔒', { fontSize: '44px' }).setOrigin(0.5);
       else this.tweens.add({ targets: art, y: art.y - 6, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: i * 150 });
       this.add.text(x, 330, def.name, textStyle(30, lit ? '#ffffff' : '#8a91ad')).setOrigin(0.5);
@@ -62,6 +66,11 @@ export default class FightersScene extends Phaser.Scene {
           textStyle(19, joined ? form.color : '#ffd93b')).setOrigin(0.5);
       }
       if (joined) this.startUp(player, type, x);
+      if (joined && FIGHTER_SKINS[type]) {
+        makeButton(this, x + 76, 146, 52, 40, '🎨', () => this.skinsPopup(player, type, def, top), { fontSize: 22, color: 0x6a3ab8 });
+        // Back from buying or wearing a skin: the skins stay open
+        if (data?.skins === type) this.skinsPopup(player, type, def, top);
+      }
     });
 
     // The forms, and the story level that opens each one
@@ -104,6 +113,59 @@ export default class FightersScene extends Phaser.Scene {
       }
     }, { fontSize: 16, color: 0xc99a00 });
     b.setEnabled(player.coins >= up.cost);
+  }
+
+  // A fighter's skins: wear one you own, or buy one with diamonds (it is worn right away)
+  skinsPopup(player, type, def, top) {
+    const pop = this.add.container(0, 0).setDepth(200);
+    pop.add(this.add.rectangle(0, 0, 1280, 720, 0x000000, 0.65).setOrigin(0).setInteractive());
+    pop.add(panel(this, 640, 370, 960, 470, def.color));
+    pop.add(this.add.text(640, 170, `${def.name} skins`, textStyle(42, '#ffd93b')).setOrigin(0.5));
+    const mine = player.skins[type] ?? { owned: [], worn: null };
+    [null, ...FIGHTER_SKINS[type]].forEach((id, i) => {
+      const x = 640 + (i - 1.5) * 220;
+      const skin = SKINS[id];
+      const look = { ...formLook(def.look, top), rank: 3 };
+      const art = fighterPortrait(this, x, 300, look, 2.2, `${def.texture}_${top}`);
+      if (id && art.setTexture) art.setTexture(skinTexture(this, art.texture.key, id));
+      pop.add(art);
+      pop.add(this.add.text(x, 410, skin ? skin.name : 'Normal', textStyle(28)).setOrigin(0.5));
+      const wearing = mine.worn === id;
+      const owned = !id || mine.owned.includes(id);
+      let label = 'Wear';
+      if (wearing) label = '✓ Wearing';
+      else if (!owned) label = `${skin.price} 💎`;
+      const b = makeButton(this, x, 462, 180, 48, label, () => this.wearSkin(type, id), {
+        fontSize: 22, color: wearing ? 0x2f8a4a : owned ? 0x3a4470 : player.diamonds >= skin.price ? 0x2a7fa8 : 0x5a5f72,
+      });
+      if (wearing) b.setEnabled(false);
+      pop.add(b);
+    });
+    pop.add(makeButton(this, 640, 560, 200, 50, 'Close', () => {
+      pop.setVisible(false);
+      this.time.delayedCall(1, () => pop.destroy());
+    }, { fontSize: 24, color: 0x3a4470 }));
+  }
+
+  wearSkin(type, id) {
+    const done = Save.update((p) => {
+      const s = (p.skins[type] ??= { owned: [], worn: null });
+      if (id && !s.owned.includes(id)) {
+        const price = SKINS[id].price;
+        if (p.diamonds < price) return false;
+        p.diamonds -= price;
+        s.owned.push(id);
+      }
+      s.worn = id;
+      return true;
+    });
+    if (!done) {
+      const msg = this.add.text(640, 520, 'Not enough 💎', textStyle(26, '#ff6b6b')).setOrigin(0.5).setDepth(210);
+      this.tweens.add({ targets: msg, y: 500, alpha: 0, delay: 700, duration: 600, onComplete: () => msg.destroy() });
+      return;
+    }
+    Audio.sfx('coin');
+    this.scene.restart({ skins: type });
   }
 
   buy(type, def, x, currency = 'coins') {

@@ -113,6 +113,8 @@ function migrate(p) {
   p.badges ??= [];
   // Levels won on Hard without losing a life (the 4th star)
   p.perfect ??= [];
+  // Fighter skins (src/data/skins.js): { kaito: { owned: ['golden'], worn: 'golden' } }
+  p.skins ??= {};
   p.base ??= {};
   // Fighter forms the player had opened before the forms were spread over 60 levels (they were opened by
   // levels 3, 8, 13, 18 and 25): kept, so nobody loses a form
