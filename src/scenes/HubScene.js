@@ -198,10 +198,11 @@ export default class HubScene extends Phaser.Scene {
       () => this.scene.start('Shop'), { color: 0x2f8a4a, fontSize: shopOpen(player) ? 36 : 28 });
     makeButton(this, 938, 392, 204, 76, 'Base', () => this.scene.start('Base'), { color: 0x8a6a2a, fontSize: 34 });
     shop.setEnabled(shopOpen(player));
-    const endless = makeButton(this, 830, 484, 420, 76,
-      endlessOpen(player) ? `Endless Battle  (best: wave ${player.endlessBest})` : `Endless Battle  (needs ★ ${ENDLESS_STARS})`,
-      () => this.scene.start('Game', { levelId: 'endless', difficulty: 'normal' }), { color: 0x6a3ab8, fontSize: 28 });
+    const endless = makeButton(this, 722, 484, 204, 76,
+      endlessOpen(player) ? `Endless  (wave ${player.endlessBest})` : `Endless  ★ ${ENDLESS_STARS}`,
+      () => this.scene.start('Game', { levelId: 'endless', difficulty: 'normal' }), { color: 0x6a3ab8, fontSize: 24 });
     endless.setEnabled(endlessOpen(player));
+    makeButton(this, 938, 484, 204, 76, '🐾 Pets', () => this.scene.start('Pets'), { color: 0xc0507a, fontSize: 32 });
     makeButton(this, 722, 576, 204, 76, '🎁 Rewards', () => this.scene.start('Rewards'), { color: 0xc99a00, fontSize: 30 });
     makeButton(this, 938, 576, 204, 76, 'Leaderboard', () => this.scene.start('Leaderboard'), { fontSize: 28 });
     // Today's quests are picked on the first visit of the day, so the Rewards dot can count them

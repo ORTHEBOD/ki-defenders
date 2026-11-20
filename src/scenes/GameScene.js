@@ -12,6 +12,8 @@ import { Analytics } from '../systems/Analytics.js';
 import { ENEMIES } from '../data/enemies.js';
 import { addXp, SUPER_NEED, SUPER_FILL } from '../data/hero.js';
 import Hero from '../objects/Hero.js';
+import Pet from '../objects/Pet.js';
+import { PETS } from '../data/pets.js';
 import { Save, activeHero } from '../systems/Save.js';
 import { weekOf, compareScores, formatTime } from '../data/weekly.js';
 import { levelOpen, maxForm } from '../systems/Progress.js';
@@ -156,6 +158,10 @@ export default class GameScene extends Phaser.Scene {
     if (this.hero?.has('overflow')) this.ki += 50;
     // Tester account: lots of Ki to try everything
     if (player?.super) this.ki += 20000;
+
+    // The pet that comes along (Pets page)
+    const petId = player?.pets?.active;
+    this.pet = PETS[petId] ? new Pet(this, petId, { x: end.x - 40, y: end.y - 110 }) : null;
 
     this.createHud();
     this.abilityButtons = [];
@@ -1252,6 +1258,7 @@ export default class GameScene extends Phaser.Scene {
     for (const e of this.enemies) if (e.alive) e.update(dt);
     for (const f of this.fighters) f.update(dt);
     this.hero?.update(dt);
+    this.pet?.update(dt);
     if (this.heroSelected) {
       if (this.hero?.alive) this.heroSel.setPosition(this.hero.x, this.hero.y + 16);
       else this.selectHero(false);
@@ -1266,6 +1273,7 @@ export default class GameScene extends Phaser.Scene {
 
     for (const e of this.enemies) {
       if (!e.reachedEnd) continue;
+      if (e.def.lives && this.pet?.block(e)) continue;
       if (e.def.lives) this.loseLives(e.def.lives);
       else if (e.def.loot) this.floatText(W / 2, 140, `The ${e.def.name} got away!`, '#ffd93b', 30, SCREEN);
     }
@@ -1549,7 +1557,7 @@ export default class GameScene extends Phaser.Scene {
       this.banner(`${e.def.name} defeated!`);
     }
     this.kills++;
-    this.ki += e.def.reward;
+    this.ki += e.def.reward + (this.pet?.def.ki ?? 0);
     Audio.sfx('pop', 0.04);
     this.floatText(e.x, e.y - 34, `+${e.def.reward}`, '#ffd93b', 20);
     this.poof(e.x, e.y);
@@ -1652,10 +1660,10 @@ export default class GameScene extends Phaser.Scene {
     // The win bonus only goes to a hero that fought
     const xp = this.heroXp > 0 ? Math.round(this.heroXp) + bonus : 0;
     const stars = win ? this.diff.stars : 0;
-    const coins = battleCoins({
+    const coins = Math.round(battleCoins({
       win, stars, levelNumber: this.level.id, kills: this.kills, bounty: !!this.hero?.has('bounty'), extra: this.hero?.gear.coins ?? 0,
       endlessWaves: this.endless ? wavesDone : undefined,
-    }) + this.loot;
+    }) * (1 + (this.pet?.def.coins ?? 0))) + this.loot;
     let weekBest = false;
     let perfect = 0;
     const result = Save.update((p) => {

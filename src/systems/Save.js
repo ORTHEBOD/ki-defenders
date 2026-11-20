@@ -115,6 +115,8 @@ function migrate(p) {
   p.perfect ??= [];
   // Fighter skins (src/data/skins.js): { kaito: { owned: ['golden'], worn: 'golden' } }
   p.skins ??= {};
+  // Pets (src/data/pets.js): the ones bought, and the one that comes along to battles
+  p.pets ??= { owned: [], active: null };
   p.base ??= {};
   // Fighter forms the player had opened before the forms were spread over 60 levels (they were opened by
   // levels 3, 8, 13, 18 and 25): kept, so nobody loses a form

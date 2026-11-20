@@ -1,6 +1,6 @@
 """Cuts the surprise monsters out of the user's sheets (art_sources/sheets_2026-11-20):
 Shield Knight and Golden Goblin with 5 walking frames (monsters_frames.jpg), Split Slime and Mini Slime with 2
-(monsters.jpg). Like tools/cut_monsters.py: art/<key>.png, art/<key>_1.png ... on one canvas, bottom-centered,
+(monsters.jpg), and the 4 pets with 2 frames each (pets_clean.jpg). Like tools/cut_monsters.py: art/<key>.png, art/<key>_1.png ... on one canvas, bottom-centered,
 facing right.
 
 Run: python tools/cut_monsters2.py [--sheet out.png]
@@ -18,7 +18,6 @@ cut_heroes.SHEETS = os.path.join(PROJECT, "art_sources", "sheets_2026-11-20")
 OUT = os.path.join(PROJECT, "art")
 
 # key: (sheet, boxes in sheet pixels, how far from white is still background, flip to face right)
-# The slimes' glowing cracks are white: no white holes are cut out of them (SOLID)
 MONSTERS = {
     "shieldKnight": ("monsters_frames.jpg", [(25, 517, 115, 629), (124, 517, 211, 629), (221, 517, 312, 628),
                                              (320, 517, 411, 628), (420, 517, 509, 628)], 48, False),
@@ -26,8 +25,13 @@ MONSTERS = {
                                            (1176, 663, 1258, 756), (1270, 663, 1352, 756)], 48, False),
     "splitSlime": ("monsters.jpg", [(409, 604, 529, 687), (566, 596, 700, 687)], 30, False),
     "miniSlime": ("monsters.jpg", [(768, 629, 851, 686), (893, 634, 969, 685)], 30, False),
+    "pet_dragon": ("pets_clean.jpg", [(94, 41, 308, 311), (413, 72, 638, 281)], 30, False),
+    "pet_kitten": ("pets_clean.jpg", [(746, 59, 971, 284), (1046, 86, 1272, 284)], 30, False),
+    "pet_turtle": ("pets_clean.jpg", [(145, 450, 324, 647), (414, 526, 638, 670)], 30, False),
+    "pet_fox": ("pets_clean.jpg", [(753, 442, 959, 680), (1027, 508, 1267, 682)], 30, False),
 }
-SOLID = {"splitSlime", "miniSlime"}
+# White inside the figure is part of it: the slimes' glowing cracks, the white kitten and its cloud
+SOLID = {"splitSlime", "miniSlime", "pet_kitten", "pet_turtle", "pet_fox", "pet_dragon"}
 
 
 def pad(box, n=4):

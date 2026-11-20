@@ -3,7 +3,7 @@
 // when online, so the next launch gets the newest version.
 // Bump CACHE when the file list changes.
 
-const CACHE = 'ki-defenders-v41';
+const CACHE = 'ki-defenders-v42';
 
 const FILES = [
   './',
@@ -35,6 +35,9 @@ const FILES = [
   'src/data/bossTalk.js',
   'src/data/skins.js',
   'src/art/skins.js',
+  'src/data/pets.js',
+  'src/objects/Pet.js',
+  'src/scenes/PetsScene.js',
   'src/systems/Feedback.js',
   'src/scenes/BaseScene.js',
   'src/data/weekly.js',
@@ -333,6 +336,14 @@ const FILES = [
   'art/lavaTitan.png',
   'art/lavaTitan_1.png',
   'art/pyrax.png',
+  'art/pet_dragon.png',
+  'art/pet_dragon_1.png',
+  'art/pet_kitten.png',
+  'art/pet_kitten_1.png',
+  'art/pet_turtle.png',
+  'art/pet_turtle_1.png',
+  'art/pet_fox.png',
+  'art/pet_fox_1.png',
   'art/shieldKnight.png',
   'art/shieldKnight_1.png',
   'art/shieldKnight_2.png',
