@@ -456,6 +456,10 @@ export default class GameScene extends Phaser.Scene {
   // or metal plates with rivets
   drawGround(g, rnd) {
     const th = this.theme;
+    if (th.sky) {
+      this.drawSkyGround(g, rnd);
+      return;
+    }
     g.fillStyle(th.ground).fillRect(0, 0, W, H);
     if (th.metal) {
       g.lineStyle(2, 0x000000, 0.25);
@@ -509,6 +513,29 @@ export default class GameScene extends Phaser.Scene {
   }
 
   // Frozen Peaks: snow drifts and glittering ice. Volcano: dark rock with glowing lava cracks.
+  // Sky Temple: with the painted floor (art/sky_ground.jpg) the ground stays see-through and the picture shows
+  // under it (see bakeMap). Without it: white marble tiles with gold lines, and clouds drifting at the edges.
+  drawSkyGround(g, rnd) {
+    if (this.textures.exists('sky_ground')) return;
+    const th = this.theme;
+    g.fillStyle(th.ground).fillRect(0, 0, W, H);
+    for (let x = 0; x < W; x += 80) {
+      for (let y = 0; y < H; y += 80) {
+        g.fillStyle(rnd.pick(th.blobs), 0.9).fillRect(x + 2, y + 2, 76, 76);
+        g.fillStyle(0xffffff, 0.35).fillRect(x + 4, y + 4, 72, 4);
+      }
+    }
+    g.lineStyle(2, 0xd8b45a, 0.55);
+    for (let x = 0; x < W; x += 80) g.lineBetween(x, 0, x, H);
+    for (let y = 0; y < H; y += 80) g.lineBetween(0, y, W, y);
+    for (let i = 0; i < 16; i++) {
+      const x = rnd.pick([rnd.between(0, 120), rnd.between(W - 120, W)]);
+      const y = rnd.between(60, H);
+      g.fillStyle(0xffffff, 0.85);
+      [[-30, 0, 24], [-8, -10, 28], [18, -4, 24], [36, 6, 18]].forEach(([dx, dy, r]) => g.fillCircle(x + dx, y + dy, r));
+    }
+  }
+
   drawColdOrHot(g, rnd) {
     const th = this.theme;
     if (th.snow) {
@@ -556,6 +583,8 @@ export default class GameScene extends Phaser.Scene {
     if (this.textures.exists('battleMap')) this.textures.remove('battleMap');
     g.generateTexture('battleMap', W, H);
     g.destroy();
+    // The Sky Temple's painted floor goes under the road and the scenery
+    if (this.theme.sky && this.textures.exists('sky_ground')) this.add.image(0, 0, 'sky_ground').setOrigin(0).setDisplaySize(W, H).setDepth(0);
     this.add.image(0, 0, 'battleMap').setOrigin(0).setDepth(0);
     const metal = this.theme.metal;
     const tint = metal ? 0x3fd0f5 : this.theme.lava ? 0xff6a1a : this.theme.snow ? 0xdff4ff : 0xfff2c0;
@@ -649,6 +678,25 @@ export default class GameScene extends Phaser.Scene {
       g.fillStyle(0x3fd0f5, 0.18).fillCircle(x, y, 26);
       g.lineStyle(2, COLORS.outline).fillStyle(0x2e3442).fillCircle(x, y, 10).strokeCircle(x, y, 10);
       g.fillStyle(0x9fe8ff).fillCircle(x, y, 5);
+    } else if (kind === 'pillar') {
+      const s = rnd.realInRange(0.85, 1.2);
+      g.fillStyle(0x000000, 0.18).fillEllipse(x + 5, y + 16 * s, 36 * s, 10 * s);
+      g.lineStyle(2, COLORS.outline).fillStyle(0xf4f6fa);
+      g.fillRect(x - 10 * s, y - 34 * s, 20 * s, 48 * s).strokeRect(x - 10 * s, y - 34 * s, 20 * s, 48 * s);
+      g.fillStyle(0xd6dde8).fillRect(x + 3 * s, y - 34 * s, 6 * s, 48 * s);
+      g.fillStyle(0xd8b45a).fillRect(x - 14 * s, y - 40 * s, 28 * s, 7 * s).fillRect(x - 14 * s, y + 10 * s, 28 * s, 7 * s);
+      g.lineStyle(2, COLORS.outline).strokeRect(x - 14 * s, y - 40 * s, 28 * s, 7 * s).strokeRect(x - 14 * s, y + 10 * s, 28 * s, 7 * s);
+    } else if (kind === 'cloud') {
+      const s = rnd.realInRange(0.7, 1.1);
+      g.fillStyle(0x9fb8d0, 0.35).fillEllipse(x + 4, y + 12 * s, 76 * s, 20 * s);
+      g.fillStyle(0xffffff, 0.95);
+      [[-22, 0, 16], [-6, -9, 19], [13, -4, 17], [27, 4, 12], [0, 5, 18]].forEach(([dx, dy, r]) => g.fillCircle(x + dx * s, y + dy * s, r * s));
+    } else if (kind === 'lantern') {
+      g.fillStyle(0xffd93b, 0.16).fillCircle(x, y - 22, 26);
+      g.fillStyle(0x000000, 0.16).fillEllipse(x + 2, y + 4, 22, 6);
+      g.lineStyle(4, 0x6a5a3a).lineBetween(x, y + 2, x, y - 14);
+      g.lineStyle(2, COLORS.outline).fillStyle(0xffc93b).fillRoundedRect(x - 9, y - 34, 18, 20, 5).strokeRoundedRect(x - 9, y - 34, 18, 20, 5);
+      g.fillStyle(0xfff6c0).fillRect(x - 4, y - 30, 8, 12);
     } else if (kind === 'pipe') {
       g.lineStyle(2, COLORS.outline).fillStyle(0x6a7488).fillRect(x - 30, y - 7, 60, 14).strokeRect(x - 30, y - 7, 60, 14);
       g.fillStyle(0x8a94a8).fillRect(x - 30, y - 5, 60, 3);

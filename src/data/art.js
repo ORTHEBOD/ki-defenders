@@ -24,6 +24,8 @@ export const ART_FILES = [
     shieldKnight: 5, goldGoblin: 5, splitSlime: 2, miniSlime: 2,
     // The pets
     pet_dragon: 2, pet_kitten: 2, pet_turtle: 2, pet_fox: 2,
+    // Sky Temple
+    cloudSpirit: 5, windMonkey: 5, gargoyle: 2, thunderMonk: 5, stormEagle: 4, skyEmperor: 4,
   }).flatMap(([k, n]) => [k, ...Array.from({ length: n - 1 }, (_, i) => `${k}_${i + 1}`)]),
 ];
 
@@ -37,6 +39,7 @@ const SIZES = {
   ogre: 80, scorpion: 80, mech: 80, krag: 100, sandKing: 100, vorn: 100, coin: 28,
   snowImp: 48, iceGolem: 56, frostBat: 56, yetiCub: 48, snowball: 32, lavaSlime: 52, fireHound: 58, magmaBrute: 56,
   pet_dragon: 56, pet_kitten: 56, pet_turtle: 56, pet_fox: 56,
+  cloudSpirit: 52, windMonkey: 52, gargoyle: 60, thunderMonk: 50, stormEagle: 100, skyEmperor: 100,
   shieldKnight: 54, goldGoblin: 46, splitSlime: 50, miniSlime: 34,
   emberWisp: 48, frostGiant: 80, lavaTitan: 80, iceQueen: 100, pyrax: 100,
 };

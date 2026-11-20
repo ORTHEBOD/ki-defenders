@@ -43,6 +43,14 @@ export const MAPS = [
     },
     miniBoss: 'lavaTitan', boss: 'pyrax', music: 'volcano',
   },
+  {
+    name: 'Sky Temple', color: 0x9fd8ff, needStars: 140, first: 61, count: 15,
+    theme: {
+      ground: 0xe4ebf4, blobs: [0xf2f6fb, 0xd6e0ec, 0xfafcff], edge: 0xc9a24a, road: 0xf4efe2, pebble: 0xd8b45a,
+      deco: ['pillar', 'pillar', 'cloud', 'lantern'], boulder: 0xc8d0dc, sky: true,
+    },
+    miniBoss: 'stormEagle', boss: 'skyEmperor', music: 'sky',
+  },
 ];
 
 // The map a level is in (its index in MAPS)
@@ -77,6 +85,9 @@ const NAMES = [
   ['Ash Road', 'Smoking Fields', 'Lava River', 'Ember Maze', 'Burning Forest', 'Obsidian Bridge', 'Magma Falls',
     'Cinder Maze', 'Fire Hound Den', 'Titan\'s Forge', 'Sulfur Lake', 'Molten Labyrinth', 'Crater Rim',
     'Heart of the Volcano', 'Inferno Throne'],
+  ['Cloud Stairs', 'Floating Gardens', 'Wind Bridge', 'Cloud Maze', 'Monkey Grove', 'Gargoyle Gate', 'Thunder Hall',
+    'Sky Labyrinth', 'Rainbow Walk', 'Eagle\'s Nest', 'Storm Terrace', 'Temple Maze', 'Golden Steps',
+    'Hall of Heavens', 'Emperor\'s Throne'],
 ];
 
 // Road shapes. Enemies start at the first point (left side) and the base is at the last one.
@@ -100,6 +111,8 @@ const ROAD_ORDER = [
     [1, true], [4, true]],
   [[7, false], [5, true], [0, true], [3, false], [6, true], [2, true], [4, false], [1, true], [7, true], [3, true],
     [5, false], [0, false]],
+  [[6, true], [3, true], [1, false], [7, false], [5, false], [2, false], [0, true], [4, false], [6, false], [3, false],
+    [7, true], [1, true]],
 ];
 
 // Tiny seeded random numbers, so every level is the same each time
@@ -193,6 +206,13 @@ function mazeOpen(cols, rows, entryRow, exitRow, rocks) {
 
 // Which enemies can show up by level number (1-60). The Frozen Peaks and the Volcano bring their own.
 function enemyPool(n) {
+  if (n >= 61) {
+    const pool = ['windMonkey', 'windMonkey', 'cloudSpirit', 'thunderMonk', 'fireHound'];
+    if (n >= 63) pool.push('gargoyle');
+    if (n >= 66) pool.push('cloudSpirit', 'thunderMonk', 'emberWisp');
+    if (n >= 70) pool.push('gargoyle', 'magmaBrute');
+    return pool;
+  }
   if (n >= 46) {
     const pool = ['fireHound', 'lavaSlime', 'magmaBrute', 'fireHound', 'iceGolem', 'yetiCub'];
     if (n >= 48) pool.push('emberWisp', 'lavaSlime');
@@ -216,7 +236,7 @@ function enemyPool(n) {
 }
 
 // Enemies that come only a few at a time (slow, tough or healers)
-const HEAVY = ['brute', 'medic', 'iceGolem', 'magmaBrute', 'emberWisp'];
+const HEAVY = ['brute', 'medic', 'iceGolem', 'magmaBrute', 'emberWisp', 'gargoyle', 'thunderMonk'];
 
 // Waves get bigger and tougher through each level and from level to level.
 // The last wave always brings the map's boss: a mini boss, or the big boss on the map's last level.
@@ -355,7 +375,7 @@ export const ENDLESS = {
 
 // The waves for endless mode, made one at a time (w starts at 0)
 export function endlessWave(w) {
-  const pool = enemyPool(Math.min(60, 3 + w));
+  const pool = enemyPool(Math.min(75, 3 + w));
   const rand = rng(1000 + w);
   const hp = +(Math.pow(1.13, w)).toFixed(2);
   const groups = [{ type: 'grunt', count: 8 + Math.min(20, w), interval: Math.max(0.3, 1 - w * 0.03), hpScale: hp }];
@@ -370,7 +390,8 @@ export function endlessWave(w) {
   if (w >= 9 && w % 5 === 4) groups.push({ type: 'splitSlime', count: 3 + Math.floor(w / 10), interval: 1.2, delay: 5, hpScale: hp });
   if (w % 7 === 5) groups.push({ type: 'goldGoblin', count: 1, interval: 1, delay: 5, hpScale: hp });
   if ((w + 1) % 10 === 0) {
-    const bosses = ['ogre', 'scorpion', 'mech', 'frostGiant', 'lavaTitan', 'krag', 'sandKing', 'vorn', 'iceQueen', 'pyrax'];
+    const bosses = ['ogre', 'scorpion', 'mech', 'frostGiant', 'lavaTitan', 'stormEagle', 'krag', 'sandKing', 'vorn', 'iceQueen', 'pyrax',
+      'skyEmperor'];
     groups.push({
       type: bosses[Math.floor((w + 1) / 10 - 1) % bosses.length], count: 1, interval: 1, delay: 6,
       hpScale: +(Math.pow(1.08, w)).toFixed(2),

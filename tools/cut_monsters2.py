@@ -29,9 +29,21 @@ MONSTERS = {
     "pet_kitten": ("pets_clean.jpg", [(746, 59, 971, 284), (1046, 86, 1272, 284)], 30, False),
     "pet_turtle": ("pets_clean.jpg", [(145, 450, 324, 647), (414, 526, 638, 670)], 30, False),
     "pet_fox": ("pets_clean.jpg", [(753, 442, 959, 680), (1027, 508, 1267, 682)], 30, False),
+    # Sky Temple (levels 61-75)
+    "cloudSpirit": ("monsters_frames.jpg", [(22, 21, 141, 109), (159, 17, 270, 108), (293, 26, 408, 114),
+                                            (422, 35, 544, 116), (555, 22, 684, 129)], 48, False),
+    "windMonkey": ("monsters_frames.jpg", [(22, 145, 148, 267), (156, 145, 281, 269), (284, 145, 411, 269),
+                                           (413, 145, 541, 268), (552, 145, 676, 271)], 48, False),
+    "gargoyle": ("monsters.jpg", [(698, 58, 839, 170), (855, 66, 975, 178)], 30, False),
+    "thunderMonk": ("monsters_frames.jpg", [(760, 151, 863, 269), (889, 150, 983, 270), (1012, 150, 1104, 269),
+                                            (1129, 151, 1225, 268), (1251, 150, 1355, 268)], 48, False),
+    "stormEagle": ("monsters_frames.jpg", [(18, 281, 199, 485), (199, 275, 365, 486), (378, 323, 540, 481),
+                                           (550, 344, 744, 457)], 48, False),
+    "skyEmperor": ("monsters_frames.jpg", [(750, 327, 858, 489), (865, 327, 973, 489), (984, 327, 1092, 489),
+                                           (1105, 327, 1228, 489)], 48, False),
 }
 # White inside the figure is part of it: the slimes' glowing cracks, the white kitten and its cloud
-SOLID = {"splitSlime", "miniSlime", "pet_kitten", "pet_turtle", "pet_fox", "pet_dragon"}
+SOLID = {"splitSlime", "miniSlime", "cloudSpirit", "pet_kitten", "pet_turtle", "pet_fox", "pet_dragon"}
 
 
 def pad(box, n=4):

@@ -31,8 +31,9 @@ export default class LevelSelectScene extends Phaser.Scene {
     if (!this.mapOpen(this.mapIndex)) this.mapIndex = 0;
     this.tabs = MAPS.map((m, i) => {
       const open = this.mapOpen(i);
-      return makeButton(this, 148 + i * 246, 108, 236, 54, open ? m.name : `🔒 ${m.name}`, () => this.showMap(i),
-        { fontSize: 21, color: 0x2a3350 });
+      const tw = 1230 / MAPS.length;
+      return makeButton(this, 25 + tw * (i + 0.5), 108, tw - 8, 54, open ? m.name : `🔒 ${m.name}`, () => this.showMap(i),
+        { fontSize: 19, color: 0x2a3350 });
     });
     this.mapLayer = this.add.container(0, 0);
     this.showMap(this.mapIndex);

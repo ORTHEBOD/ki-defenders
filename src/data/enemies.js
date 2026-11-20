@@ -6,6 +6,7 @@
 // xp: hero XP for defeating it (double if the hero lands the final blow).
 // rage: below half HP it moves this much faster. burst: when it falls it blows up, hurting the hero nearby.
 // guard: fists (Kaito's punches, the hero's own attacks) only do this part of their damage.
+// dodge: this part of the hits miss it. zap: every few seconds it stuns the nearest fighter.
 // loot: coins won at the end of the battle for defeating it (lives 0: nothing is lost if it gets away).
 
 export const ENEMIES = {
@@ -82,6 +83,26 @@ export const ENEMIES = {
     name: 'Golden Goblin', xp: 2, texture: 'goldGoblin', hp: 90, speed: 125, reward: 30, lives: 0, dps: 0, barOffset: 34,
     loot: 60,
     tip: 'Golden Goblin: catch it before it runs away to win its bag of coins!',
+  },
+
+  // ---------- Sky Temple (levels 61-75) ----------
+  cloudSpirit: {
+    name: 'Cloud Spirit', xp: 2, texture: 'cloudSpirit', hp: 130, speed: 68, reward: 13, lives: 1, dps: 0, barOffset: 48, flying: true,
+    tip: 'Cloud Spirit: a flying storm cloud. Use fighters that hit the air!',
+  },
+  windMonkey: {
+    name: 'Wind Monkey', xp: 2, texture: 'windMonkey', hp: 120, speed: 120, reward: 11, lives: 1, dps: 14, barOffset: 38,
+    dodge: 0.25,
+    tip: 'Wind Monkey: very quick, and dodges 1 hit in 4!',
+  },
+  gargoyle: {
+    name: 'Stone Gargoyle', xp: 4, texture: 'gargoyle', hp: 460, speed: 30, reward: 26, lives: 2, dps: 34, barOffset: 44, armor: 10,
+    tip: 'Stone Gargoyle: stone skin. Small hits barely scratch it - use your strongest attacks!',
+  },
+  thunderMonk: {
+    name: 'Thunder Monk', xp: 3, texture: 'thunderMonk', hp: 230, speed: 48, reward: 18, lives: 1, dps: 20, barOffset: 40,
+    zap: { every: 6, range: 220, time: 1.5 },
+    tip: 'Thunder Monk: zaps your fighters and stuns them for a moment. Take it down fast!',
   },
 
   medic: {
@@ -176,6 +197,23 @@ export const ENEMIES = {
       stomp: { every: 8, radius: 170, stun: 2, damage: 80 },
       shield: { every: 15, amount: 0.15, time: 5 },
       stun: { every: 7, range: 300, time: 2.5 },
+    },
+    hardSkills: { enrage: { speed: 1.5 } },
+  },
+  stormEagle: {
+    name: 'Storm Eagle King', xp: 50, texture: 'stormEagle', hp: 3600, speed: 26, reward: 190, lives: 6, dps: 90, barOffset: 62,
+    armor: 10, boss: true,
+    skills: { stun: { every: 6, range: 300, time: 2.5 }, summon: { every: 11, type: 'cloudSpirit', count: 3, hpScale: 5 } },
+    hardSkills: { enrage: { speed: 1.6 } },
+  },
+  skyEmperor: {
+    name: 'Sky Emperor', xp: 240, texture: 'skyEmperor', hp: 12500, speed: 19, reward: 950, lives: 25, dps: 140, barOffset: 80,
+    armor: 11, boss: true,
+    skills: {
+      summon: { every: 9, type: 'windMonkey', count: 4, hpScale: 6 },
+      stomp: { every: 8, radius: 180, stun: 2, damage: 90 },
+      shield: { every: 14, amount: 0.15, time: 5 },
+      stun: { every: 6, range: 320, time: 2.5 },
     },
     hardSkills: { enrage: { speed: 1.5 } },
   },

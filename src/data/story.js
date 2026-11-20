@@ -115,6 +115,44 @@ export const STORY = {
       { who: 'zenko', name: 'Zenko', text: 'We beat every one of them. You\'re just the last one in line.' },
     ],
   },
+  toSky: {
+    before: 61,
+    title: 'Chapter 6: The Sky Temple',
+    background: 'story_sky',
+    lines: [
+      { who: 'oru', name: 'Master Oru', text: 'Look up, Zenko! A temple has appeared above the clouds - and monsters are pouring down from it.' },
+      { who: 'zenko', name: 'Zenko', text: 'Pyrax said someone else gave the orders. I bet he lives up there.' },
+      { who: 'lumi', name: 'Lumi', text: 'Monkeys with wings, stone gargoyles, monks made of thunder... this will be our hardest climb.' },
+    ],
+  },
+  stormEagle: {
+    before: 68,
+    title: 'The Storm Eagle King',
+    background: 'story_sky',
+    lines: [
+      { who: 'stormEagle', name: 'Storm Eagle King', text: 'No one flies higher than me. Turn back, or be struck down by my storm!' },
+      { who: 'blaze', name: 'Blaze', text: 'Fire beats feathers. Let\'s go!' },
+    ],
+  },
+  skyEmperor: {
+    before: 75,
+    title: 'The Sky Emperor',
+    background: 'story_sky',
+    lines: [
+      { who: 'skyEmperor', name: 'Sky Emperor', text: 'Krag, Ozul, Vorn, Seraka, Pyrax... all of them served me. I am the one who sent the portal.' },
+      { who: 'zenko', name: 'Zenko', text: 'Then this is the last battle. Everyone - give it everything!' },
+    ],
+  },
+  skyEnding: {
+    after: 75,
+    title: 'Peace in the Sky',
+    background: 'story_sky',
+    lines: [
+      { who: 'skyEmperor', name: 'Sky Emperor', text: 'Beaten... by the people of the ground...' },
+      { who: 'oru', name: 'Master Oru', text: 'The sky is free again. You are true Ki Defenders now - every one of you.' },
+      { who: 'zenko', name: 'Zenko', text: 'Endless Battle is still waiting. Let\'s see how far we can go!' },
+    ],
+  },
   ending: {
     after: 60,
     title: 'Victory!',

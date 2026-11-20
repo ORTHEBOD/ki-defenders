@@ -58,6 +58,16 @@ const SONGS = {
     kick: 'x-x---x-x-x---x-', snare: '----x-------x---', hat: 'x-x-x-x-x-x-x-x-',
     leadVol: 0.028,
   },
+  // Sky Temple: bright, floating arpeggios
+  sky: {
+    bpm: 120, perBeat: 4, leadWave: 'triangle',
+    lead: 'G5 _ D5 _ B4 _ D5 _ A5 _ _ _ G5 _ E5 _ F#5 _ D5 _ A4 _ D5 _ E5 _ _ _ - - - - '
+      + 'C6 _ G5 _ E5 _ G5 _ B5 _ _ _ A5 _ G5 _ F#5 _ A5 _ D5 _ F#5 _ G5 _ _ _ - - - -',
+    bass: 'G2 _ _ _ D3 _ _ _ E2 _ _ _ B2 _ _ _ C3 _ _ _ G2 _ _ _ D3 _ _ _ A2 _ _ _ '
+      + 'C3 _ _ _ G2 _ _ _ E2 _ _ _ B2 _ _ _ D3 _ _ _ A2 _ _ _ G2 _ _ _ G2 _ _ _',
+    kick: 'x-------x-------', snare: '----x-------x---', hat: '--x---x---x---x-',
+    leadVol: 0.055,
+  },
   boss: {
     bpm: 155, perBeat: 4,
     lead: 'D5 _ - D5 F5 _ D5 _ C5 _ A4 _ C5 _ D5 _ A#4 _ - A#4 D5 _ A#4 _ A4 _ G4 _ A4 _ C#5 _',

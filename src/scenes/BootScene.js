@@ -25,6 +25,8 @@ export default class BootScene extends Phaser.Scene {
     this.load.on('loaderror', (file) => console.warn('Art not found:', file.src));
     for (const key of ART_FILES) this.load.image(`art_${key}`, `art/${key}.png`);
     this.load.image('menu_bg', 'art/menu_bg.jpg');
+    // The Sky Temple's story scenes (made with ComfyUI)
+    this.load.image('story_sky', 'art/story_sky.jpg');
     for (const key of BASE_ART) this.load.image(key, `art/${key}.png`);
     // Which parts of each hero picture the armor, pants and boots recolor (tools/hero_anchors.py)
     for (const key of ART_FILES.filter((k) => k.startsWith('hero_'))) this.load.image(`mask_${key}`, `art/hero_masks/${key}.png`);

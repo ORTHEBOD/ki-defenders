@@ -17,7 +17,9 @@ export default class StoryScene extends Phaser.Scene {
     this.story = STORY[data.id];
     this.storyId = data.id;
     this.next = data.next ?? { scene: 'Hub' };
-    drawMenuBackground(this);
+    // A story can have its own painted background (`background`), else the menu one
+    if (this.story.background && this.textures.exists(this.story.background)) this.add.image(0, 0, this.story.background).setOrigin(0).setDisplaySize(1280, 720);
+    else drawMenuBackground(this);
     this.add.rectangle(0, 0, 1280, 720, 0x000000, 0.35).setOrigin(0);
     const title = this.add.text(640, 70, this.story.title, textStyle(54, '#ffd93b')).setOrigin(0.5).setAlpha(0);
     this.tweens.add({ targets: title, alpha: 1, duration: 500 });

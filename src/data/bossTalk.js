@@ -11,6 +11,8 @@ export const BOSS_TALK = {
   frostGiant: ['Nobody passes the gate!', 'I will freeze you solid!', 'Cold... like your chances.'],
   iceQueen: ['Your world will make a lovely ice statue.', 'Shiver before your queen.', 'Warmth is a weakness.'],
   lavaTitan: ['Melt! MELT!', 'The mountain burns with my anger!', 'Your fighters are made of wax.'],
+  stormEagle: ['The storm answers to ME!', 'From up here, you look like ants.', 'Feel the lightning of the sky!'],
+  skyEmperor: ['The heavens have chosen me to rule.', 'Pyrax was only my torch-bearer.', 'Bow, earth-dwellers!'],
   pyrax: ['Kneel before the true master!', 'Everything burns in the end.', 'I made Vorn. I can make worse.'],
 };
 

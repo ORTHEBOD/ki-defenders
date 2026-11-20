@@ -50,6 +50,7 @@ export default class Enemy {
     this.flashTime -= dt;
     if (this.def.heal) this.healTick(dt);
     if (this.def.boss) this.bossTick(dt);
+    if (this.def.zap) this.zapTick(dt);
     // Magma Brute: runs once it is badly hurt
     if (this.def.rage && !this.enraged && this.hp < this.maxHp / 2) {
       this.enraged = true;
@@ -171,6 +172,13 @@ export default class Enemy {
     if (h?.alive && Math.hypot(h.x - this.x, h.y - this.y) <= s.radius) h.takeDamage(s.damage);
   }
 
+  // Thunder Monk: zaps the nearest fighter now and then
+  zapTick(dt) {
+    this.zapTime = (this.zapTime ?? this.def.zap.every / 2) - dt;
+    if (this.zapTime > 0) return;
+    this.zapTime = this.skill_stun(this.def.zap) ? this.def.zap.every : 1;
+  }
+
   skill_stun(s) {
     const scene = this.scene;
     const targets = scene.fighters.filter((f) => f.stunTime <= 0 && Math.hypot(f.x - this.x, f.y - this.y) <= s.range);
@@ -243,6 +251,11 @@ export default class Enemy {
   // `kind` 'fist': a punch (a Shield Knight's shield blocks most of it).
   takeDamage(amount, flash = true, by = null, kind = null) {
     if (!this.alive) return;
+    // Wind Monkey: some hits miss
+    if (this.def.dodge && by && Math.random() < this.def.dodge) {
+      this.scene.floatText(this.x, this.y - this.def.barOffset - 14, 'MISS', '#c9d3ff', 18);
+      return;
+    }
     if (kind === 'fist' && this.def.guard) {
       amount *= this.def.guard;
       if (Math.random() < 0.3) this.scene.floatText(this.x, this.y - this.def.barOffset - 14, 'BLOCK!', '#c9d3ff', 18);
